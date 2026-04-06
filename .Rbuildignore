@@ -3,6 +3,7 @@
 ^build/
 ^_pkgdown.yml$
 ^\.codecov.yml$
+^\.covrignore$
 ^\.git$
 ^\.git/
 ^\.Rproj.user$
@@ -23,3 +24,9 @@
 
 # Do not include development helper tools in built package
 ^tools/
+^database/
+^output/
+
+# Exclude compiler coverage files from src/
+^src/.*\.gcda$
+^src/.*\.gcno$
