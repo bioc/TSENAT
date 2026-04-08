@@ -77,12 +77,24 @@ metadata_df <- read.table(
 gff3_dataset <- system.file('extdata', 'annotation.gff3.gz', package =
 'TSENAT')
 
-# Create config with metadata (best practice: configure first)
-config <- tsenat_config(metadata = metadata_df)
+# TPM and effective_length REQUIRED for filter_analysis_s4()
+tpm <- matrix(runif(nrow(readcounts) * ncol(readcounts), 0.1, 10),
+              nrow = nrow(readcounts), ncol = ncol(readcounts),
+              dimnames = dimnames(readcounts))
+effective_length <- matrix(100, nrow = nrow(readcounts), ncol = ncol(readcounts))
 
-# Build analysis from vignette data (metadata read from config)
+# Create config (metadata passed as explicit parameter to build_analysis_s4)
+config <- tsenat_config(
+  sample_col = 'sample',
+  condition_col = 'condition',
+  q_values = seq(0, 2, by = 0.05),
+  paired = FALSE
+)
+
+# Build analysis from vignette data - metadata as explicit parameter
 analysis <- build_analysis_s4(
   readcounts = readcounts,
+  metadata = metadata_df,
   tx2gene = gff3_dataset,
   config = config,
   tpm = tpm,

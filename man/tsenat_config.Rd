@@ -8,23 +8,22 @@ tsenat_config(
   q_values = NULL,
   condition_col = "condition",
   subject_col = NULL,
+  sample_col = "sample",
   paired = FALSE,
   control = NULL,
-  formula = NULL,
   p_threshold = 0.05,
   fdr_threshold = 0.05,
   significance_threshold = 0.05,
-  n_bootstrap = 1000,
+  nboot = 1000,
   bootstrap_method = "percentile",
-  methods = NULL,
-  generate_plots = TRUE,
-  plot_types = NULL,
+  stringency = "medium",
+  nthreads = 1,
   ...
 )
 }
 \arguments{
 \item{q_values}{\code{numeric}. Q-values for Tsallis entropy spectrum.
-Default: \code{seq(0.5, 2.0, by = 0.5)}.}
+Default: \code{seq(0, 2, by = 0.5)}.}
 
 \item{condition_col}{\code{character}. Name of column in \code{colData(se)}
 containing experimental conditions/groups. Default: 'condition'.}
@@ -33,15 +32,15 @@ containing experimental conditions/groups. Default: 'condition'.}
 containing subject/sample identifiers for paired/repeated designs.
 If provided, enables paired analysis. Default: NULL (unpaired).}
 
+\item{sample_col}{\code{character}. Name of column in \code{colData(se)}
+containing sample identifiers. Default: 'sample'.}
+
 \item{paired}{\code{logical}. Whether samples are paired/repeated measures.
 Default: FALSE. Used by jackknife and difference analysis.}
 
 \item{control}{\code{character}. Reference/control group label for difference
 analysis (e.g., 'control', 'wt'). Only used if 'difference' in methods.
 Default: NULL.}
-
-\item{formula}{\code{formula}. Optional model formula for LM interactions
-(e.g., \code{~ treatment + batch}). Default: NULL (uses condition_col).}
 
 \item{p_threshold}{\code{numeric}. Raw p-value threshold for significance
 in LM interaction testing. Default: 0.05.}
@@ -52,26 +51,22 @@ threshold. Default: 0.05.}
 \item{significance_threshold}{\code{numeric}. Significance cutoff for effect
 sizes, assumptions testing, and result filtering. Default: 0.05.}
 
-\item{n_bootstrap}{\code{integer}. Number of bootstrap resamples for jackknife
+\item{nboot}{\code{integer}. Number of bootstrap resamples for jackknife
 confidence intervals. Default: 1000.}
 
 \item{bootstrap_method}{\code{character}. Bootstrap CI method: 'percentile'
 (fast, assumes symmetric distribution) or 'bca' (bias-corrected, better for
 skewed data like bounded entropy). Default: 'percentile'.}
 
-\item{methods}{\code{character}. Analysis steps to run. Core (auto-required):
-'diversity', 'lm_interaction', 'jackknife', 'divergence', 'q_interactions'.
-Optional: 'jackknife_isoform_switching' (requires condition/subject info),
-'difference' (requires control parameter), 'effect_sizes', 'rankbased_assumptions',
-'method_concordance'. Default: core methods.}
+\item{stringency}{\code{character}. Transcript filtering stringency level.
+Options: 'lenient' (minimal filtering), 'medium' (default, reasonable filtering),
+'severe' (strict filtering, recommended for high-confidence results).
+Controls which transcripts/genes are retained in initial filtering step.
+Default: 'medium'.}
 
-\item{generate_plots}{\code{logical}. Generate visualizations.
-Default: TRUE.}
-
-\item{plot_types}{\code{character}. Specific plot types to generate. Options:
-'q_curve', 'lm_interaction', 'divergence_distribution', 'divergence_spectrum',
-'influence_heatmap', 'volcano', 'method_concordance', 'multi_gene_q_spectrum',
-'top_transcripts', 'tsallis_violin_density'. Default: all available types.}
+\item{nthreads}{\code{integer}. Number of threads for parallel computation
+where supported (diversity, divergence, LM fitting). Default: 1 (no parallelization).
+Use 2+ for multi-core systems to improve performance.}
 
 \item{...}{Additional configuration parameters (stored as-is in @config slot).
 Examples: \code{q_diff=1.0} (specific q for differences),
@@ -94,17 +89,16 @@ by wrapper functions to configure analysis behavior.
 # Default config with standard parameters
 cfg <- tsenat_config()
 
-# Custom with optional features: paired analysis, isoform switching, differences
+# Custom with paired analysis and strict filtering for high-confidence results
 cfg <- tsenat_config(
-  q_values = c(0.5, 1.0, 1.5, 2.0),
-  condition_col = "treatment",
-  subject_col = "subject_id",
+  q_values = seq(0, 2, by = 0.05),  # Recommended for paired designs: 41 values
+  condition_col = 'treatment',
+  subject_col = 'subject_id',
   paired = TRUE,
-  control = "untreated",
-  methods = c("diversity", "lm_interaction", "jackknife", "jackknife_isoform_switching",
-              "divergence", "q_interactions", "difference", "effect_sizes"),
-  bootstrap_method = "bca",
-  n_bootstrap = 5000,
+  control = 'untreated',
+  stringency = 'severe',
+  bootstrap_method = 'bca',
+  nboot = 5000,
   significance_threshold = 0.01
 )
 

@@ -10,7 +10,7 @@ jackknife_isoform_switching_s4(
   subject_col = NULL,
   gene_col = NULL,
   isoform_col = NULL,
-  q = 1,
+  q = c(0, 0.5, 1, 1.5, 2),
   norm = NULL,
   log_base = NULL,
   threshold = 90,
@@ -49,7 +49,8 @@ metadata identifying
 
 \item{q}{\code{numeric}.  Tsallis entropy parameter(s) to analyze.
 Can be single value 
- or vector for multi-q analysis (default: 1).}
+ or vector for multi-q analysis (default: c(0, 0.5, 1, 1.5, 2)).
+ If NULL, uses @config$q_values.}
 
 \item{norm}{\code{logical}. Whether to use normalized diversity values 
 (default: TRUE).}
@@ -129,6 +130,27 @@ Key Features:
 }
 
 
+**Parameter Resolution from Config**
+
+The following parameters are resolved using a three-level priority system:
+\enumerate{
+  \item User-provided argument (if not NULL)
+  \item Value from \code{analysis@config} (if key exists)
+  \item Function default value
+}
+
+Affected parameters:
+\itemize{
+  \item \code{q}: Uses config's \code{q_values} if available, else c(0, 0.5, 1, 1.5, 2)
+  \item \code{n_bootstrap}: Uses config's \code{n_bootstrap} if available, else 1000
+  \item \code{threshold}: Uses config's \code{threshold} if available, else 90
+  \item \code{lm_p_threshold}: Uses config's \code{lm_p_threshold} if available, else 0.05
+}
+
+This allows setting defaults once in the config and reusing across multiple analyses.
+
+
+
 **Mathematical Background:**
 Delta-influence measures how much removing each sample changes entropy:
 \preformatted{
@@ -165,8 +187,9 @@ metadata_df <- read.table(system.file('extdata', 'metadata.tsv', package
 = 'TSENAT'),
                           header = TRUE, sep = '\t')
 gff3_file <- system.file('extdata', 'annotation.gff3.gz', package = 'TSENAT')
+config <- tsenat_config(sample_col = 'sample', condition_col = 'condition')
 analysis <- build_analysis_s4(readcounts = readcounts, tx2gene =
-gff3_file, metadata = metadata_df,
+gff3_file, metadata = metadata_df, config = config,
                              tpm = tpm,
  effective_length = effective_length)
 analysis <- filter_analysis_s4(analysis, min_samples = 1, subset_n_genes

@@ -40,16 +40,30 @@ Available components include 'difference', 'p_values', and 'effect_sizes'.
 }
 \examples{
 # Load data and build analysis
-data(readcounts, package = "TSENAT")
-metadata_df <- read.table(system.file("extdata", "metadata.tsv", package = "TSENAT"),
-  header = TRUE, sep = "\t")
-gff3_file <- system.file("extdata", "annotation.gff3.gz", package = "TSENAT")
+data(readcounts, package = 'TSENAT')
+metadata_df <- read.table(system.file('extdata', 'metadata.tsv', package = 'TSENAT'),
+  header = TRUE, sep = '\t')
+gff3_file <- system.file('extdata', 'annotation.gff3.gz', package = 'TSENAT')
 
-# Build and filter analysis
+# NOTE: TPM and effective_length are REQUIRED for filter_analysis_s4()
+# In real workflows, these come from Salmon quantification output
+# For this example, we create minimal placeholders
+tpm <- matrix(runif(nrow(readcounts) * ncol(readcounts), 0.1, 10),
+              nrow = nrow(readcounts), ncol = ncol(readcounts),
+              dimnames = dimnames(readcounts))
+effective_length <- matrix(100, nrow = nrow(readcounts), ncol = ncol(readcounts))
+
+# Create config (required when metadata is provided)
+config <- tsenat_config(sample_col = 'sample', condition_col = 'condition')
+
+# Build analysis with TPM and effective_length
 analysis <- build_analysis_s4(readcounts = readcounts,
                              tx2gene = gff3_file,
-                             metadata = metadata_df)
-analysis <- filter_analysis_s4(analysis, stringency = "medium")
+                             metadata = metadata_df,
+                             tpm = tpm,
+                             effective_length = effective_length,
+                             config = config)
+analysis <- filter_analysis_s4(analysis, stringency = 'medium')
 
 # Calculate diversity
 analysis <- calculate_diversity_s4(analysis, q = 1.0, norm = TRUE)
@@ -60,7 +74,7 @@ pairwise_results <- pairwiseResults(analysis)
 
 # Extract specific component
 if (!is.null(pairwise_results)) {
-  difference_comp <- pairwiseResults(analysis, component = "difference")
+  difference_comp <- pairwiseResults(analysis, component = 'difference')
 }
 
 }

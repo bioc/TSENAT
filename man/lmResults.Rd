@@ -49,14 +49,15 @@ gff3_dataset <- system.file('extdata', 'annotation.gff3.gz', package =
 'TSENAT')
 
 # Build analysis from vignette data
+config <- tsenat_config(sample_col = 'sample', condition_col = 'condition')
 analysis <- build_analysis_s4(readcounts = readcounts, tx2gene =
-gff3_dataset, metadata = metadata_df,
+gff3_dataset, metadata = metadata_df, config = config,
   tpm = tpm, effective_length = effective_length)
 analysis <- filter_analysis_s4(analysis, min_samples = 1, subset_n_genes
 = 200)
 
 # Compute diversity first (required for LM interaction)
-analysis <- calculate_diversity_s4(analysis, q = c(0.5, 1.0), verbose =
+analysis <- calculate_diversity_s4(analysis, q = c(0.5, 1.0, 1.5, 2.0, 2.5), verbose =
 FALSE)
 
 # Calculate LM interaction
@@ -64,7 +65,7 @@ analysis <- calculate_lm_interaction_s4(analysis,
   condition_col = 'condition', method = 'gam')
 
 # Extract and view LM interaction results
-res <- lmResults(analysis)
-if (!is.null(res)) head(res)
+res <- lmResults(analysis, 'lm_interaction')
+if (!is.null(res)) head(res, 3)
 
 }

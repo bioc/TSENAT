@@ -32,32 +32,27 @@ from the TSENATAnalysis object, abstracting away internal storage details.
 }
 \examples{
 # Load example data
-data(readcounts, package = "TSENAT")
+data(readcounts, package = 'TSENAT')
 
-# Create SummarizedExperiment from counts
+# Create TSENATAnalysis from count matrix
+# For simple count matrices (no tx2gene mapping), use TSENATAnalysis directly
+config <- tsenat_config(
+  q_values = c(0.5, 1.0, 2.0),
+  condition_col = 'group'
+)
 se <- SummarizedExperiment::SummarizedExperiment(
   assays = list(counts = readcounts),
-  rowData = data.frame(gene_id = rownames(readcounts)),
   colData = data.frame(
-    sample_id = colnames(readcounts),
-    group = rep(c("A", "B"), length.out = ncol(readcounts))
+    group = rep(c('A', 'B'), length.out = ncol(readcounts))
   )
 )
-
-# Create TSENATAnalysis object with configuration
-analysis <- TSENATAnalysis(
-  se = se,
-  config = list(
-    q_values = c(0.5, 1.0, 2.0),
-    condition_col = "group"
-  )
-)
+analysis <- TSENATAnalysis(se = se, config = config)
 
 # Run analysis to generate diversity results
 analysis <- calculate_diversity_s4(analysis)
 
 # Extract diversity results
-div_results <- getResults(analysis, type = "diversity")
+div_results <- getResults(analysis, type = 'diversity')
 if (!is.null(div_results)) {
   head(div_results, n = 3)
 }

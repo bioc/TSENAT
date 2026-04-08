@@ -56,13 +56,25 @@
 #' )
 #' gff3_dataset <- system.file('extdata', 'annotation.gff3.gz', package =
 #' 'TSENAT')
+#'
+#' # TPM and effective_length REQUIRED for filter_analysis_s4()
+#' tpm <- matrix(runif(nrow(readcounts) * ncol(readcounts), 0.1, 10),
+#'               nrow = nrow(readcounts), ncol = ncol(readcounts),
+#'               dimnames = dimnames(readcounts))
+#' effective_length <- matrix(100, nrow = nrow(readcounts), ncol = ncol(readcounts))
 #' 
-#' # Create config with metadata (best practice: configure first)
-#' config <- tsenat_config(metadata = metadata_df)
+#' # Create config (metadata passed as explicit parameter to build_analysis_s4)
+#' config <- tsenat_config(
+#'   sample_col = 'sample',
+#'   condition_col = 'condition',
+#'   q_values = seq(0, 2, by = 0.05),
+#'   paired = FALSE
+#' )
 #' 
-#' # Build analysis from vignette data (metadata read from config)
+#' # Build analysis from vignette data - metadata as explicit parameter
 #' analysis <- build_analysis_s4(
 #'   readcounts = readcounts,
+#'   metadata = metadata_df,
 #'   tx2gene = gff3_dataset,
 #'   config = config,
 #'   tpm = tpm,
@@ -323,12 +335,18 @@ jackknife_entropy_outliers_s4 <- function(analysis, q = NULL, norm = NULL, log_b
 #' gff3_dataset <- system.file('extdata', 'annotation.gff3.gz', package =
 #' 'TSENAT')
 #' 
-#' # Create config with metadata (best practice: configure first)
-#' config <- tsenat_config(metadata = metadata_df)
+#' # Create config (metadata passed as explicit parameter to build_analysis_s4)
+#' config <- tsenat_config(
+#'   sample_col = 'sample',
+#'   condition_col = 'condition',
+#'   q_values = seq(0, 2, by = 0.05),
+#'   paired = FALSE
+#' )
 #' 
 #' # Build analysis from vignette data and create small subset
 #' analysis <- build_analysis_s4(
 #'   readcounts = readcounts,
+#'   metadata = metadata_df,
 #'   tx2gene = gff3_dataset,
 #'   config = config,
 #'   tpm = tpm,
@@ -535,9 +553,15 @@ calculate_difference_s4 <- function(analysis, control = NULL, q = NULL, conditio
 #' 'TSENAT')
 #' 
 #' # Build analysis from vignette data and create small subset
-#' config <- tsenat_config(metadata = metadata_df)
+#' config <- tsenat_config(
+#'   sample_col = 'sample',
+#'   condition_col = 'condition',
+#'   q_values = seq(0, 2, by = 0.05),
+#'   paired = FALSE
+#' )
 #' analysis <- build_analysis_s4(
 #'   readcounts = readcounts,
+#'   metadata = metadata_df,
 #'   tx2gene = gff3_dataset,
 #'   config = config,
 #'   tpm = tpm,
@@ -759,13 +783,25 @@ setMethod("test_rankbased_assumptions_s4", signature(analysis = "TSENATAnalysis"
 #' )
 #' gff3_dataset <- system.file('extdata', 'annotation.gff3.gz', package =
 #' 'TSENAT')
+#'
+#' # Create config (metadata passed as explicit parameter to build_analysis_s4)
+#' config <- tsenat_config(
+#'   sample_col = 'sample',
+#'   condition_col = 'condition',
+#'   q_values = seq(0, 2, by = 0.05),
+#'   paired = FALSE
+#' )
 #' 
 #' # Build analysis from vignette data and create small subset
-#' analysis <- build_analysis_s4(readcounts = readcounts, tx2gene =
-#' gff3_dataset, metadata = metadata_df,
-#'   tpm = tpm, effective_length = effective_length)
-#' analysis <- filter_analysis_s4(analysis, min_samples = 1, subset_n_genes
-#' = 200)
+#' analysis <- build_analysis_s4(
+#'   readcounts = readcounts,
+#'   tx2gene = gff3_dataset,
+#'   metadata = metadata_df,
+#'   config = config,
+#'   tpm = tpm,
+#'   effective_length = effective_length
+#' )
+#' analysis <- filter_analysis_s4(analysis, min_samples = 1, subset_n_genes = 200)
 #' analysis <- calculate_diversity_s4(analysis, q = c(0.5, 1.0, 1.5))
 #' analysis <- calculate_difference_s4(analysis, control = 'normal')
 #'   
@@ -903,25 +939,27 @@ plot_volcano_ma_grid_s4 <- function(analysis, x_col = NULL, padj_col = "padj", l
 #' 
 #' # Configure analysis parameters first (fail-fast principle)
 #' config <- tsenat_config(
+#'   sample_col = 'sample',
 #'   condition_col = 'condition',
 #'   subject_col = 'paired_samples',
 #'   paired = TRUE,
 #'   control = 'normal',
-#'   metadata = metadata_df
+#'   q_values = seq(0, 2, by = 0.1)
 #' )
 #'
-#' # Build analysis with configured parameters
+#' # Build analysis with configured parameters and metadata as explicit parameter
 #' analysis <- build_analysis_s4(
 #'   readcounts = readcounts,
 #'   tx2gene = gff3_dataset,
+#'   metadata = metadata_df,
 #'   config = config,
 #'   tpm = tpm,
 #'   effective_length = effective_length
 #' )
 #' 
 #' analysis <- filter_analysis_s4(analysis, stringency = 'severe')
-#' analysis <- calculate_diversity_s4(analysis, q = c(0.5, 1.0, 1.5))
-#' analysis <- calculate_divergence_s4(analysis, q = c(0.5, 1.0, 1.5))
+#' analysis <- calculate_diversity_s4(analysis, q = c(0.5, 1.0, 1.5, 2.0, 2.5))
+#' analysis <- calculate_divergence_s4(analysis, q = c(0.5, 1.0, 1.5, 2.0, 2.5))
 #' analysis <- calculate_lm_interaction_s4(analysis, method = 'gam')
 #' # Note: compute_method_concordance_s4 requires results from both
 #' # rank_test_q_condition_s4 and test_rankbased_assumptions_s4
@@ -1111,8 +1149,9 @@ setMethod("compute_method_concordance_s4", "TSENATAnalysis", function(analysis, 
 #' 'TSENAT')
 #' 
 #' # Build analysis from vignette data and create small subset
+#' config <- tsenat_config(sample_col = 'sample', condition_col = 'condition')
 #' analysis <- build_analysis_s4(readcounts = readcounts, tx2gene =
-#' gff3_dataset, metadata = metadata_df,
+#' gff3_dataset, metadata = metadata_df, config = config,
 #'   tpm = tpm, effective_length = effective_length)
 #' analysis <- filter_analysis_s4(analysis, min_samples = 1, subset_n_genes
 #' = 200)
@@ -1259,8 +1298,9 @@ plot_divergence_spectrum_s4 <- function(analysis, gene = NULL, n_genes = 4, ncol
 #' 'TSENAT')
 #' 
 #' # Build analysis from vignette data and create small subset
+#' config <- tsenat_config(sample_col = 'sample', condition_col = 'condition')
 #' analysis <- build_analysis_s4(readcounts = readcounts, tx2gene =
-#' gff3_dataset, metadata = metadata_df,
+#' gff3_dataset, metadata = metadata_df, config = config,
 #'   tpm = tpm, effective_length = effective_length)
 #' analysis <- filter_analysis_s4(analysis, min_samples = 1, subset_n_genes
 #' = 200)
@@ -1459,24 +1499,26 @@ setMethod("plot_method_concordance_s4", "TSENATAnalysis", function(analysis, ver
 #' 'TSENAT')
 #' # Configure analysis parameters first
 #' config <- tsenat_config(
+#'   sample_col = 'sample',
 #'   condition_col = 'condition',
 #'   subject_col = 'paired_samples',
 #'   paired = TRUE,
 #'   control = 'normal',
-#'   metadata = metadata_df
+#'   q_values = seq(0, 2, by = 0.1)
 #' )
 #'
 #' # Build analysis with configured parameters
 #' analysis <- build_analysis_s4(
 #'   readcounts = readcounts,
 #'   tx2gene = gff3_dataset,
+#'   metadata = metadata_df,
 #'   config = config,
 #'   tpm = tpm,
 #'   effective_length = effective_length
 #' )
 #'
 #' analysis <- filter_analysis_s4(analysis, stringency = 'severe')
-#' analysis <- calculate_diversity_s4(analysis, q = c(0.5, 1, 1.5), verbose
+#' analysis <- calculate_diversity_s4(analysis, q = c(0.5, 1.0, 1.5, 2.0, 2.5), verbose
 #' = FALSE)
 #' analysis <- calculate_lm_interaction_s4(analysis, method = 'gam', verbose
 #' = FALSE)
@@ -1654,26 +1696,25 @@ plot_top_transcripts_s4 <- function(analysis, gene = NULL, condition_col = NULL,
 #' 'TSENAT')
 #' # Configure analysis parameters first
 #' config <- tsenat_config(
+#'   sample_col = 'sample',
 #'   condition_col = 'condition',
-#'   subject_col = 'paired_samples',
-#'   paired = TRUE,
-#'   control = 'normal',
-#'   metadata = metadata_df
+#'   control = 'normal'
 #' )
 #'
 #' # Build analysis with configured parameters
 #' analysis <- build_analysis_s4(
 #'   readcounts = readcounts,
 #'   tx2gene = gff3_dataset,
+#'   metadata = metadata_df,
 #'   config = config,
 #'   tpm = tpm,
 #'   effective_length = effective_length
 #' )
 #'
 #' analysis <- filter_analysis_s4(analysis, stringency = 'severe')
-#' analysis <- calculate_diversity_s4(analysis, q = c(0.5, 1, 1.5), verbose
+#' analysis <- calculate_diversity_s4(analysis, q = c(0.5, 1.0, 1.5, 2.0, 2.5), verbose
 #' = FALSE)
-#' analysis <- calculate_divergence_s4(analysis, q = c(0.5, 1, 1.5), verbose
+#' analysis <- calculate_divergence_s4(analysis, q = c(0.5, 1.0, 1.5, 2.0, 2.5), verbose
 #' = FALSE)
 #' analysis <- calculate_lm_interaction_s4(analysis, method = 'gam')
 #' analysis <- effect_sizes_divergence_s4(analysis)
@@ -1800,24 +1841,24 @@ plot_divergence_distribution_s4 <- function(analysis, threshold = 0.1, output_fi
 #' 
 #' # Configure analysis parameters first
 #' config <- tsenat_config(
+#'   sample_col = 'sample',
 #'   condition_col = 'condition',
 #'   subject_col = 'paired_samples',
-#'   paired = TRUE,
-#'   control = 'normal',
-#'   metadata = metadata_df
+#'   q_values = seq(0, 2, by = 0.1)
 #' )
 #'
 #' # Build analysis with configured parameters
 #' analysis <- build_analysis_s4(
 #'   readcounts = readcounts,
 #'   tx2gene = gff3_dataset,
+#'   metadata = metadata_df,
 #'   config = config,
 #'   tpm = tpm,
 #'   effective_length = effective_length
 #' )
 #'
 #' analysis <- filter_analysis_s4(analysis, stringency = 'severe')
-#' analysis <- calculate_diversity_s4(analysis, q = c(0.5, 1.0, 1.5))
+#' analysis <- calculate_diversity_s4(analysis, q = c(0.5, 1.0, 1.5, 2.0, 2.5))
 #' analysis <- calculate_lm_interaction_s4(analysis, method = 'gam')
 #' analysis <- jackknife_isoform_switching_s4(analysis, n_bootstrap = 50)
 #' tables <- prepare_gene_switching_tables_s4(analysis)
@@ -2005,26 +2046,27 @@ prepare_gene_switching_tables_s4 <- function(analysis, n_top_genes = NULL, n_tra
 #' 
 #' # Configure analysis parameters first
 #' config <- tsenat_config(
+#'   sample_col = 'sample',
 #'   condition_col = 'condition',
 #'   subject_col = 'paired_samples',
 #'   paired = TRUE,
-#'   control = 'normal',
-#'   metadata = metadata_df
+#'   q_values = seq(0, 2, by = 0.1)
 #' )
 #'
 #' # Build analysis with configured parameters
 #' analysis <- build_analysis_s4(
 #'   readcounts = readcounts,
 #'   tx2gene = gff3_dataset,
+#'   metadata = metadata_df,
 #'   config = config,
 #'   tpm = tpm,
 #'   effective_length = effective_length
 #' )
 #'
 #' analysis <- filter_analysis_s4(analysis, stringency = 'severe')
-#' analysis <- calculate_diversity_s4(analysis, q = c(0.5, 1, 1.5), verbose
+#' analysis <- calculate_diversity_s4(analysis, q = c(0.5, 1.0, 1.5, 2.0, 2.5), verbose
 #' = FALSE)
-#' analysis <- calculate_divergence_s4(analysis, q = c(0.5, 1, 1.5))
+#' analysis <- calculate_divergence_s4(analysis, q = c(0.5, 1.0, 1.5, 2.0, 2.5))
 #' analysis <- calculate_lm_interaction_s4(analysis, method = 'gam')
 #' analysis <- jackknife_isoform_switching_s4(analysis, q = c(0.5, 1, 1.5),
 #'   n_bootstrap = 50)
@@ -2200,17 +2242,19 @@ plot_multiq_delta_influence_heatmaps_s4 <- function(analysis, n_genes = 4, lm_re
 #' 
 #' # Configure analysis parameters first
 #' config <- tsenat_config(
+#'   sample_col = 'sample',
 #'   condition_col = 'condition',
 #'   subject_col = 'paired_samples',
 #'   paired = TRUE,
 #'   control = 'normal',
-#'   metadata = metadata_df
+#'   q_values = seq(0.2, 2.5, by = 0.15)
 #' )
 #'
 #' # Build analysis with configured parameters
 #' analysis <- build_analysis_s4(
 #'   readcounts = readcounts,
 #'   tx2gene = gff3_dataset,
+#'   metadata = metadata_df,
 #'   config = config,
 #'   tpm = tpm,
 #'   effective_length = effective_length
@@ -2343,8 +2387,8 @@ plot_lm_interaction_gam_s4 <- function(analysis, n_top = 6, genes = NULL, condit
             n_top, ", condition_col=", condition_col, "]"))
     }
 
-    # Save plot to file if requested
-    if (!is.null(output_file)) {
+    # Save plot to file if requested (only if result is a valid ggplot)
+    if (!is.null(output_file) && inherits(result, "ggplot")) {
         save_analysis_output(result, output_file, object = analysis, verbose = verbose,
             func_name = "plot_lm_interaction_gam_s4", width = width, height = height)
     }
@@ -2446,11 +2490,25 @@ plot_lm_interaction_gam_s4 <- function(analysis, n_top = 6, genes = NULL, condit
 #' )
 #' gff3_dataset <- system.file('extdata', 'annotation.gff3.gz', package =
 #' 'TSENAT')
-#' analysis <- build_analysis_s4(readcounts = readcounts, tx2gene =
-#' gff3_dataset, metadata = metadata_df,
-#'   tpm = tpm, effective_length = effective_length)
-#' analysis <- filter_analysis_s4(analysis, min_samples = 1, subset_n_genes
-#' = 200)
+#' 
+#' # Create config (metadata passed as explicit parameter to build_analysis_s4)
+#' config <- tsenat_config(
+#'   sample_col = 'sample',
+#'   condition_col = 'condition',
+#'   q_values = seq(0, 2, by = 0.05),
+#'   paired = FALSE
+#' )
+#' 
+#' # Build analysis from vignette data
+#' analysis <- build_analysis_s4(
+#'   readcounts = readcounts,
+#'   tx2gene = gff3_dataset,
+#'   metadata = metadata_df,
+#'   config = config,
+#'   tpm = tpm,
+#'   effective_length = effective_length
+#' )
+#' analysis <- filter_analysis_s4(analysis, min_samples = 1, subset_n_genes = 200)
 #' analysis <- calculate_diversity_s4(analysis, q = c(0.5, 1.0, 1.5))
 #' analysis <- m_estimate_s4(
 #'   analysis,
@@ -2630,7 +2688,7 @@ m_estimate_s4 <- function(analysis, condition_col = NULL, loss_type = "huber", s
 #' \code{min_isoform_abundance}
 #'   from data. Requires \code{pair_col} in colData for paired designs.
 #'   User-provided values for any parameter override stringency defaults.
-#'   Default: NULL (use explicit parameters).
+#'   Default: 'medium' (balanced filtering recommended for most analyses).
 #'
 #' @param pair_col Character; column name in colData containing pair IDs for
 #' paired designs.
@@ -2705,11 +2763,17 @@ m_estimate_s4 <- function(analysis, condition_col = NULL, loss_type = "huber", s
 #' The filtering and subsetting operations are applied in sequence:
 #'
 #' 1. Extracts the SE from \code{analysis@se}
-#' 2. Filters using \code{.filter_se()} with specified filtering parameters
+#' 2. Filters using \code{.filter_se()} with specified filtering parameters (default: 'medium' stringency)
 #' 3. If any subset parameters are provided, applies gene/sample selection
 #'    to select specific genes and/or samples
 #' 4. Stores the filtered/subsetted SE back in \code{analysis@se}
 #' 5. Returns the modified analysis object invisibly
+#'
+#' **Default Filtering (stringency = 'medium'):** By default, filtering applies
+#' balanced stringency: requires transcripts in ≥50% of samples with minimum
+#' isoform abundance of 5%, and genes with at least 2 transcripts. This balances
+#' noise reduction with preservation of isoform diversity for reliable entropy
+#' calculations.
 #'
 #' **Important:** Filtering should be performed BEFORE computing diversity,
 #' divergence, or LM interaction results. If called after analysis results
@@ -2730,8 +2794,9 @@ m_estimate_s4 <- function(analysis, condition_col = NULL, loss_type = "huber", s
 #' )
 #' gff3_dataset <- system.file('extdata', 'annotation.gff3.gz', package =
 #' 'TSENAT')
+#' config <- tsenat_config(sample_col = 'sample', condition_col = 'condition')
 #' analysis <- build_analysis_s4(readcounts = readcounts, tx2gene =
-#' gff3_dataset, metadata = metadata_df,
+#' gff3_dataset, metadata = metadata_df, config = config,
 #'   tpm = tpm, effective_length = effective_length)
 #' analysis <- filter_analysis_s4(analysis, stringency = 'medium')
 #'
@@ -2746,17 +2811,18 @@ m_estimate_s4 <- function(analysis, condition_col = NULL, loss_type = "huber", s
 # Sample coverage: Require genes present in minimum number of samples - Min
 # transcripts per gene: Filter genes with too few isoforms - Isoform abundance
 # thresholds: Exclude rare isoforms from analysis - Subsetting options: Random
-# or variance-based gene/sample selection - Stringency presets: Easy 'light',
-# 'medium', 'severe' filtering profiles Mathematical Background: QC filtering
-# removes noise that would artificially inflate entropy/divergence.  Genes with
-# single isoform (H=0) or all absent samples contribute no signal.  Rare
-# transcripts have unreliable expression values -> exclude them.  Example: Raw
-# data: 88 genes × 12 samples (many genes expressed in <50% samples) After
-# filter: 50 genes × 12 samples (multi-isoform, well-represented genes) Result:
-# More reliable diversity estimates and smaller multiple-testing burden.
+# or variance-based gene/sample selection - Stringency presets: Default 'medium'
+# (balanced), 'soft' (permissive), or 'severe' (stringent) filtering profiles.
+# Mathematical Background: QC filtering removes noise that would artificially
+# inflate entropy/divergence. Genes with single isoform (H=0) or all absent
+# samples contribute no signal. Rare transcripts have unreliable expression
+# values -> exclude them. Example: Raw data: 88 genes × 12 samples (many genes
+# expressed in <50% samples) After filter: 50 genes × 12 samples (multi-isoform,
+# well-represented genes) Result: More reliable diversity estimates and smaller
+# multiple-testing burden.
 # ============================================================================
 filter_analysis_s4 <- function(analysis, min_tpm = 1, tpm_assay_name = NULL, min_samples = 5L,
-    stringency = NULL, pair_col = NULL, min_tx_per_gene = 2L, min_isoform_abundance = NULL,
+    stringency = "medium", pair_col = NULL, min_tx_per_gene = 2L, min_isoform_abundance = NULL,
     assay_name = "counts", subset_n_genes = NULL, subset_genes = NULL, subset_n_samples = NULL,
     subset_samples = NULL, subset_select_by = c("variance", "mean", "random"), subset_seed = 42,
     subset_min_count = NULL, verbose = FALSE) {
@@ -2836,13 +2902,18 @@ filter_analysis_s4 <- function(analysis, min_tpm = 1, tpm_assay_name = NULL, min
 #' If NULL, will attempt to read from \code{config$metadata}.
 #' Priority: explicit \code{metadata} argument > \code{config$metadata} > NULL.
 #'
-#' @param tpm Optional matrix of transcript-level TPM values. If provided,
-#' will be
-#'   stored in the SummarizedExperiment. Same dimensions as readcounts required.
+#' @param tpm REQUIRED matrix of transcript-level TPM values (Transcripts Per Million).
+#' Must be provided and will be stored in the SummarizedExperiment for use during
+#'   diverse filtering. Same dimensions as readcounts required (rows = transcripts, 
+#'   columns = samples). Typically from SALMON quantification output.
+#'   If not provided to build_analysis_s4(), subsequent filter_analysis_s4() calls 
+#'   will fail with an explicit error message.
 #'
-#' @param effective_length Optional numeric vector of transcript effective
-#' lengths
-#'   (e.g., from SALMON). Length should match nrow(readcounts).
+#' @param effective_length REQUIRED numeric vector of transcript effective lengths
+#'   (e.g., from SALMON EffectiveLength column). Length must match nrow(readcounts).
+#'   Typically obtained as the median effective length across all samples.
+#'   If not provided to build_analysis_s4(), the data will not be stored for later use
+#'   in length-normalized calculations.
 #'
 #' @param config Optional list of configuration parameters to store in the
 #'   TSENATAnalysis object. Can also contain \code{config$metadata} which will be
@@ -2887,20 +2958,42 @@ filter_analysis_s4 <- function(analysis, min_tpm = 1, tpm_assay_name = NULL, min
 #'   \item{@plots}{Empty list (populated by plotting functions)}
 #'   \item{@metadata}{Metadata with package version and creation timestamp}
 #'
-#' @details
+#'
+#' \strong{CRITICAL: TPM and effective_length Requirements}
+#'
+#' Both \code{tpm} and \code{effective_length} MUST be provided to ensure correct
+#' filtering and normalization in downstream analysis:
+#' \itemize{
+#'   \item \code{filter_analysis_s4()} requires TPM data (stored in metadata).
+#'     If TPM is missing, the function will fail with an explicit error message
+#'     that guides you to pass it to \code{build_analysis_s4()}.
+#'   \item \code{calculate_diversity_s4()} uses \code{effective_length} for 
+#'     length-normalized entropy calculations.
+#' }
+#'
+#' Following Bioconductor best practices (fail-fast principle), these are explicit
+#' parameters, not optional. They must be passed at object construction time:
+#' \preformatted{
+#' analysis <- build_analysis_s4(
+#'   readcounts = readcounts,
+#'   metadata = metadata_df,
+#'   tx2gene = gff3_file,
+#'   tpm = tpm,                    # REQUIRED from Salmon output
+#'   effective_length = effective_length,  # REQUIRED from Salmon output
+#'   config = config
+#' )
+#' }
+#'
 #' This wrapper combines two steps into one:
 #' \enumerate{
-#'   \item Call \code{.
-#' build_se()} to create a SummarizedExperiment from transcript counts
+#'   \item Call \code{.build_se()} to create a SummarizedExperiment from transcript counts
 #'   \item Wrap the result in \code{TSENATAnalysis()} to create the analysis object
 #' }
 #'
-#' The returned object is ready for 
-#' diversity analysis via \code{calculate_diversity_s4()}.
+#' The returned object is ready for diversity analysis via \code{calculate_diversity_s4()}.
 #'
 #' If you need to inspect or filter the SummarizedExperiment before creating the
-#' TSENATAnalysis object,  call \code{. build_se()} and 
-#' \code{TSENATAnalysis()} separately.
+#' TSENATAnalysis object, call \code{.build_se()} and \code{TSENATAnalysis()} separately.
 #'
 #' @seealso
 #' \code{\link{TSENATAnalysis}} for the S4 class structure
@@ -2927,15 +3020,18 @@ filter_analysis_s4 <- function(analysis, min_tpm = 1, tpm_assay_name = NULL, min
 #'
 #' # Create sample metadata
 #' metadata <- data.frame(
+#'   sample = colnames(counts),
 #'   condition = rep(c('control', 'treatment'), each = 5),
 #'   row.names = colnames(counts))
 #'
 #' # Build analysis object - use NAMED parameters to avoid confusion
 #' # Method 1: With explicit tx2gene data.frame (most common)
+#' config <- tsenat_config(sample_col = 'sample', condition_col = 'condition')
 #' analysis <- build_analysis_s4(
 #'   readcounts = counts,
 #'   tx2gene = tx2gene,
-#'   metadata = metadata)
+#'   metadata = metadata,
+#'   config = config)
 #'
 #' # Verify the analysis object was created
 #' analysis
@@ -3064,9 +3160,41 @@ build_analysis_s4 <- function(readcounts = NULL, salmon_dir = NULL, tx2gene, ass
         stop("[build_analysis_s4] Either 'readcounts' or 'salmon_dir' must be provided\n",
             "  readcounts: matrix/data.frame of transcript counts\n", "  salmon_dir: path to Salmon quantification output directory")
     }
+    
+    # Validate column parameters when metadata is provided
+    if (!is.null(metadata)) {
+        missing_cols <- c()
+        
+        if (is.null(config$sample_col)) {
+            missing_cols <- c(missing_cols, "sample_col")
+        }
+        if (is.null(config$condition_col)) {
+            missing_cols <- c(missing_cols, "condition_col")
+        }
+        
+        if (length(missing_cols) > 0) {
+            stop("[build_analysis_s4] Metadata provided but required column parameters missing: ",
+                paste(missing_cols, collapse = ", "), "\n",
+                "  These parameters MUST be provided in tsenat_config():\n",
+                "    config <- tsenat_config(\n",
+                "      sample_col = 'sample',        # Column name with sample identifiers\n",
+                "      condition_col = 'condition', # Column name with condition/treatment labels\n",
+                "      ...\n",
+                "    )\n",
+                "    analysis <- build_analysis_s4(config = config, metadata = metadata_df, ...)",
+                call. = FALSE)
+        }
+    }
+    
     # Build SummarizedExperiment
+    # Extract column names from config
+    sample_col_value <- if (!is.null(config$sample_col)) config$sample_col else "sample"
+    condition_col_value <- config$condition_col  # May be NULL for non-paired analysis
+    subject_col_value <- config$subject_col      # Optional for paired analysis
+    
     se <- .build_se(readcounts = readcounts, tx2gene = tx2gene, assay_name = assay_name,
-        metadata = metadata, tpm = tpm, effective_length = effective_length, skip = skip,
+        metadata = metadata, sample_col = sample_col_value, condition_col = condition_col_value,
+        subject_col = subject_col_value, tpm = tpm, effective_length = effective_length, skip = skip,
         verbose = verbose)
 
     # Ensure sample_id column exists in colData (required by TSENATAnalysis)

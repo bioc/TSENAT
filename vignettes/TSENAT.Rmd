@@ -98,10 +98,18 @@ gff3_file <- system.file("extdata", "annotation.gff3.gz", package = "TSENAT")
 
 # Create analysis object with transcript counts, annotation, and metadata
 # IMPORTANT: Use named parameters to avoid confusion with optional salmon_dir parameter
+# First, create a configuration with column parameters
+config <- tsenat_config(
+  sample_col = "sample",
+  condition_col = "condition"
+)
+
+# Then build the analysis with the config and metadata
 analysis <- build_analysis_s4(
   readcounts = readcounts,
   tx2gene = gff3_file,
-  metadata = metadata_df
+  metadata = metadata_df,
+  config = config
 )
 
 # Filter low-abundance transcripts
@@ -280,22 +288,24 @@ FIRST, then pass it to the builder function (fail-fast principle):
 
 ```{r initialize-analysis-object}
 ## Configure analysis parameters first (best practice: fail-fast principle)
-## This validates all parameters against metadata before object creation
+## This validates all parameters before object creation
 config <- tsenat_config(
+  sample_col = "sample",
   condition_col = "condition",
   subject_col = "paired_samples",
   q_values = seq(0, 2, by = 0.05),
   nthreads = 2,
   paired = TRUE,
-  control = "normal",
-  metadata = metadata_df
+  control = "normal"
 )
 
 ## Build a complete `TSENATAnalysis` object from readcounts + GFF3.gz annotation
 ## Pass config at construction (Bioconductor pattern): immutable object creation
+## Note: metadata is passed as explicit parameter (Bioconductor best practice)
 analysis <- build_analysis_s4(
   config = config,
-  readcounts = readcounts, 
+  readcounts = readcounts,
+  metadata = metadata_df,
   tx2gene = gff3_file, 
   tpm = tpm,
   effective_length = effective_length
@@ -327,10 +337,14 @@ provide a comprehensive framework for assessing isoform heterogeneity at multipl
 We normalize entropy to [0,1] range (`norm = TRUE`) for comparable cross-q assessment.
 
 ```{r tsallis-entropy-computation}
+# Set random seed for reproducible bootstrap CI calculations
+set.seed(12345)
+
 # Compute diversity using S4 wrapper with bootstrap confidence intervals [@S232; @S115]
 analysis <- calculate_diversity_s4(
     analysis,
-    norm = TRUE
+    norm = TRUE,
+    output_file = "vignette_diversity_results.tsv"
 )
 ```
 
@@ -632,7 +646,7 @@ if (exists("tables_result") && is.list(tables_result) &&
 
 Visualize switching patterns for the top genes identified by the LM interaction test. This shows which transcripts are switching in genes with significant q * condition interaction effects. The heatmaps below display **jackknife delta influence** [@S232]-a resampling-based measure of how robustly each transcript's relative contribution changes between conditions-across different q-values (rows: 0 to 2.0, representing increasing diversity scales from rare to abundant isoforms) and transcripts (columns) for each gene. Delta influence values are computed from bootstrap resampling iterations, providing robust, non-parametric estimates of transcript switching significance weighted by consistency across replicates.
 
-```{r fig-3-transcript-jackknife-influence, echo=TRUE, results='hide', fig.width=12, fig.height=12, eval=TRUE, out.width="98%", fig.pos="H", fig.cap = "**Figure 3:** Transcript-level switching patterns via jackknife resampling. Rows q-values (0-2.0), columns transcripts. Red/blue indicates condition influence."}
+```{r fig-3-transcript-jackknife-influence, echo=TRUE, results='hide', fig.width=12, fig.height=10, eval=TRUE, out.width="98%", fig.pos="H", fig.cap = "**Figure 3:** Transcript-level switching patterns via jackknife resampling. Rows q-values (0-2.0), columns transcripts. Red/blue indicates condition influence."}
 # Generate multi-Q heatmaps for top 4 genes using S4 wrapper
 plot_multiq_delta_influence_heatmaps_s4(
     analysis, 
@@ -650,7 +664,7 @@ plot_multiq_delta_influence_heatmaps_s4(
 
 This robustness-weighted visualization reveals not just *which* transcripts switch, but *how reliably* they switch, allowing distinction between robust biological signals and artifacts of sampling variation.
 
-```{r fig-4-transcript-abundance-heatmap, echo=TRUE, results='hide', fig.width=12, fig.height=9, eval=TRUE, out.width="98%", fig.pos="H", fig.cap = "**Figure 4:** Transcript abundance heatmap with hierarchical clustering. Rows are transcripts, columns are conditions. Blue low, red high expression."}
+```{r fig-4-transcript-abundance-heatmap, echo=TRUE, results='hide', fig.width=12, fig.height=8, eval=TRUE, out.width="98%", fig.pos="H", fig.cap = "**Figure 4:** Transcript abundance heatmap with hierarchical clustering. Rows are transcripts, columns are conditions. Blue low, red high expression."}
 # Generate transcript abundance heatmap for top 4 transcripts using hierarchical clustering
 # metric = "median" aggregates expression values across paired conditions
 plot_top_transcripts_s4(
@@ -1012,13 +1026,13 @@ The `tsenat()` function accepts a configured `TSENATConfig` object and orchestra
 
 - `diversity(analysis)` -> SummarizedExperiment (genes x samples, multiple assays for each q-value)
 
-- `lmResults(analysis)` -> list containing data.frame of LM interaction results (or NULL if method not run)
+- `lmResults(analysis)` -> list containing data.frame of LM interaction results
 
-- `jeoResults(analysis, q = 1.0)` -> SummarizedExperiment of jackknife entropy outlier confidence intervals (or NULL)
+- `jeoResults(analysis, q = 1.0)` -> SummarizedExperiment of jackknife entropy outlier confidence intervals
 
-- `jisResults(analysis, q = 1.0)` -> list of jackknife isoform switching results (or NULL)
+- `jisResults(analysis, q = 1.0)` -> list of jackknife isoform switching results
 
-- `rankResults(analysis)` -> data.frame of rank test results (or NULL)
+- `rankResults(analysis)` -> data.frame of rank test results
 
 - `divergence(analysis)` -> SummarizedExperiment of pairwise divergence metrics
 
@@ -1028,19 +1042,26 @@ If a requested method was not run during `tsenat()` orchestration, the accessor 
 # Configure analysis parameters once (best practice for reproducibility)
 tsenat_config <- tsenat_config(
   q_values = seq(0, 2, by = 0.05),
-  sample_type_col = "sample_type",
-  subject_col = "paired_samples"
+  sample_col = "sample",
+  condition_col = "condition",
+  subject_col = "paired_samples",
+  nthreads = 2
+)
+
+## Build a complete `TSENATAnalysis` object
+analysis <- build_analysis_s4(
+  config = config,
+  readcounts = readcounts,
+  metadata = metadata_df,
+  tx2gene = gff3_file, 
+  tpm = tpm,
+  effective_length = effective_length
 )
 
 # Run complete pipeline with one function call orchestrating all specified methods
 # methods parameter: vector of analysis steps to execute ("diversity", "lm_interaction", "jackknife", "divergence")
 # verbose = TRUE: prints progress messages showing gene filtering, step completion, and result summaries
-analysis <- tsenat(
-  se = se,
-  config = tsenat_config,
-  methods = c("diversity", "lm_interaction", "jackknife", "divergence"),
-  verbose = TRUE
-)
+analysis <- tsenat(analysis)
 
 # Access results via consistent S4 methods (type-safe, mutually-exclusive access instead of nested list indexing)
 diversity_results <- diversity(analysis)

@@ -261,7 +261,7 @@
 #' genes <- rep(paste0('gene_', 1:5), each = 3)
 #' 
 #' # Calculate diversity at multiple q values
-#' se <- .calculate_diversity(counts, genes = genes, q = c(0.5, 1.0, 1.5),
+#' se <- .calculate_diversity(counts, genes = genes, q = c(0.5, 1.0, 1.5, 2.0, 2.5),
 #' norm = TRUE)
 #' 
 #' # Add sample metadata
@@ -272,7 +272,7 @@
 #' 
 #' # Run linear model interaction analysis
 #' results <- .calculate_lm_interaction(se, condition_col = 'condition')
-.calculate_lm_interaction <- function(se, condition_col = "condition", min_obs = 10,
+.calculate_lm_interaction <- function(se, condition_col = "condition", min_obs = 5,
     method = c("lmm", "gam", "fpca", "gee"), pvalue = c("satterthwaite", "lrt", "both"),
     subject_col = NULL, paired = FALSE, nthreads = 1, assay_name = "diversity", pcorr = "BH",
     verbose = FALSE, bias_correction = TRUE, regularization = c("pca", "lasso", "elasticnet",

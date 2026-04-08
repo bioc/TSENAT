@@ -65,59 +65,50 @@ readcounts <- as.matrix(readcounts)
 # Load sample metadata and annotation
 metadata_df <- read.table(
   system.file("extdata", "metadata.tsv",
-  package = "TSENAT"), header = TRUE, row.names = 1,
+  package = "TSENAT"), header = TRUE,
   sep = "\t")
 
 gff3_file <- system.file("extdata",
   "annotation.gff3.gz", package = "TSENAT")
 ```
 
-### Create configuration file
+### Create configuration and build analysis
 
-Create a configuration object that specifies your analysis parameters (q-values, experimental conditions, sample grouping) before building the analysis object. This fail-fast pattern ensures invalid parameters are caught immediately before processing begins.
+Create a configuration object specifying your experimental design parameters (sample/condition columns from metadata) before building the analysis object. This fail-fast pattern ensures invalid parameters are caught immediately before processing begins.
 
 ```r
-## Configure analysis parameters first (best practice: fail-fast principle)
-## This validates all parameters against metadata before object creation
+## Create configuration file
 config <- tsenat_config(
+  sample_col = "sample",
   condition_col = "condition",
   subject_col = "paired_samples",
   q_values = seq(0, 2, by = 0.05),
   nthreads = 2,
   paired = TRUE,
-  control = "normal",
-  metadata = metadata_df
-)
-```
+  control = "normal")
 
-### Build TSENAT Analysis Object
-
-Combine the read counts, annotation file, metadata, and configuration into a single TSENATAnalysis S4 object that serves as the central container for all downstream analysis.
-
-```r
-## Build a complete `TSENATAnalysis` object from readcounts + GFF3.gz annotation
-## Pass config at construction (Bioconductor pattern): immutable object creation
+## Build TSENATAnalysis object
 analysis <- build_analysis_s4(
-  config = config,
   readcounts = readcounts, 
-  tx2gene = gff3_file, 
+  tx2gene = gff3_file,
+  metadata = metadata_df,
+  config = config,
   tpm = tpm,
-  effective_length = effective_length
-)
+  effective_length = effective_length)
 ```
 
 ### Orchestration Function
 
-For a complete analysis with default parameters, use the `tsenat()` orchestration function:
+The `tsenat()` function provides a complete, automated analysis pipeline in a single call. It takes your configured `TSENATAnalysis` object and executes all downstream analysis steps: entropy computation, statistical testing for q×condition interactions, and rich visualization. This is the recommended entry point for most users—it orchestrates the full workflow while respecting your configuration parameters (q-values, design, bootstrap settings, etc.) and handles output management seamlessly. For advanced customization, use individual functions directly as shown in the step-by-step workflow below.
 
 ```r
 # Returns: Fully configured TSENATAnalysis object with diversity, testing, and plots
-analysis <- tsenat(se, config = cfg)
+result <- tsenat(analysis)
 ```
 
 ## Detailed Step-by-Step Workflow
 
-For customization at each stage, use individual functions:
+For fine-grained control over your analysis, TSENAT also provides individual functions for each major step. This modular approach allows you to apply custom parameters at each stage, inspect intermediate results, or skip certain components entirely. The workflow below demonstrates the core analysis pipeline when using individual function calls—useful for exploratory analysis, parameter optimization, or integrating TSENAT results into larger custom workflows.
 
 ### 1. Filter & Compute Diversity
 
@@ -170,7 +161,7 @@ print(p_qcurve)
 
 ## Related Packages
 
-TSENAT answers a unique question: **How do isoforms reorganize, independent of abundance changes?** It complements other Bioconductor tools:
+TSENAT addresses a fundamental but underappreciated question in transcriptomic analysis: **How do genes reorganize their isoform usage patterns, independent of changes in total abundance?** This question is distinct from standard differential expression analysis and reveals a layer of biological complexity—coordinated isoform switching—that conventional methods overlook. TSENAT fills a specific niche in the Bioconductor ecosystem by measuring scale-dependent isoform diversity rather than abundance or individual transcript shifts. Below is how TSENAT complements other Bioconductor tools:
 
 | Tool | Answers | TSENAT Difference |
 |------|---------|-------------------|
@@ -179,11 +170,11 @@ TSENAT answers a unique question: **How do isoforms reorganize, independent of a
 | **SplicingFactory** | What is the overall isoform diversity? | TSENAT extends with **scale-dependent diversity** (q-spectrum) vs fixed measures |
 | **Kallisto, Salmon** | How many reads per transcript? | TSENAT uses their quantification as input; adds diversity analysis layer |
 
-## Loading Salmon Quantification Data
+## Native Salmon Integration
 
-TSENAT can read Salmon quantification output directly by automatically discovering all quant.sf files in a directory structure, eliminating manual file parsing. This streamlined workflow accepts the raw output from Salmon without requiring intermediate format conversions.
+TSENAT is specifically engineered to work seamlessly with Salmon quantification output. Rather than requiring manual parsing or format conversion, TSENAT automatically discovers transcript-level quantification files across your Salmon output directory and integrates them directly into the analysis pipeline. This tight integration means you can move from Salmon quantification to entropy analysis without intermediate data manipulation—the raw `quant.sf` files are all you need. TSENAT discovers these files automatically, validates their compatibility with your experimental design, and handles length-correction and normalization as part of the diversity computation workflow.
 
-TSENAT automatically discovers and reads Salmon output when you provide a directory:
+To get started with Salmon-quantified data:
 
 ```r
 library(TSENAT)
@@ -234,7 +225,7 @@ Example metadata structure:
 
 ```r
 # Load metadata from TSV file
-metadata_df <- read.table("metadata.tsv", header = TRUE, sep = "\t", row.names = 1)
+metadata_df <- read.table("metadata.tsv", header = TRUE, sep = "\t")
 ```
 
 Expected TSV file format (`metadata.tsv`):

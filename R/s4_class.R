@@ -90,8 +90,9 @@
 #' = 'TSENAT'),
 #'   header = TRUE, sep = '\t')
 #' gff3_file <- system.file('extdata', 'annotation.gff3.gz', package = 'TSENAT')
+#' config <- tsenat_config(sample_col = 'sample', condition_col = 'condition')
 #' analysis <- build_analysis_s4(readcounts = readcounts, tx2gene =
-#' gff3_file, metadata = metadata_df,
+#' gff3_file, metadata = metadata_df, config = config,
 #'   tpm = tpm, effective_length = effective_length)
 #' analysis <- filter_analysis_s4(analysis, min_samples = 1, subset_n_genes
 #' = 200)
@@ -129,8 +130,9 @@ NULL
 #' = 'TSENAT'),
 #'   header = TRUE, sep = '\t')
 #' gff3_file <- system.file('extdata', 'annotation.gff3.gz', package = 'TSENAT')
+#' config <- tsenat_config(sample_col = 'sample', condition_col = 'condition')
 #' analysis <- build_analysis_s4(readcounts = readcounts, tx2gene =
-#' gff3_file, metadata = metadata_df,
+#' gff3_file, metadata = metadata_df, config = config,
 #'   tpm = tpm, effective_length = effective_length)
 #' analysis <- filter_analysis_s4(analysis, min_samples = 1, subset_n_genes
 #' = 200)
@@ -215,9 +217,10 @@ TSENATAnalysis <- function(se, config = list()) {
 #'   package = 'TSENAT'), header = TRUE, sep = '\t')
 #' gff3_file <- system.file('extdata', 'annotation.gff3.gz',
 #'   package = 'TSENAT')
+#' config <- tsenat_config(sample_col = 'sample', condition_col = 'condition')
 #' analysis <- build_analysis_s4(readcounts = readcounts, tx2gene =
 #' gff3_file,
-#'   metadata = metadata_df, tpm = tpm,
+#'   metadata = metadata_df, config = config, tpm = tpm,
 #'   effective_length = effective_length)
 #' analysis <- filter_analysis_s4(analysis, min_samples = 1, subset_n_genes
 #' = 200)
@@ -331,14 +334,15 @@ setMethod("diversity", "TSENATAnalysis", function(object, q = NULL) {
 #' 'TSENAT')
 #'
 #' # Build analysis from vignette data
+#' config <- tsenat_config(sample_col = 'sample', condition_col = 'condition')
 #' analysis <- build_analysis_s4(readcounts = readcounts, tx2gene =
-#' gff3_dataset, metadata = metadata_df,
+#' gff3_dataset, metadata = metadata_df, config = config,
 #'   tpm = tpm, effective_length = effective_length)
 #' analysis <- filter_analysis_s4(analysis, min_samples = 1, subset_n_genes
 #' = 200)
 #'
 #' # Compute diversity first (required for LM interaction)
-#' analysis <- calculate_diversity_s4(analysis, q = c(0.5, 1.0), verbose =
+#' analysis <- calculate_diversity_s4(analysis, q = c(0.5, 1.0, 1.5, 2.0, 2.5), verbose =
 #' FALSE)
 #'
 #' # Calculate LM interaction
@@ -346,8 +350,8 @@ setMethod("diversity", "TSENATAnalysis", function(object, q = NULL) {
 #'   condition_col = 'condition', method = 'gam')
 #'
 #' # Extract and view LM interaction results
-#' res <- lmResults(analysis)
-#' if (!is.null(res)) head(res)
+#' res <- lmResults(analysis, 'lm_interaction')
+#' if (!is.null(res)) head(res, 3)
 #'
 #' @export
 setGeneric("lmResults", function(object, component = NULL) {
@@ -419,10 +423,24 @@ setMethod("lmResults", "TSENATAnalysis", function(object, component = NULL) {
 #'   header = TRUE, sep = '\t')
 #' gff3_file <- system.file('extdata', 'annotation.gff3.gz', package = 'TSENAT')
 #'
-#' # Build and filter analysis
+#' # NOTE: TPM and effective_length are REQUIRED for filter_analysis_s4()
+#' # In real workflows, these come from Salmon quantification output
+#' # For this example, we create minimal placeholders
+#' tpm <- matrix(runif(nrow(readcounts) * ncol(readcounts), 0.1, 10),
+#'               nrow = nrow(readcounts), ncol = ncol(readcounts),
+#'               dimnames = dimnames(readcounts))
+#' effective_length <- matrix(100, nrow = nrow(readcounts), ncol = ncol(readcounts))
+#'
+#' # Create config (required when metadata is provided)
+#' config <- tsenat_config(sample_col = 'sample', condition_col = 'condition')
+#' 
+#' # Build analysis with TPM and effective_length
 #' analysis <- build_analysis_s4(readcounts = readcounts,
 #'                              tx2gene = gff3_file,
-#'                              metadata = metadata_df)
+#'                              metadata = metadata_df,
+#'                              tpm = tpm,
+#'                              effective_length = effective_length,
+#'                              config = config)
 #' analysis <- filter_analysis_s4(analysis, stringency = 'medium')
 #'
 #' # Calculate diversity
@@ -484,6 +502,12 @@ setMethod("pairwiseResults", "TSENATAnalysis", function(object, component = NULL
 #'   header = TRUE, sep = '\t'
 #' )
 #' gff3_file <- system.file('extdata', 'annotation.gff3.gz', package = 'TSENAT')
+#'
+#' # TPM and effective_length REQUIRED for filter_analysis_s4()
+#' tpm <- matrix(runif(nrow(readcounts) * ncol(readcounts), 0.1, 10),
+#'               nrow = nrow(readcounts), ncol = ncol(readcounts),
+#'               dimnames = dimnames(readcounts))
+#' effective_length <- matrix(100, nrow = nrow(readcounts), ncol = ncol(readcounts))
 #' 
 #' config <- tsenat_config(q_values = c(0.5, 1.0), generate_plots = FALSE)
 #' analysis <- build_analysis_s4(readcounts, tx2gene = gff3_file,
@@ -657,8 +681,9 @@ setMethod("rankResults<-", "TSENATAnalysis", function(object, value) {
 #' = 'TSENAT'),
 #'   header = TRUE, sep = '\t')
 #' gff3_file <- system.file('extdata', 'annotation.gff3.gz', package = 'TSENAT')
+#' config <- tsenat_config(sample_col = 'sample', condition_col = 'condition')
 #' analysis <- build_analysis_s4(readcounts = readcounts, tx2gene =
-#' gff3_file, metadata = metadata_df,
+#' gff3_file, metadata = metadata_df, config = config,
 #'   tpm = tpm, effective_length = effective_length)
 #' analysis <- filter_analysis_s4(analysis, min_samples = 1, subset_n_genes
 #' = 200)
@@ -725,10 +750,20 @@ setMethod("jeoResults", "TSENATAnalysis", function(object, q = NULL) {
 #'   header = TRUE, sep = '\t')
 #' gff3_file <- system.file('extdata', 'annotation.gff3.gz', package = 'TSENAT')
 #'
+#' # TPM and effective_length REQUIRED for filter_analysis_s4()
+#' tpm <- matrix(runif(nrow(readcounts) * ncol(readcounts), 0.1, 10),
+#'               nrow = nrow(readcounts), ncol = ncol(readcounts),
+#'               dimnames = dimnames(readcounts))
+#' effective_length <- matrix(100, nrow = nrow(readcounts), ncol = ncol(readcounts))
+#'
 #' # Build analysis object
+#' config <- tsenat_config(sample_col = 'sample', condition_col = 'condition')
 #' analysis <- build_analysis_s4(readcounts = readcounts,
 #'                              tx2gene = gff3_file,
-#'                              metadata = metadata_df)
+#'                              metadata = metadata_df,
+#'                              tpm = tpm,
+#'                              effective_length = effective_length,
+#'                              config = config)
 #'
 #' # Filter low-abundance transcripts
 #' analysis <- filter_analysis_s4(analysis, stringency = 'medium')
@@ -811,8 +846,9 @@ setMethod("jisResults", "TSENATAnalysis", function(object, q = NULL) {
 #' = 'TSENAT'),
 #'   header = TRUE, sep = '\t')
 #' gff3_file <- system.file('extdata', 'annotation.gff3.gz', package = 'TSENAT')
+#' config <- tsenat_config(sample_col = 'sample', condition_col = 'condition')
 #' analysis <- build_analysis_s4(readcounts = readcounts, tx2gene =
-#' gff3_file, metadata = metadata_df,
+#' gff3_file, metadata = metadata_df, config = config,
 #'   tpm = tpm, effective_length = effective_length)
 #' analysis <- filter_analysis_s4(analysis, min_samples = 1, subset_n_genes
 #' = 200)
@@ -866,8 +902,9 @@ setMethod("divergence", "TSENATAnalysis", function(object, component = NULL) {
 #' = 'TSENAT'),
 #'   header = TRUE, sep = '\t')
 #' gff3_file <- system.file('extdata', 'annotation.gff3.gz', package = 'TSENAT')
+#' config <- tsenat_config(sample_col = 'sample', condition_col = 'condition')
 #' analysis <- build_analysis_s4(readcounts = readcounts, tx2gene =
-#' gff3_file, metadata = metadata_df,
+#' gff3_file, metadata = metadata_df, config = config,
 #'   tpm = tpm, effective_length = effective_length)
 #' analysis <- filter_analysis_s4(analysis, min_samples = 1, subset_n_genes
 #' = 200)
@@ -962,8 +999,9 @@ setMethod("addPlot", "TSENATAnalysis", function(object, type, plot, replace = FA
 #' = 'TSENAT'),
 #'   header = TRUE, sep = '\t')
 #' gff3_file <- system.file('extdata', 'annotation.gff3.gz', package = 'TSENAT')
+#' config <- tsenat_config(sample_col = 'sample', condition_col = 'condition')
 #' analysis <- build_analysis_s4(readcounts = readcounts, tx2gene =
-#' gff3_file, metadata = metadata_df,
+#' gff3_file, metadata = metadata_df, config = config,
 #'   tpm = tpm, effective_length = effective_length)
 #' analysis <- filter_analysis_s4(analysis, min_samples = 1, subset_n_genes
 #' = 200)
@@ -984,12 +1022,17 @@ setMethod("show", "TSENATAnalysis", function(object) {
         message("\nConfiguration:")
         for (name in names(object@config)) {
             val <- object@config[[name]]
-            if (is.character(val) && length(val) == 1) {
+            if (is.null(val)) {
+                message(sprintf("  %s: NULL", name))
+            } else if (is.logical(val) && length(val) == 1) {
                 message(sprintf("  %s: %s", name, val))
-            } else if (is.numeric(val) && length(val) <= 3) {
+            } else if (is.character(val) && length(val) == 1) {
+                message(sprintf("  %s: %s", name, val))
+            } else if (is.numeric(val) && length(val) <= 5) {
                 message(sprintf("  %s: %s", name, paste(val, collapse = ", ")))
             } else {
-                message(sprintf("  %s: <%s>", name, class(val)))
+                # For complex objects, show type and summary
+                message(sprintf("  %s: <%s>", name, class(val)[1]))
             }
         }
     }
@@ -1047,8 +1090,9 @@ setMethod("show", "TSENATAnalysis", function(object) {
 #' = 'TSENAT'),
 #'   header = TRUE, sep = '\t')
 #' gff3_file <- system.file('extdata', 'annotation.gff3.gz', package = 'TSENAT')
+#' config <- tsenat_config(sample_col = 'sample', condition_col = 'condition')
 #' analysis <- build_analysis_s4(readcounts = readcounts, tx2gene =
-#' gff3_file, metadata = metadata_df,
+#' gff3_file, metadata = metadata_df, config = config,
 #'   tpm = tpm, effective_length = effective_length)
 #' analysis <- filter_analysis_s4(analysis, min_samples = 1, subset_n_genes
 #' = 200)
@@ -1176,8 +1220,9 @@ setMethod("summary", "TSENATAnalysis", function(object) {
 #' metadata_df <- read.table(system.file('extdata', 'metadata.tsv', 
 #'   package = 'TSENAT'), header = TRUE, sep = '\t')
 #' gff3_file <- system.file('extdata', 'annotation.gff3.gz', package = 'TSENAT')
+#' config <- tsenat_config(sample_col = 'sample', condition_col = 'condition')
 #' analysis <- build_analysis_s4(readcounts = readcounts, tx2gene = gff3_file,
-#'   metadata = metadata_df, tpm = tpm, effective_length = effective_length)
+#'   metadata = metadata_df, config = config, tpm = tpm, effective_length = effective_length)
 #' config <- getConfig(analysis)
 #' print(config$q_values)
 #'
@@ -1226,8 +1271,9 @@ setMethod("getConfig", "TSENATAnalysis", function(object) {
 #' gff3_file <- system.file('extdata', 'annotation.gff3.gz', package = 'TSENAT')
 #' 
 #' # Build and subset analysis
+#' config <- tsenat_config(sample_col = 'sample', condition_col = 'condition')
 #' analysis <- build_analysis_s4(readcounts = readcounts, tx2gene =
-#' gff3_file, metadata = metadata_df,
+#' gff3_file, metadata = metadata_df, config = config,
 #'   tpm = tpm, effective_length = effective_length)
 #' analysis <- filter_analysis_s4(analysis, min_samples = 1, subset_n_genes
 #' = 200)
@@ -1258,8 +1304,9 @@ setGeneric("setConfig", function(object, value) {
 #' gff3_file <- system.file('extdata', 'annotation.gff3.gz', package = 'TSENAT')
 #' 
 #' # Build and subset analysis
+#' config <- tsenat_config(sample_col = 'sample', condition_col = 'condition')
 #' analysis <- build_analysis_s4(readcounts = readcounts, tx2gene =
-#' gff3_file, metadata = metadata_df,
+#' gff3_file, metadata = metadata_df, config = config,
 #'   tpm = tpm, effective_length = effective_length)
 #' analysis <- filter_analysis_s4(analysis, min_samples = 1, subset_n_genes
 #' = 200)
@@ -1315,8 +1362,9 @@ setMethod("setConfig", "TSENATAnalysis", function(object, value) {
 #' gff3_file <- system.file('extdata', 'annotation.gff3.gz', package = 'TSENAT')
 #' 
 #' # Build and subset analysis
+#' config <- tsenat_config(sample_col = 'sample', condition_col = 'condition')
 #' analysis <- build_analysis_s4(readcounts = readcounts, tx2gene =
-#' gff3_file, metadata = metadata_df,
+#' gff3_file, metadata = metadata_df, config = config,
 #'   tpm = tpm, effective_length = effective_length)
 #' analysis <- filter_analysis_s4(analysis, min_samples = 1, subset_n_genes
 #' = 200)
@@ -1346,8 +1394,9 @@ setGeneric("setConfigValue", function(object, key, value) {
 #' gff3_file <- system.file('extdata', 'annotation.gff3.gz', package = 'TSENAT')
 #' 
 #' # Build and subset analysis with initial configuration
+#' config <- tsenat_config(sample_col = 'sample', condition_col = 'condition')
 #' analysis <- build_analysis_s4(readcounts = readcounts, tx2gene =
-#' gff3_file, metadata = metadata_df,
+#' gff3_file, metadata = metadata_df, config = config,
 #'   tpm = tpm, effective_length = effective_length)
 #' analysis <- filter_analysis_s4(analysis, min_samples = 1, subset_n_genes
 #' = 200)
@@ -1390,8 +1439,9 @@ setMethod("setConfigValue", "TSENATAnalysis", function(object, key, value) {
 #' = 'TSENAT'),
 #'   header = TRUE, sep = '\t')
 #' gff3_file <- system.file('extdata', 'annotation.gff3.gz', package = 'TSENAT')
+#' config <- tsenat_config(sample_col = 'sample', condition_col = 'condition')
 #' analysis <- build_analysis_s4(readcounts = readcounts, tx2gene =
-#' gff3_file, metadata = metadata_df,
+#' gff3_file, metadata = metadata_df, config = config,
 #'   tpm = tpm, effective_length = effective_length)
 #' analysis <- filter_analysis_s4(analysis, min_samples = 1, subset_n_genes
 #' = 200)
