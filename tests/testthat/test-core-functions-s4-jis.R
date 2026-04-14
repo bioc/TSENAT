@@ -292,7 +292,7 @@ test_that(".resolve_and_validate_jis_params converts q to numeric vector", {
     norm = NULL,
     log_base = NULL,
     pseudocount = NULL,
-    n_bootstrap = 100,
+    nboot = 100,
     analysis = analysis,
     verbose = FALSE
   )
@@ -309,7 +309,7 @@ test_that(".resolve_and_validate_jis_params handles vector q values", {
     norm = NULL,
     log_base = NULL,
     pseudocount = NULL,
-    n_bootstrap = 100,
+    nboot = 100,
     analysis = analysis,
     verbose = FALSE
   )
@@ -325,7 +325,7 @@ test_that(".resolve_and_validate_jis_params uses config values", {
     norm = NULL,      # Should use config
     log_base = NULL,  # Should use config
     pseudocount = NULL,  # Should use config
-    n_bootstrap = 100,
+    nboot = 100,
     analysis = analysis,
     verbose = FALSE
   )
@@ -334,7 +334,7 @@ test_that(".resolve_and_validate_jis_params uses config values", {
   expect_equal(params$pseudocount, 0)  # From config
 })
 
-test_that(".resolve_and_validate_jis_params rejects invalid n_bootstrap", {
+test_that(".resolve_and_validate_jis_params rejects invalid nboot", {
   analysis <- make_test_analysis_jis()
   
   expect_error(
@@ -343,7 +343,7 @@ test_that(".resolve_and_validate_jis_params rejects invalid n_bootstrap", {
       norm = NULL,
       log_base = NULL,
       pseudocount = NULL,
-      n_bootstrap = -1,  # Invalid
+      nboot = -1,  # Invalid
       analysis = analysis,
       verbose = FALSE
     ),
@@ -351,7 +351,7 @@ test_that(".resolve_and_validate_jis_params rejects invalid n_bootstrap", {
   )
 })
 
-test_that(".resolve_and_validate_jis_params warns when n_bootstrap < 50", {
+test_that(".resolve_and_validate_jis_params warns when nboot < 50", {
   analysis <- make_test_analysis_jis()
   
   expect_warning(
@@ -360,7 +360,7 @@ test_that(".resolve_and_validate_jis_params warns when n_bootstrap < 50", {
       norm = NULL,
       log_base = NULL,
       pseudocount = NULL,
-      n_bootstrap = 20,  # Below recommended
+      nboot = 20,  # Below recommended
       analysis = analysis,
       verbose = FALSE
     ),
@@ -376,7 +376,7 @@ test_that(".resolve_and_validate_jis_params overrides with explicit parameters",
     norm = FALSE,  # Override config
     log_base = 10,  # Override config
     pseudocount = 1,  # Override config
-    n_bootstrap = 200,
+    nboot = 200,
     analysis = analysis,
     verbose = FALSE
   )
@@ -451,7 +451,7 @@ test_that(".store_jis_results updates metadata with function call", {
   
   # Check metadata was updated
   expect_true(
-    any(grepl("jackknife_isoform_switching_s4", 
+    any(grepl("calculate_jis", 
               updated_analysis@metadata$function_calls))
   )
 })
@@ -561,33 +561,33 @@ test_that(".save_jis_output handles text file output", {
 })
 
 # ============================================================================
-# TEST SUITE 8: jackknife_isoform_switching_s4() - Main Wrapper
+# TEST SUITE 8: calculate_jis() - Main Wrapper
 # ============================================================================
 
-test_that("jackknife_isoform_switching_s4 rejects non-TSENATAnalysis input", {
+test_that("calculate_jis rejects non-TSENATAnalysis input", {
   expect_error(
-    TSENAT::jackknife_isoform_switching_s4(
+    TSENAT::calculate_jis(
       analysis = list(),
-      n_bootstrap = 10
+      nboot = 10
     ),
     "must be a TSENATAnalysis object"
   )
 })
 
-test_that("jackknife_isoform_switching_s4 returns TSENATAnalysis object", {
+test_that("calculate_jis returns TSENATAnalysis object", {
   analysis <- make_test_analysis_jis()
   
   # Pre-populate diversity results so validation passes
   analysis@diversity_results <- list(q_1_00 = list(q = 1.0))
   
   result <- suppressWarnings(
-    TSENAT::jackknife_isoform_switching_s4(
+    TSENAT::calculate_jis(
       analysis = analysis,
       condition_col = "condition",
       gene_col = "gene_id",
       isoform_col = "transcript_id",
       q = 1.0,
-      n_bootstrap = 10,
+      nboot = 10,
       verbose = FALSE
     )
   )
@@ -595,18 +595,18 @@ test_that("jackknife_isoform_switching_s4 returns TSENATAnalysis object", {
   expect_is(result, "TSENATAnalysis")
 })
 
-test_that("jackknife_isoform_switching_s4 stores results in @jackknife_results", {
+test_that("calculate_jis stores results in @jackknife_results", {
   analysis <- make_test_analysis_jis()
   analysis@diversity_results <- list(q_1_00 = list(q = 1.0))
   
   result <- suppressWarnings(
-    TSENAT::jackknife_isoform_switching_s4(
+    TSENAT::calculate_jis(
       analysis = analysis,
       condition_col = "condition",
       gene_col = "gene_id",
       isoform_col = "transcript_id",
       q = 1.0,
-      n_bootstrap = 10,
+      nboot = 10,
       verbose = FALSE
     )
   )
@@ -615,40 +615,40 @@ test_that("jackknife_isoform_switching_s4 stores results in @jackknife_results",
   expect_true(any(grepl("^q_", names(result@jackknife_results))))
 })
 
-test_that("jackknife_isoform_switching_s4 updates metadata", {
+test_that("calculate_jis updates metadata", {
   analysis <- make_test_analysis_jis()
   analysis@diversity_results <- list(q_1_00 = list(q = 1.0))
   
   result <- suppressWarnings(
-    TSENAT::jackknife_isoform_switching_s4(
+    TSENAT::calculate_jis(
       analysis = analysis,
       condition_col = "condition",
       gene_col = "gene_id",
       isoform_col = "transcript_id",
       q = 1.0,
-      n_bootstrap = 10,
+      nboot = 10,
       verbose = FALSE
     )
   )
   
   expect_true(
-    any(grepl("jackknife_isoform_switching_s4", 
+    any(grepl("calculate_jis", 
               result@metadata$function_calls))
   )
 })
 
-test_that("jackknife_isoform_switching_s4 auto-detects columns when NULL", {
+test_that("calculate_jis auto-detects columns when NULL", {
   analysis <- make_test_analysis_jis()
   analysis@diversity_results <- list(q_1_00 = list(q = 1.0))
   
   result <- suppressWarnings(
-    TSENAT::jackknife_isoform_switching_s4(
+    TSENAT::calculate_jis(
       analysis = analysis,
       condition_col = NULL,  # Auto-detect
       gene_col = NULL,        # Auto-detect
       isoform_col = NULL,     # Auto-detect
       q = 1.0,
-      n_bootstrap = 10,
+      nboot = 10,
       verbose = FALSE
     )
   )
@@ -656,25 +656,25 @@ test_that("jackknife_isoform_switching_s4 auto-detects columns when NULL", {
   expect_is(result, "TSENATAnalysis")
 })
 
-test_that("jackknife_isoform_switching_s4 rejects invalid n_bootstrap", {
+test_that("calculate_jis rejects invalid nboot", {
   analysis <- make_test_analysis_jis()
   analysis@diversity_results <- list(q_1_00 = list(q = 1.0))
   
   expect_error(
-    TSENAT::jackknife_isoform_switching_s4(
+    TSENAT::calculate_jis(
       analysis = analysis,
       condition_col = "condition",
       gene_col = "gene_id",
       isoform_col = "transcript_id",
       q = 1.0,
-      n_bootstrap = -1,  # Invalid
+      nboot = -1,  # Invalid
       verbose = FALSE
     ),
     "must be a positive integer"
   )
 })
 
-test_that("jackknife_isoform_switching_s4 handles multi-q analysis", {
+test_that("calculate_jis handles multi-q analysis", {
   analysis <- make_test_analysis_jis()
   analysis@diversity_results <- list(
     q_0_50 = list(q = 0.5),
@@ -682,13 +682,13 @@ test_that("jackknife_isoform_switching_s4 handles multi-q analysis", {
   )
   
   result <- suppressWarnings(
-    TSENAT::jackknife_isoform_switching_s4(
+    TSENAT::calculate_jis(
       analysis = analysis,
       condition_col = "condition",
       gene_col = "gene_id",
       isoform_col = "transcript_id",
       q = c(0.5, 1.0),
-      n_bootstrap = 10,
+      nboot = 10,
       verbose = FALSE
     )
   )
@@ -699,20 +699,20 @@ test_that("jackknife_isoform_switching_s4 handles multi-q analysis", {
   expect_true(length(q_keys) > 0)
 })
 
-test_that("jackknife_isoform_switching_s4 saves to file when output_file provided", {
+test_that("calculate_jis saves to file when output_file provided", {
   analysis <- make_test_analysis_jis()
   analysis@diversity_results <- list(q_1_00 = list(q = 1.0))
   
   temp_file <- tempfile(fileext = ".rds")
   
   result <- suppressWarnings(
-    TSENAT::jackknife_isoform_switching_s4(
+    TSENAT::calculate_jis(
       analysis = analysis,
       condition_col = "condition",
       gene_col = "gene_id",
       isoform_col = "transcript_id",
       q = 1.0,
-      n_bootstrap = 10,
+      nboot = 10,
       output_file = temp_file,
       verbose = FALSE
     )
@@ -722,7 +722,7 @@ test_that("jackknife_isoform_switching_s4 saves to file when output_file provide
   file.remove(temp_file)
 })
 
-test_that("jackknife_isoform_switching_s4 supports method chaining", {
+test_that("calculate_jis supports method chaining", {
   analysis <- make_test_analysis_jis()
   analysis@diversity_results <- list(
     q_0_50 = list(q = 0.5),
@@ -731,15 +731,15 @@ test_that("jackknife_isoform_switching_s4 supports method chaining", {
   
   # Chain multiple calls
   result <- suppressWarnings(
-    TSENAT::jackknife_isoform_switching_s4(
+    TSENAT::calculate_jis(
       analysis = analysis,
       q = 0.5,
-      n_bootstrap = 10,
+      nboot = 10,
       verbose = FALSE
     ) %>%
-      TSENAT::jackknife_isoform_switching_s4(
+      TSENAT::calculate_jis(
         q = 1.0,
-        n_bootstrap = 10,
+        nboot = 10,
         verbose = FALSE
       )
   )
@@ -750,7 +750,7 @@ test_that("jackknife_isoform_switching_s4 supports method chaining", {
   expect_true(length(q_keys) >= 1)
 })
 
-test_that("jackknife_isoform_switching_s4 accepts LM results parameter", {
+test_that("calculate_jis accepts LM results parameter", {
   analysis <- make_test_analysis_jis()
   analysis@diversity_results <- list(q_1_00 = list(q = 1.0))
   
@@ -766,13 +766,13 @@ test_that("jackknife_isoform_switching_s4 accepts LM results parameter", {
   # The base function may have specific data requirements beyond our test scope
   result <- tryCatch(
     suppressWarnings(
-      TSENAT::jackknife_isoform_switching_s4(
+      TSENAT::calculate_jis(
         analysis = analysis,
         condition_col = "condition",
         gene_col = "gene_id",
         isoform_col = "transcript_id",
         q = 1.0,
-        n_bootstrap = 10,
+        nboot = 10,
         lm_results = lm_results,
         lm_p_threshold = 0.05,
         use_lm_fdr = TRUE,
@@ -819,7 +819,7 @@ test_that("Full workflow: validation -> detection -> params -> results -> storag
     norm = NULL, 
     log_base = NULL, 
     pseudocount = NULL, 
-    n_bootstrap = 100,
+    nboot = 100,
     threshold = NULL,
     lm_p_threshold = NULL,
     analysis = analysis, 
@@ -835,13 +835,13 @@ test_that("Error handling: invalid column names propagate correctly", {
   
   # Should throw error when condition_col doesn't exist and can't be auto-detected
   expect_error(
-    TSENAT::jackknife_isoform_switching_s4(
+    TSENAT::calculate_jis(
       analysis = analysis,
       condition_col = "nonexistent_col",
       gene_col = "gene_id",
       isoform_col = "transcript_id",
       q = 1.0,
-      n_bootstrap = 100,
+      nboot = 100,
       verbose = FALSE
     )
   )
@@ -853,17 +853,17 @@ test_that("Verbose mode produces informative messages", {
   
   expect_message(
     suppressWarnings(
-      TSENAT::jackknife_isoform_switching_s4(
+      TSENAT::calculate_jis(
         analysis = analysis,
         condition_col = "condition",
         gene_col = "gene_id",
         isoform_col = "transcript_id",
         q = 1.0,
-        n_bootstrap = 10,
+        nboot = 10,
         verbose = TRUE
       )
     ),
-    "jackknife_isoform_switching_s4"
+    "calculate_jis"
   )
 })
 
@@ -878,13 +878,13 @@ test_that("Output file (RDS) preserves analysis object structure and data", {
   temp_file <- tempfile(fileext = ".rds")
   
   result <- suppressWarnings(
-    TSENAT::jackknife_isoform_switching_s4(
+    TSENAT::calculate_jis(
       analysis = analysis,
       condition_col = "condition",
       gene_col = "gene_id",
       isoform_col = "transcript_id",
       q = 1.0,
-      n_bootstrap = 10,
+      nboot = 10,
       output_file = temp_file,
       verbose = FALSE
     )

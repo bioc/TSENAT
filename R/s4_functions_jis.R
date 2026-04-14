@@ -1,6 +1,6 @@
 #' Jackknife isoform switching analysis on TSENATAnalysis object
 #'
-#' Wrapper around .jackknife_isoform_switching() that manages TSENATAnalysis
+#' Wrapper around .calculate_jis() that manages TSENATAnalysis
 #' object. Identifies transcripts with significant isoform switching patterns
 #' using jackknife resampling across samples to detect influential isoforms.
 #'
@@ -39,7 +39,7 @@
 #' @param q \code{numeric}.  Tsallis entropy parameter(s) to analyze.
 #'  Can be single value 
 #'   or vector for multi-q analysis (default: c(0, 0.5, 1, 1.5, 2)).
-#'   If NULL, uses @config$q_values.
+#'   If NULL, uses @config$q.
 #'
 #' @param norm \code{logical}. Whether to use normalized diversity values 
 #'   (default: TRUE).
@@ -56,7 +56,7 @@
 #' are classified
 #'   as 'switching'.
 #'
-#' @param n_bootstrap \code{integer}.  Number of bootstrap resamples for 
+#' @param nboot \code{integer}.  Number of bootstrap resamples for 
 #' confidence 
 #'   intervals (default: 1000).
 #'
@@ -99,10 +99,10 @@
 #'
 #' Affected parameters:
 #' \itemize{
-#'   \item \code{q}: Uses config's \code{q_values} if available, else c(0, 0.5, 1, 1.5, 2)
-#'   \item \code{n_bootstrap}: Uses config's \code{n_bootstrap} if available, else 1000
-#'   \item \code{threshold}: Uses config's \code{threshold} if available, else 90
-#'   \item \code{lm_p_threshold}: Uses config's \code{lm_p_threshold} if available, else 0.05
+#'   \item \code{q}: Multi-q vector c(0, 0.5, 1, 1.5, 2) if not provided, or \code{@config$q} if available
+#'   \item \code{nboot}: Uses \code{@config$nboot} if available, else 1000
+#'   \item \code{threshold}: Uses \code{@config$threshold} if available, else 90
+#'   \item \code{lm_p_threshold}: Uses \code{@config$lm_p_threshold} if available, else 0.05
 #' }
 #'
 #' This allows setting defaults once in the config and reusing across multiple analyses.
@@ -115,8 +115,8 @@
 #'
 #'   The analysis object is returned visibly to support method chaining:
 #'   \preformatted{
-#'     analysis <- jackknife_isoform_switching_s4(analysis, q = 0.5)
-#'     analysis <- jackknife_isoform_switching_s4(analysis, q = 1.0)
+#'     analysis <- calculate_jis(analysis, q = 0.5)
+#'     analysis <- calculate_jis(analysis, q = 1.0)
 #'   }
 #'
 #' @details
@@ -138,7 +138,7 @@
 #' 1. Extracts SummarizedExperiment from \code{@se} slot
 #' 2. Detects condition_col, gene_col, isoform_col from colData/rowData or
 #' \code{@config}
-#' 3. Calls \code{.jackknife_isoform_switching()} with extracted parameters
+#' 3. Calls \code{.calculate_jis()} with extracted parameters
 #'
 #' **Parameter Auto-Detection:**
 #' \enumerate{
@@ -160,20 +160,20 @@
 #' = 'TSENAT'),
 #'                           header = TRUE, sep = '\t')
 #' gff3_file <- system.file('extdata', 'annotation.gff3.gz', package = 'TSENAT')
-#' config <- tsenat_config(sample_col = 'sample', condition_col = 'condition')
-#' analysis <- build_analysis_s4(readcounts = readcounts, tx2gene =
+#' config <- TSENAT_config(sample_col = 'sample', condition_col = 'condition')
+#' analysis <- build_analysis(readcounts = readcounts, tx2gene =
 #' gff3_file, metadata = metadata_df, config = config,
 #'                              tpm = tpm,
 #'  effective_length = effective_length)
-#' analysis <- filter_analysis_s4(analysis, min_samples = 1, subset_n_genes
+#' analysis <- filter_analysis(analysis, min_samples = 1, subset_n_genes
 #' = 20, subset_n_samples = 8)
-#' analysis <- calculate_diversity_s4(analysis, q = 1)
+#' analysis <- calculate_diversity(analysis, q = 1)
 #' 
 #' @export
-jackknife_isoform_switching_s4 <- function(analysis, condition_col = NULL, subject_col = NULL,
-    gene_col = NULL, isoform_col = NULL, q = c(0, 0.5, 1, 1.5, 2), norm = NULL, log_base = NULL, threshold = 90,
-    n_bootstrap = 1000, pseudocount = NULL, lm_results = NULL, lm_p_threshold = 0.05,
-    use_lm_fdr = TRUE, output_file = NULL, verbose = FALSE, ...) {
+calculate_jis <- function(analysis, condition_col = NULL, subject_col = NULL, gene_col = NULL,
+    isoform_col = NULL, q = c(0, 0.5, 1, 1.5, 2), norm = NULL, log_base = NULL, threshold = 90,
+    nboot = 1000, pseudocount = NULL, lm_results = NULL, lm_p_threshold = 0.05, use_lm_fdr = TRUE,
+    output_file = NULL, verbose = FALSE, ...) {
     # Validate input and extract SummarizedExperiment
     se <- .validate_jis_input(analysis)
 
@@ -188,19 +188,20 @@ jackknife_isoform_switching_s4 <- function(analysis, condition_col = NULL, subje
     # Extract or validate LM results
     lm_results <- .extract_lm_results(analysis, lm_results, verbose)
 
-    # Resolve and validate all parameters (including threshold and lm_p_threshold)
-    params <- .resolve_and_validate_jis_params(q, norm, log_base, pseudocount, n_bootstrap,
+    # Resolve and validate all parameters (including threshold and
+    # lm_p_threshold)
+    params <- .resolve_and_validate_jis_params(q, norm, log_base, pseudocount, nboot,
         threshold, lm_p_threshold, analysis, verbose)
 
     # Call base jackknife function
     result <- tryCatch({
-        .jackknife_isoform_switching(se = se, condition_col = condition_col, subject_col = subject_col,
+        .calculate_jis(se = se, condition_col = condition_col, subject_col = subject_col,
             gene_col = gene_col, isoform_col = isoform_col, q = params$q, norm = params$norm,
-            log_base = params$log_base, threshold = params$threshold, n_bootstrap = params$n_bootstrap,
+            log_base = params$log_base, threshold = params$threshold, nboot = params$nboot,
             pseudocount = params$pseudocount, verbose = verbose, lm_results = lm_results,
             lm_p_threshold = params$lm_p_threshold, use_lm_fdr = use_lm_fdr)
     }, error = function(e) {
-        stop("[jackknife_isoform_switching_s4] Jackknife analysis failed:\n", conditionMessage(e),
+        stop("[calculate_jis] Jackknife analysis failed:\n", conditionMessage(e),
             call. = FALSE)
     })
 
@@ -236,8 +237,7 @@ jackknife_isoform_switching_s4 <- function(analysis, condition_col = NULL, subje
 
     se <- analysis@se
     if (!inherits(se, "SummarizedExperiment")) {
-        stop("[jackknife_isoform_switching_s4] @se must be a SummarizedExperiment object",
-            call. = FALSE)
+        stop("[calculate_jis] @se must be a SummarizedExperiment object", call. = FALSE)
     }
 
     se
@@ -271,16 +271,15 @@ jackknife_isoform_switching_s4 <- function(analysis, condition_col = NULL, subje
     } else {
         # Validate explicit condition_col exists
         if (!condition_col %in% cd_cols) {
-            stop("[jackknife_isoform_switching_s4] condition_col '", condition_col,
-                "' not found in colData.\n", "  Available columns: ", paste(cd_cols,
-                  collapse = ", "), call. = FALSE)
+            stop("[calculate_jis] condition_col '", condition_col, "' not found in colData.\n",
+                "  Available columns: ", paste(cd_cols, collapse = ", "), call. = FALSE)
         }
     }
 
     if (is.null(condition_col)) {
-        stop("[jackknife_isoform_switching_s4] Cannot auto-detect condition_col.\n",
-            "  Available colData columns: ", paste(cd_cols, collapse = ", "), "\n\n",
-            "SOLUTION: Set @config$condition_col or pass explicit parameter\n", call. = FALSE)
+        stop("[calculate_jis] Cannot auto-detect condition_col.\n", "  Available colData columns: ",
+            paste(cd_cols, collapse = ", "), "\n\n", "SOLUTION: Set @config$condition_col or pass explicit parameter\n",
+            call. = FALSE)
     }
 
     # Extract rowData columns
@@ -297,7 +296,7 @@ jackknife_isoform_switching_s4 <- function(analysis, condition_col = NULL, subje
     } else {
         # Validate explicit gene_col exists if rowData is present
         if (length(rd_cols) > 0 && !gene_col %in% rd_cols) {
-            stop("[jackknife_isoform_switching_s4] gene_col '", gene_col, "' not found in rowData.\n",
+            stop("[calculate_jis] gene_col '", gene_col, "' not found in rowData.\n",
                 "  Available columns: ", paste(rd_cols, collapse = ", "), call. = FALSE)
         }
     }
@@ -311,7 +310,7 @@ jackknife_isoform_switching_s4 <- function(analysis, condition_col = NULL, subje
     } else {
         # Validate explicit isoform_col exists if rowData is present
         if (length(rd_cols) > 0 && !isoform_col %in% rd_cols) {
-            stop("[jackknife_isoform_switching_s4] isoform_col '", isoform_col, "' not found in rowData.\n",
+            stop("[calculate_jis] isoform_col '", isoform_col, "' not found in rowData.\n",
                 "  Available columns: ", paste(rd_cols, collapse = ", "), call. = FALSE)
         }
     }
@@ -333,7 +332,7 @@ jackknife_isoform_switching_s4 <- function(analysis, condition_col = NULL, subje
         if ("lm_interaction" %in% names(analysis@lm_results)) {
             lm_results <- analysis@lm_results$lm_interaction
             if (verbose) {
-                message("[jackknife_isoform_switching_s4] Using LM interaction results")
+                message("[calculate_jis] Using LM interaction results")
             }
         }
     }
@@ -360,17 +359,17 @@ jackknife_isoform_switching_s4 <- function(analysis, condition_col = NULL, subje
 
     q_vals <- if (is.numeric(q))
         q else c(q)
-    
-    # Use intersection of requested and available q-values
-    # This allows jackknife to work with any set of q-values from diversity
+
+    # Use intersection of requested and available q-values This allows
+    # jackknife to work with any set of q-values from diversity
     usable_q <- intersect(q_vals, available_q)
-    
+
     if (length(usable_q) == 0) {
-        warning("[jackknife_isoform_switching_s4] No matching q-values found.\n",
-                "  Requested: ", paste(q_vals, collapse = ", "), "\n",
-                "  Available: ", paste(available_q, collapse = ", "), call. = FALSE)
+        warning("[calculate_jis] No matching q-values found.\n", "  Requested: ",
+            paste(q_vals, collapse = ", "), "\n", "  Available: ", paste(available_q,
+                collapse = ", "), call. = FALSE)
     } else if (verbose) {
-        message("[jackknife_isoform_switching_s4] Using q-values: ", paste(usable_q, collapse = ", "))
+        message("[calculate_jis] Using q-values: ", paste(usable_q, collapse = ", "))
     }
 
     invisible(NULL)
@@ -382,41 +381,43 @@ jackknife_isoform_switching_s4 <- function(analysis, condition_col = NULL, subje
 #' @param norm Normalization flag
 #' @param log_base Logarithm base
 #' @param pseudocount Pseudocount for regularization
-#' @param n_bootstrap Number of bootstrap resamples
+#' @param nboot Number of bootstrap resamples
 #' @param analysis TSENATAnalysis object for config access
 #' @param verbose Logical, print messages
 #'
 #' @return List with resolved parameters and q_vals (numeric vector)
 #'
 #' @noRd
-.resolve_and_validate_jis_params <- function(q, norm = NULL, log_base = NULL, pseudocount = NULL, n_bootstrap = 1000,
-    threshold = NULL, lm_p_threshold = NULL, analysis, verbose = FALSE) {
-    # Resolve q: use config if available, otherwise use the provided value (which has function default)
-    if (is.null(q) && "q_values" %in% names(analysis@config)) {
-        q <- analysis@config$q_values
+.resolve_and_validate_jis_params <- function(q, norm = NULL, log_base = NULL, pseudocount = NULL,
+    nboot = 1000, threshold = NULL, lm_p_threshold = NULL, analysis, verbose = FALSE) {
+    # Resolve q: use config if available, otherwise use the provided value
+    # (which has function default)
+    if (is.null(q) && "q" %in% names(analysis@config)) {
+        q <- analysis@config$q
     }
-    
+
     # Convert q to numeric vector
     q_vals <- if (is.numeric(q))
         q else as.numeric(q)
 
-    # Resolve all parameters from config using standard resolver
-    # Defaults match TSENAT.Rmd vignette usage
+    # Resolve all parameters from config using standard resolver Defaults match
+    # TSENAT.Rmd vignette usage
     norm <- resolve_slot_param(norm, analysis@config, "norm", TRUE)
     log_base <- resolve_slot_param(log_base, analysis@config, "log_base", exp(1))
-    pseudocount <- resolve_slot_param(pseudocount, analysis@config, "pseudocount", 0)
-    n_bootstrap <- resolve_slot_param(n_bootstrap, analysis@config, "n_bootstrap", 1000)
+    pseudocount <- resolve_slot_param(pseudocount, analysis@config, "pseudocount",
+        0)
+    nboot <- resolve_slot_param(nboot, analysis@config, "nboot", 1000)
     threshold <- resolve_slot_param(threshold, analysis@config, "threshold", 90)
-    lm_p_threshold <- resolve_slot_param(lm_p_threshold, analysis@config, "lm_p_threshold", 0.05)
+    lm_p_threshold <- resolve_slot_param(lm_p_threshold, analysis@config, "lm_p_threshold",
+        0.05)
 
-    # Validate n_bootstrap
-    if (!is.numeric(n_bootstrap) || length(n_bootstrap) != 1 || n_bootstrap < 1) {
-        stop("'n_bootstrap' must be a positive integer", call. = FALSE)
+    # Validate nboot
+    if (!is.numeric(nboot) || length(nboot) != 1 || nboot < 1) {
+        stop("'nboot' must be a positive integer", call. = FALSE)
     }
 
-    if (n_bootstrap < 50) {
-        warning("n_bootstrap = ", n_bootstrap, " is less than recommended minimum 50",
-            call. = FALSE)
+    if (nboot < 50) {
+        warning("nboot = ", nboot, " is less than recommended minimum 50", call. = FALSE)
     }
 
     # Validate threshold
@@ -430,7 +431,7 @@ jackknife_isoform_switching_s4 <- function(analysis, condition_col = NULL, subje
     }
 
     list(q = q, q_vals = q_vals, norm = norm, log_base = log_base, pseudocount = pseudocount,
-        n_bootstrap = n_bootstrap, threshold = threshold, lm_p_threshold = lm_p_threshold)
+        nboot = nboot, threshold = threshold, lm_p_threshold = lm_p_threshold)
 }
 
 #' Store jackknife results in analysis object
@@ -452,7 +453,7 @@ jackknife_isoform_switching_s4 <- function(analysis, condition_col = NULL, subje
         }
         analysis@jackknife_results[["multi_q"]] <- result
         if (verbose) {
-            message("[jackknife_isoform_switching_s4] Stored multi-q results")
+            message("[calculate_jis] Stored multi-q results")
         }
     } else {
         # Single or vector q-values
@@ -465,20 +466,20 @@ jackknife_isoform_switching_s4 <- function(analysis, condition_col = NULL, subje
             } else if (length(q_vals) == 1) {
                 analysis@jackknife_results[[q_key]] <- result
             } else {
-                warning("[jackknife_isoform_switching_s4] Result for q=", q_vals[i],
-                  " (key: ", q_key, ") not found", call. = FALSE)
+                warning("[calculate_jis] Result for q=", q_vals[i], " (key: ", q_key,
+                  ") not found", call. = FALSE)
             }
 
             if (verbose) {
-                message("[jackknife_isoform_switching_s4] Stored results for ", q_key)
+                message("[calculate_jis] Stored results for ", q_key)
             }
         }
     }
 
     # Update metadata
     if (is.list(analysis@metadata)) {
-        call_str <- sprintf("jackknife_isoform_switching_s4[q=%s, condition_col=%s]",
-            paste(q_vals, collapse = ","), condition_col)
+        call_str <- sprintf("calculate_jis[q=%s, condition_col=%s]", paste(q_vals,
+            collapse = ","), condition_col)
         analysis@metadata$function_calls <- c(analysis@metadata$function_calls, call_str)
         analysis@metadata$function_timestamps <- c(analysis@metadata$function_timestamps,
             as.character(Sys.time()))
@@ -507,11 +508,10 @@ jackknife_isoform_switching_s4 <- function(analysis, condition_col = NULL, subje
         tryCatch({
             saveRDS(analysis, file = output_file)
             if (verbose) {
-                message("[jackknife_isoform_switching_s4] Saved to ", output_file)
+                message("[calculate_jis] Saved to ", output_file)
             }
         }, error = function(e) {
-            warning("[jackknife_isoform_switching_s4] Failed to save: ", conditionMessage(e),
-                call. = FALSE)
+            warning("[calculate_jis] Failed to save: ", conditionMessage(e), call. = FALSE)
         })
     }
 }
@@ -555,7 +555,7 @@ jackknife_isoform_switching_s4 <- function(analysis, condition_col = NULL, subje
                 row.names = FALSE)
         }
     }, error = function(e) {
-        warning("[jackknife_isoform_switching_s4] Could not write results: ", conditionMessage(e),
+        warning("[calculate_jis] Could not write results: ", conditionMessage(e),
             call. = FALSE)
     })
 }

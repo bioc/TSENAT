@@ -19,7 +19,7 @@
 #' used throughout S4 wrapper functions.
 #'
 #' @examples
-#' config <- list(nthreads = 4, verbose = TRUE, q_values = seq(0.01, 2, by =
+#' config <- list(nthreads = 4, verbose = TRUE, q = seq(0.01, 2, by =
 #' 0.05))
 #' 
 #' # User-provided value takes priority
@@ -174,7 +174,7 @@ auto_detect_column <- function(available_cols, config_list = NULL, config_key = 
 #' @param create_dir Logical. Create directory if it doesn't exist. Default:
 #' TRUE.
 #' @param func_name Function name for error messages (e.g.,
-#' 'calculate_diversity_s4'). Default: 'wrapper_function'
+#' 'calculate_diversity'). Default: 'wrapper_function'
 #' @param width Numeric or NULL. Plot width in inches (for ggplot/PDF/PNG
 #' output). Default: NULL (use ggplot defaults).
 #' @param height Numeric or NULL. Plot height in inches (for ggplot/PDF/PNG
@@ -283,11 +283,11 @@ save_analysis_output <- function(data, output_file, object = NULL, verbose = FAL
                 6 else height
 
             if (ext == ".pdf") {
-                ggplot2::ggsave(output_file, plot = data, width = plot_width, 
-                               height = plot_height, device = "pdf")
+                ggplot2::ggsave(output_file, plot = data, width = plot_width, height = plot_height,
+                  device = "pdf")
             } else {
-                ggplot2::ggsave(output_file, plot = data, width = plot_width, 
-                               height = plot_height, device = "png", dpi = 300)
+                ggplot2::ggsave(output_file, plot = data, width = plot_width, height = plot_height,
+                  device = "png", dpi = 300)
             }
 
             if (verbose) {
@@ -354,7 +354,7 @@ save_analysis_output <- function(data, output_file, object = NULL, verbose = FAL
 #' combined_results <- extract_multiq_table(q_result)
 #' head(combined_results)
 #' 
-#' @export
+#' @noRd
 extract_multiq_table <- function(result, is_multiq = NULL, extract_fn = NULL, q_value_col = "q_value") {
 
     # Auto-detect multi-q if not specified

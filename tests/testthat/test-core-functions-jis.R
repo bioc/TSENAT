@@ -460,7 +460,6 @@ test_that(".jis_apply_fdr maintains p-value ordering relationships", {
 # ============================================================================
 
 test_that(".jis_handle_multi_q returns list of results for multiple q values", {
-  skip_on_cran()
   
   se <- create_test_se()
   
@@ -472,7 +471,7 @@ test_that(".jis_handle_multi_q returns list of results for multiple q values", {
     norm = TRUE,
     log_base = exp(1),
     pseudocount = 0,
-    n_bootstrap = 10
+    nboot = 10
   )
   
   result <- TSENAT:::.jis_handle_multi_q(se, q_values, q_params, verbose = FALSE)
@@ -522,12 +521,12 @@ test_that("Gene mapping and entropy calculation work together", {
 
 # Helper functions are defined locally or sourced globally via setup.R
 
-test_that("jackknife_entropy_outliers basic vector input", {
+test_that("calculate_jeo basic vector input", {
   # Test basic vector input
   set.seed(123)
   x <- c(100, 50, 75, 200, 80, 120, 150, 60)
   
-  result <- .jackknife_entropy_outliers(
+  result <- .calculate_jeo(
     x = x,
     q = 1,
     norm = TRUE,
@@ -540,13 +539,13 @@ test_that("jackknife_entropy_outliers basic vector input", {
   expect_true("influence" %in% names(result))
 })
 
-test_that("jackknife_entropy_outliers multiple q with verbose = TRUE", {
+test_that("calculate_jeo multiple q with verbose = TRUE", {
   # Test printing of multi-q results
   set.seed(123)
   x <- c(100, 50, 75, 200, 80, 120)
   
   suppressMessages(
-    result <- .jackknife_entropy_outliers(
+    result <- .calculate_jeo(
       x = x,
       q = c(1.0, 2.0),
       norm = TRUE,
@@ -557,12 +556,12 @@ test_that("jackknife_entropy_outliers multiple q with verbose = TRUE", {
   expect_true(is.list(result))
 })
 
-test_that("jackknife_entropy_outliers matrix with multiple q", {
+test_that("calculate_jeo matrix with multiple q", {
   # Test matrix input with multiple q values
   set.seed(123)
   x <- matrix(c(100, 50, 200, 75, 150, 80), nrow = 2, ncol = 3)
   
-  result <- .jackknife_entropy_outliers(
+  result <- .calculate_jeo(
     x = x,
     q = c(1.0, 1.5, 2.0),
     norm = TRUE,
@@ -572,7 +571,7 @@ test_that("jackknife_entropy_outliers matrix with multiple q", {
   expect_true(is.list(result))
 })
 
-test_that("jackknife_entropy_outliers with SE and res inputs", {
+test_that("calculate_jeo with SE and res inputs", {
   # Test SummarizedExperiment with results data.frame for multi-gene analysis
   set.seed(123)
   
@@ -584,7 +583,7 @@ test_that("jackknife_entropy_outliers with SE and res inputs", {
   
   res <- data.frame(gene_id = c("g1", "g2", "g3"), pvalue = c(0.001, 0.01, 0.1))
   
-  result <- .jackknife_entropy_outliers(
+  result <- .calculate_jeo(
     se = se,
     res = res,
     top_n = 2,
@@ -596,7 +595,7 @@ test_that("jackknife_entropy_outliers with SE and res inputs", {
   expect_true(is.list(result))
 })
 
-test_that("jackknife_entropy_outliers SE gene lookup from rowData gene_name", {
+test_that("calculate_jeo SE gene lookup from rowData gene_name", {
   # Test gene lookup using gene_name column in rowData
   set.seed(123)
   
@@ -611,7 +610,7 @@ test_that("jackknife_entropy_outliers SE gene lookup from rowData gene_name", {
   
   res <- data.frame(gene_id = c("GENEQ", "GENEZ", "GENEX"), pvalue = c(0.001, 0.01, 0.1))
   
-  result <- .jackknife_entropy_outliers(
+  result <- .calculate_jeo(
     se = se,
     res = res,
     top_n = 1,
@@ -638,7 +637,7 @@ test_that("jackknife_entropy_outliers SE gene lookup from rowData gene_id", {
   
   res <- data.frame(gene_id = c("G001", "G002", "G003"), pvalue = c(0.001, 0.01, 0.1))
   
-  result <- .jackknife_entropy_outliers(
+  result <- .calculate_jeo(
     se = se,
     res = res,
     top_n = 1,
@@ -664,7 +663,7 @@ test_that("jackknife_entropy_outliers SE with missing gene warning", {
   
   # Should handle missing gene gracefully with a warning
   expect_warning(
-    result <- .jackknife_entropy_outliers(
+    result <- .calculate_jeo(
       se = se,
       res = res,
       top_n = 2,
@@ -690,7 +689,7 @@ test_that("jackknife_entropy_outliers with invalid count values", {
   
   # Should handle invalid counts
   expect_warning(
-    result <- .jackknife_entropy_outliers(
+    result <- .calculate_jeo(
       se = se,
       res = res,
       top_n = 1,
@@ -713,7 +712,7 @@ test_that("jackknife_entropy_outliers SE with pseudocount and normalization", {
   
   res <- data.frame(gene_id = c("g1", "g2"), pvalue = c(0.001, 0.01))
   
-  result <- .jackknife_entropy_outliers(
+  result <- .calculate_jeo(
     se = se,
     res = res,
     top_n = 1,
@@ -731,7 +730,7 @@ test_that("jackknife_entropy_outliers with different log bases", {
   set.seed(123)
   x <- c(100, 50, 75, 200, 80, 120)
   
-  result_e <- .jackknife_entropy_outliers(
+  result_e <- .calculate_jeo(
     x = x,
     q = 2,
     norm = TRUE,
@@ -739,7 +738,7 @@ test_that("jackknife_entropy_outliers with different log bases", {
     verbose = FALSE
   )
   
-  result_2 <- .jackknife_entropy_outliers(
+  result_2 <- .calculate_jeo(
     x = x,
     q = 2,
     norm = TRUE,
@@ -756,7 +755,7 @@ test_that("jackknife_entropy_outliers with outlier threshold parameter", {
   set.seed(123)
   x <- c(100, 50, 75, 200, 80, 120, 150, 60)
   
-  result_90 <- .jackknife_entropy_outliers(
+  result_90 <- .calculate_jeo(
     x = x,
     q = 2,
     norm = TRUE,
@@ -764,7 +763,7 @@ test_that("jackknife_entropy_outliers with outlier threshold parameter", {
     verbose = FALSE
   )
   
-  result_95 <- .jackknife_entropy_outliers(
+  result_95 <- .calculate_jeo(
     x = x,
     q = 2,
     norm = TRUE,
@@ -781,14 +780,14 @@ test_that("jackknife_entropy_outliers with seed for reproducibility", {
   set.seed(123)
   x <- c(100, 50, 75, 200, 80, 120)
   
-  result1 <- .jackknife_entropy_outliers(
+  result1 <- .calculate_jeo(
     x = x,
     q = 2,
     norm = TRUE,
     verbose = FALSE
   )
   
-  result2 <- .jackknife_entropy_outliers(
+  result2 <- .calculate_jeo(
     x = x,
     q = 2,
     norm = TRUE,
@@ -839,9 +838,8 @@ test_that("compute_delta_statistics returns statistics", {
   expect_equal(length(result$ci_lower), 2)
 })
 
-test_that("jackknife_isoform_switching with SummarizedExperiment", {
-  # Test jackknife_isoform_switching with proper SE input
-  skip_on_cran()
+test_that("calculate_jis with SummarizedExperiment", {
+  # Test calculate_jis with proper SE input
   skip_if_not_installed("SummarizedExperiment")
   set.seed(123)
   
@@ -867,7 +865,7 @@ test_that("jackknife_isoform_switching with SummarizedExperiment", {
     )
   )
   
-  result <- .jackknife_isoform_switching(
+  result <- .calculate_jis(
     se = se,
     condition_col = "condition",
     gene_col = "gene_id",
@@ -879,9 +877,8 @@ test_that("jackknife_isoform_switching with SummarizedExperiment", {
   expect_true(is.list(result) || inherits(result, "tsenat_isoform_switching"))
 })
 
-test_that("jackknife_isoform_switching with multiple q", {
+test_that("calculate_jis with multiple q", {
   # Test with multi-q 
-  skip_on_cran()
   
   skip_if_not_installed("SummarizedExperiment")
   set.seed(123)
@@ -908,7 +905,7 @@ test_that("jackknife_isoform_switching with multiple q", {
     )
   )
   
-  result <- .jackknife_isoform_switching(
+  result <- .calculate_jis(
     se = se,
     condition_col = "condition",
     gene_col = "gene_id",
@@ -925,7 +922,7 @@ test_that("jackknife_entropy_outliers returns required field structure", {
   set.seed(123)
   x <- c(100, 50, 75, 200, 80, 120)
   
-  result <- .jackknife_entropy_outliers(
+  result <- .calculate_jeo(
     x = x,
     q = 2,
     norm = TRUE,
@@ -941,7 +938,7 @@ test_that("jackknife_entropy_outliers identifies outliers", {
   # Create data with one very dominant transcript
   x <- c(1000, 50, 75, 200, 80, 120)  # First value is much larger
   
-  result <- .jackknife_entropy_outliers(
+  result <- .calculate_jeo(
     x = x,
     q = 2,
     norm = TRUE,
@@ -958,7 +955,7 @@ test_that("jackknife_entropy_outliers with very small counts", {
   set.seed(123)
   x <- c(1, 2, 1, 3, 2, 1)
   
-  result <- .jackknife_entropy_outliers(
+  result <- .calculate_jeo(
     x = x,
     q = 2,
     norm = TRUE,
@@ -975,7 +972,7 @@ test_that("jackknife_entropy_outliers with zero counts", {
   set.seed(123)
   x <- c(100, 0, 75, 200, 0, 120)
   
-  result <- .jackknife_entropy_outliers(
+  result <- .calculate_jeo(
     x = x,
     q = 2,
     norm = TRUE,
@@ -991,7 +988,7 @@ test_that("jackknife_entropy_outliers with q = 1 (Shannon entropy)", {
   set.seed(123)
   x <- c(100, 50, 75, 200, 80, 120)
   
-  result <- .jackknife_entropy_outliers(
+  result <- .calculate_jeo(
     x = x,
     q = 1.0,
     norm = TRUE,
@@ -1007,7 +1004,7 @@ test_that("jackknife_entropy_outliers with large q value", {
   set.seed(123)
   x <- c(100, 50, 75, 200, 80, 120)
   
-  result <- .jackknife_entropy_outliers(
+  result <- .calculate_jeo(
     x = x,
     q = 5.0,
     norm = TRUE,
@@ -1030,7 +1027,7 @@ test_that("jackknife_entropy_outliers SE with top_n > total genes", {
   res <- data.frame(gene_id = c("g1", "g2", "g3"), pvalue = c(0.001, 0.01, 0.1))
   
   # top_n = 10 but only 3 genes available - should use all 3
-  result <- .jackknife_entropy_outliers(
+  result <- .calculate_jeo(
     se = se,
     res = res,
     top_n = 10,
@@ -1052,7 +1049,7 @@ test_that("jackknife_entropy_outliers SE SE validation", {
   res <- data.frame(gene_id = c("g1"), pvalue = c(0.001))
   
   expect_error(
-    .jackknife_entropy_outliers(
+    .calculate_jeo(
       se = invalid_se,
       res = res,
       q = 2,
@@ -1076,7 +1073,7 @@ test_that("jackknife_entropy_outliers SE res validation", {
   invalid_res <- list(gene_id = c("g1"))
   
   expect_error(
-    .jackknife_entropy_outliers(
+    .calculate_jeo(
       se = se,
       res = invalid_res,
       q = 2,
@@ -1091,7 +1088,7 @@ test_that("jackknife_entropy_outliers summary method", {
   set.seed(123)
   x <- c(100, 50, 75, 200, 80, 120)
   
-  result <- .jackknife_entropy_outliers(
+  result <- .calculate_jeo(
     x = x,
     q = 2,
     norm = TRUE,
@@ -1107,7 +1104,7 @@ test_that("jackknife_entropy_outliers print method", {
   set.seed(123)
   x <- c(100, 50, 75, 200, 80, 120)
   
-  result <- .jackknife_entropy_outliers(
+  result <- .calculate_jeo(
     x = x,
     q = 2,
     norm = TRUE,
@@ -1127,7 +1124,7 @@ test_that("jackknife_entropy_outliers nthreads = 1 (sequential)", {
   set.seed(123)
   x <- c(100, 50, 75, 200, 80, 120, 150, 60)
   
-  result <- .jackknife_entropy_outliers(
+  result <- .calculate_jeo(
     x = x,
     q = 1,
     norm = TRUE,
@@ -1147,7 +1144,7 @@ test_that("jackknife_entropy_outliers nthreads = 2 with multi-q", {
   set.seed(123)
   x <- c(100, 50, 75, 200, 80)
   
-  result <- .jackknife_entropy_outliers(
+  result <- .calculate_jeo(
     x = x,
     q = c(0.5, 1, 1.5),  # 3 q values triggers parallel (> 2) but fewer than before
     norm = TRUE,
@@ -1162,7 +1159,6 @@ test_that("jackknife_entropy_outliers nthreads = 2 with multi-q", {
 
 test_that("jackknife_entropy_outliers nthreads parameter passes through SE path", {
   # Test nthreads parameter with SummarizedExperiment input
-  skip_on_cran()
   skip_if_not_installed("SummarizedExperiment")
   set.seed(123)
   
@@ -1186,7 +1182,7 @@ test_that("jackknife_entropy_outliers nthreads parameter passes through SE path"
     row.names = c("Gene1", "Gene2")
   )
   
-  result <- .jackknife_entropy_outliers(
+  result <- .calculate_jeo(
     se = se,
     res = res,
     top_n = 2,
@@ -1200,7 +1196,6 @@ test_that("jackknife_entropy_outliers nthreads parameter passes through SE path"
 
 test_that("jackknife_entropy_outliers nthreads parameter passes through matrix recursion", {
   # Test nthreads parameter through matrix input (internal recursion)
-  skip_on_cran()
   set.seed(123)
   x_matrix <- matrix(
     c(100, 50, 75, 80, 200, 120, 150, 160),
@@ -1209,7 +1204,7 @@ test_that("jackknife_entropy_outliers nthreads parameter passes through matrix r
   rownames(x_matrix) <- c("Gene1", "Gene2")
   
   # Single q value (no parallelization but nthreads should still work)
-  result <- .jackknife_entropy_outliers(
+  result <- .calculate_jeo(
     x = x_matrix,
     q = 1,
     nthreads = 1,
@@ -1227,7 +1222,7 @@ test_that("jackknife_entropy_outliers nthreads behavior: nthreads > 1 without mu
   x <- c(100, 50, 75, 200, 80)
   
   # Single q value: should not parallelize even with nthreads = 2
-  result <- .jackknife_entropy_outliers(
+  result <- .calculate_jeo(
     x = x,
     q = 1,  # Only 1 q value, so no parallelization
     nthreads = 2,
@@ -1343,6 +1338,8 @@ test_that(".jis_process_all_genes processes genes with 2+ transcripts", {
   conditions <- c("A", "B")
   paired_info <- TSENAT:::.setup_paired_design_jis(se, NULL, "condition")
   
+  # OPTIMIZATION: Reduce n_bootstrap from 10->3 for unit test (saves ~7 seconds)
+  # Coverage remains full; validation happens in full workflow test
   result <- TSENAT:::.jis_process_all_genes(
     se = se,
     gene_ids = c("g1", "g2"),
@@ -1355,7 +1352,7 @@ test_that(".jis_process_all_genes processes genes with 2+ transcripts", {
     norm = TRUE,
     log_base = exp(1),
     pseudocount = 0,
-    n_bootstrap = 10,
+    nboot = 3,
     lm_gene_mapping = NULL
   )
   
@@ -1376,6 +1373,8 @@ test_that(".jis_process_all_genes skips genes with <2 transcripts", {
   rd$gene_id <- c("g1", "g1", "g1", "g_single", "g2", "g2")
   SummarizedExperiment::rowData(se) <- rd
   
+  # OPTIMIZATION: Reduce n_bootstrap from 10->3 for unit test (saves ~7 seconds)
+  # Coverage remains full; validation happens in full workflow test
   result <- TSENAT:::.jis_process_all_genes(
     se = se,
     gene_ids = c("g1", "g_single", "g2"),
@@ -1388,7 +1387,7 @@ test_that(".jis_process_all_genes skips genes with <2 transcripts", {
     norm = TRUE,
     log_base = exp(1),
     pseudocount = 0,
-    n_bootstrap = 10,
+    nboot = 3,
     lm_gene_mapping = NULL
   )
   
@@ -1412,6 +1411,8 @@ test_that(".jis_process_all_genes adds LM results when provided", {
     stringsAsFactors = FALSE
   )
   
+  # OPTIMIZATION: Reduce n_bootstrap from 10->3 for unit test (saves ~7 seconds)
+  # Coverage remains full; validation happens in full workflow test
   result <- TSENAT:::.jis_process_all_genes(
     se = se,
     gene_ids = c("g1", "g2"),
@@ -1424,7 +1425,7 @@ test_that(".jis_process_all_genes adds LM results when provided", {
     norm = TRUE,
     log_base = exp(1),
     pseudocount = 0,
-    n_bootstrap = 10,
+    nboot = 3,
     lm_gene_mapping = lm_results
   )
   
@@ -1437,6 +1438,8 @@ test_that(".jis_process_all_genes handles paired design corrections", {
   conditions <- c("A", "B")
   paired_info <- TSENAT:::.setup_paired_design_jis(se, "individual_id", "condition")
   
+  # OPTIMIZATION: Reduce n_bootstrap from 10->3 for unit test (saves ~7 seconds)
+  # Coverage remains full; validation happens in full workflow test
   result <- TSENAT:::.jis_process_all_genes(
     se = se,
     gene_ids = c("g1", "g2"),
@@ -1449,7 +1452,7 @@ test_that(".jis_process_all_genes handles paired design corrections", {
     norm = TRUE,
     log_base = exp(1),
     pseudocount = 0,
-    n_bootstrap = 10,
+    nboot = 3,
     lm_gene_mapping = NULL
   )
   
@@ -1611,7 +1614,6 @@ test_that(".jis_normalize_pseudocount returns pseudocount >= 1e-8", {
 # ============================================================================
 
 test_that("Full workflow: validation -> pairing -> LM filtering -> gene processing", {
-  skip_on_cran()
   
   se <- create_test_se()
   

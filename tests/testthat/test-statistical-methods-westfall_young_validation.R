@@ -156,7 +156,7 @@ test_that("Type I error (FWER) is maintained at appropriate alpha level", {
   # Test under H₀: no gene × q interaction
   n_genes <- 5
   n_q <- 3
-  n_samples <- 8  # Increased from 4 to avoid sparse contingency tables in Mood's median test
+  n_samples <- 8  # Adequate sample size for robust permutation test results
   
   fwer_count <- 0
   n_simulations <- 30  # Reduced for speed in test suite
@@ -172,10 +172,9 @@ test_that("Type I error (FWER) is maintained at appropriate alpha level", {
     data_null$entropy <- rnorm(nrow(data_null), mean = 2, sd = 0.5)
     
     # Run rank-based test with multiple correction
-    # Suppress occasional chi-squared warnings from Mood's median test with sparse tables
     result <- suppressWarnings(
       tryCatch(
-        .rank_test_q_condition(
+        .calculate_srh(
           data = data_null,
           entropy_col = "entropy",
           q_col = "q",
@@ -277,7 +276,7 @@ test_that("detect_q_gene_interactions handles paired design correctly", {
   data_paired$condition <- data_paired$sample_type
   
   # Run with paired design
-  result <- .rank_test_q_condition(
+  result <- .calculate_srh(
     data = data_paired,
     entropy_col = "entropy",
     q_col = "q",
@@ -308,7 +307,7 @@ test_that("Westfall-Young permutation maintains FWER with adequate sample sizes"
   set.seed(888)
   
   # Create unpaired data with adequate sample size (20 per q-level)
-  # Ensures contingency tables in Mood's median test have sufficient cell counts
+  # Sample size ensures sufficient observations for permutation test computation
   # even during permutation resampling
   data_large <- expand.grid(
     sample = 1:20,
@@ -322,7 +321,7 @@ test_that("Westfall-Young permutation maintains FWER with adequate sample sizes"
   data_large$condition <- rep(c("A", "B"), length.out = nrow(data_large))
   
   # Run with Westfall-Young (uses permutation loop)
-  result <- .rank_test_q_condition(
+  result <- .calculate_srh(
     data = data_large,
     entropy_col = "entropy",
     q_col = "q",
@@ -371,7 +370,7 @@ test_that("Westfall-Young permutation works with unpaired rank-based tests", {
   
   # Run with Hochberg correction (more stable for moderate sample sizes)
   # Hochberg is valid under positive regression dependence (satisfied for Tsallis entropy q-values)
-  result <- .rank_test_q_condition(
+  result <- .calculate_srh(
     data = data_sig,
     entropy_col = "entropy",
     q_col = "q",
@@ -401,49 +400,11 @@ test_that("Westfall-Young permutation works with unpaired rank-based tests", {
 })
 
 # ════════════════════════════════════════════════════════════════════════════════
-# TEST 7: CONDITIONAL RANK TEST SELECTION
+# TEST 7: CONDITIONAL RANK TEST SELECTION [REMOVED - dead code]
 # ════════════════════════════════════════════════════════════════════════════════
 
-test_that("Conditional rank test selection adapts to data characteristics", {
-  set.seed(888)
-  
-  # Test 7a: Normal data → Kruskal-Wallis
-  data_normal <- data.frame(
-    entropy = rnorm(60, mean = 2, sd = 0.5),
-    q = factor(rep(c(1, 2, 3, 4), 15))
-  )
-  
-  result_normal <- .apply_conditional_rank_test(
-    data = data_normal,
-    value_col = "entropy",
-    group_col = "q",
-    verbose = FALSE
-  )
-  
-  expect_is(result_normal$p_value, "numeric")
-  expect_true(result_normal$p_value >= 0 & result_normal$p_value <= 1)
-  
-  # Test 7b: Heteroscedastic data → Should detect and adjust
-  data_hetero <- data.frame(
-    entropy = c(
-      rnorm(15, mean = 2, sd = 0.2),   # Low variance group
-      rnorm(15, mean = 2.5, sd = 2.0), # High variance group
-      rnorm(15, mean = 2.2, sd = 0.3), # Low variance group
-      rnorm(15, mean = 2.3, sd = 0.25) # Low variance group
-    ),
-    q = factor(rep(c(1, 2, 3, 4), 15))
-  )
-  
-  result_hetero <- .apply_conditional_rank_test(
-    data = data_hetero,
-    value_col = "entropy",
-    group_col = "q",
-    verbose = FALSE
-  )
-  
-  expect_is(result_hetero$p_value, "numeric")
-  expect_true(result_hetero$characteristics$heteroscedastic %in% c(TRUE, FALSE))
-})
+# Removed: test_that("Conditional rank test selection adapts to data characteristics")
+# Reason: .apply_conditional_rank_test() was deleted in code cleanup
 
 # ════════════════════════════════════════════════════════════════════════════════
 # TEST 8: PARALLEL WESTFALL-YOUNG PERMUTATION (nthreads=2)
@@ -469,7 +430,7 @@ test_that("Parallel WY permutation (nthreads=2) produces valid results", {
   
   # Run with WY permutation and nthreads=2
   # Use smaller wy_randomizations for speed
-  result_parallel <- .rank_test_q_condition(
+  result_parallel <- .calculate_srh(
     data = data_parallel,
     entropy_col = "entropy",
     q_col = "q",
@@ -530,7 +491,7 @@ test_that("Serial (nthreads=1) and parallel (nthreads=2) WY produce consistent r
   # Set seed identically for both runs
   # Suppress chi-squared approximation warnings (expected with small sample sizes)
   set.seed(777)
-  result_serial <- suppressWarnings(.rank_test_q_condition(
+  result_serial <- suppressWarnings(.calculate_srh(
     data = data_compare,
     entropy_col = "entropy",
     q_col = "q",
@@ -545,7 +506,7 @@ test_that("Serial (nthreads=1) and parallel (nthreads=2) WY produce consistent r
   ))
   
   set.seed(777)
-  result_parallel <- suppressWarnings(.rank_test_q_condition(
+  result_parallel <- suppressWarnings(.calculate_srh(
     data = data_compare,
     entropy_col = "entropy",
     q_col = "q",

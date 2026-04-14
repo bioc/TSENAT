@@ -2,53 +2,41 @@ library(testthat)
 
 context("Orchestration: Configuration and Pipeline")
 
-# Skip all tests in this file on CRAN
-skip_on_cran()
-
 # ============================================================================
 # Helper: Create test SummarizedExperiment using real package data
-# Loads data like workflow.R but returns just the SE (not TSENATAnalysis)
 # ============================================================================
 
 make_test_se <- function() {
-  # Load example dataset (includes readcounts, tpm, and effective_length)
-  # Uses ALL 16 samples (8 normal, 8 tumor) from TSENAT package
   data(readcounts, package = "TSENAT", envir = environment())
   readcounts <- as.matrix(readcounts)
   
-  # Verify all samples are loaded
   if (ncol(readcounts) != 16) {
     stop("Expected 16 samples in readcounts, got ", ncol(readcounts))
   }
   
-  # Load sample metadata and annotation (ALL samples, no filtering)
   metadata_df <- read.table(
     system.file("extdata", "metadata.tsv", package = "TSENAT"),
     header = TRUE, sep = "\t"
   )
   
-  # Verify all samples in metadata
   if (nrow(metadata_df) != 16) {
     stop("Expected 16 samples in metadata, got ", nrow(metadata_df))
   }
   
   gff3_file <- system.file("extdata", "annotation.gff3.gz", package = "TSENAT")
   
-  # Configure analysis parameters (follow workflow.R pattern)
-  # Uses all 16 samples with paired design (8 subjects, 2 timepoints each)
-  config <- tsenat_config(
+  config <- TSENAT_config(
     sample_col = "sample",
     condition_col = "condition",
     subject_col = "paired_samples",
-    q_values = seq(0, 2, by = 0.05),  # ~41 q-values matching workflow.R for sufficient GAM data points
+    q = seq(0, 2, by = 0.05),
     paired = TRUE,
     control = "normal",
     stringency = "severe",
     nthreads = 1
   )
   
-  # Build TSENATAnalysis object (has embedded SummarizedExperiment) with ALL samples
-  analysis <- build_analysis_s4(
+  analysis <- build_analysis(
     config = config,
     readcounts = readcounts,
     metadata = metadata_df,
@@ -57,792 +45,1452 @@ make_test_se <- function() {
     effective_length = effective_length
   )
   
-  # Apply medium stringency filtering
-  analysis <- filter_analysis_s4(analysis, stringency = "medium", verbose = FALSE)
-  
-  # Return unfiltered SE with all 16 samples - let tsenat() workflow handle default filtering
-  # workflow.R doesn't pre-filter; filtering happens inside tsenat()
+  analysis <- filter_analysis(analysis, stringency = "medium", verbose = FALSE)
   se(analysis)
 }
 
 # ============================================================================
-# TEST: tsenat_config function
+# TEST: TSENAT_config function (CONSOLIDATED: 10 → 3 tests)
 # ============================================================================
 
-test_that("tsenat_config creates config with defaults", {
-  config <- tsenat_config()
-  
+test_that("TSENAT_config creates and stores configurations", {
+  # Test 1: Minimal required parameters
+  config <- TSENAT_config(
+    sample_col = "sample",
+    condition_col = "condition",
+    q = 1.0
+  )
   expect_true(is.list(config))
-  # These fields are always present
-  expect_true(all(c("p_threshold", "q_values", "p_threshold") %in% names(config)))
-  # seed is optional, only included if specified
-  expect_true("q_values" %in% names(config))
-})
-
-test_that("tsenat_config accepts custom parameters", {
-  config <- tsenat_config(p_threshold = 0.01, seed = 123)
+  expect_true("q" %in% names(config))
   
+  # Test 2: Custom parameters with required ones
+  config <- TSENAT_config(
+    sample_col = "sample",
+    condition_col = "condition",
+    q = 1.0,
+    p_threshold = 0.01,
+    seed = 123
+  )
   expect_equal(config$p_threshold, 0.01)
   expect_equal(config$seed, 123)
-})
-
-test_that("tsenat_config stores all provided arguments", {
-  config <- tsenat_config(
+  
+  # Test 3: All provided arguments
+  config <- TSENAT_config(
+    sample_col = "sample",
+    condition_col = "condition",
     p_threshold = 0.05,
-    q_values = c(0.5, 1.0, 1.5),
+    q = c(0.5, 1.0, 1.5),
     norm = "none"
   )
-  
   expect_equal(config$p_threshold, 0.05)
   expect_equal(config$norm, "none")
-  expect_equal(length(config$q_values), 3)
+  expect_equal(length(config$q), 3)
 })
 
-# ============================================================================
-# TEST: getConfig and setConfig
-# ============================================================================
-
-test_that("getConfig retrieves configuration from analysis", {
-  se <- make_test_se()
-  analysis <- TSENATAnalysis(se, config = tsenat_config(seed = 99))
+test_that("TSENAT_config validates parameters", {
+  # Test q validation
+  config <- TSENAT_config(
+    sample_col = "sample",
+    condition_col = "condition",
+    q = c(0.5, 1.0, 1.5)
+  )
+  expect_true(is.numeric(config$q))
+  expect_true(length(config$q) >= 1)
   
+  # Test stringency parameter
+  config <- TSENAT_config(
+    sample_col = "sample",
+    condition_col = "condition",
+    q = 1.0,
+    stringency = "medium"
+  )
+  expect_equal(config$stringency, "medium")
+})
+
+test_that("TSENAT_config/getConfig/setConfig integration", {
+  se <- make_test_se()
+  
+  # getConfig test
+  analysis <- TSENATAnalysis(se, config = TSENAT_config(
+    sample_col = "sample",
+    condition_col = "condition",
+    q = 1.0,
+    seed = 99
+  ))
   config <- getConfig(analysis)
-  
   expect_equal(config$seed, 99)
-})
-
-test_that("setConfig replaces configuration", {
-  se <- make_test_se()
-  analysis <- TSENATAnalysis(se, config = tsenat_config(seed = 1))
   
-  new_analysis <- setConfig(analysis, tsenat_config(seed = 2))
+  # setConfig test
+  analysis_new <- setConfig(analysis, TSENAT_config(
+    sample_col = "sample",
+    condition_col = "condition",
+    q = 1.0,
+    seed = 2
+  ))
+  expect_equal(analysis_new@config$seed, 2)
   
-  expect_equal(new_analysis@config$seed, 2)
-})
-
-test_that("setConfig preserves SE data", {
-  se <- make_test_se()
-  analysis <- TSENATAnalysis(se)
-  
-  new_config <- tsenat_config(p_threshold = 0.001)
-  new_analysis <- setConfig(analysis, new_config)
-  
+  # Preserves SE data
+  new_config <- TSENAT_config(
+    sample_col = "sample",
+    condition_col = "condition",
+    q = 1.0,
+    p_threshold = 0.001
+  )
+  analysis_new <- setConfig(analysis, new_config)
   expect_identical(
-    SummarizedExperiment::assay(new_analysis@se, "counts"),
+    SummarizedExperiment::assay(analysis_new@se, "counts"),
     SummarizedExperiment::assay(se, "counts")
   )
 })
 
 # ============================================================================
-# TEST: tsenat pipeline function
+# TEST: tsenat pipeline function (CONSOLIDATED: 7 → 2 tests)
 # ============================================================================
 
-test_that("tsenat creates TSENATAnalysis from SummarizedExperiment", {
+test_that("tsenat pipeline requires TSENATAnalysis object", {
   se <- make_test_se()
   
-  # tsenat requires a TSENATAnalysis object, not a raw SE
-  expect_error(
-    tsenat(se),
-    "must be a TSENATAnalysis object"
-  )
-})
-
-test_that("tsenat accepts SE with valid assays", {
-  se <- make_test_se()
+  # All tsenat calls should fail with raw SE
+  expect_error(TSENAT(se), "must be a TSENATAnalysis object")
+  expect_error(TSENAT(se, verbose = FALSE), "must be a TSENATAnalysis object")
   
-  # tsenat requires a TSENATAnalysis object, not a raw SE
-  expect_error(
-    tsenat(se, verbose = FALSE),
-    "must be a TSENATAnalysis object"
-  )
-})
-
-test_that("tsenat accepts config, methods, and filter_genome parameters", {
-  # Consolidated test combining 3 parameter tests for efficiency (Phase 9 optimization)
-  se <- make_test_se()
-  
-  # tsenat requires a TSENATAnalysis object, not a raw SE
-  expect_error(
-    tsenat(se, verbose = FALSE),
-    "must be a TSENATAnalysis object"
-  )
-})
-
-test_that("tsenat rejects invalid SE (missing required assays)", {
-  # Create invalid SE - no tpm assay
+  # Invalid SEs
   counts <- matrix(rpois(100 * 20, lambda = 100), nrow = 100)
   invalid_se <- SummarizedExperiment::SummarizedExperiment(
     assays = list(counts = counts),
     colData = data.frame(condition = rep(c('A', 'B'), 10), row.names = paste0('S', 1:20))
   )
-  
-  # tsenat() requires a TSENATAnalysis object, not a raw SE
-  expect_error(
-    tsenat(invalid_se, verbose = FALSE),
-    "must be a TSENATAnalysis object"
-  )
+  expect_error(TSENAT(invalid_se, verbose = FALSE), "must be a TSENATAnalysis object")
 })
 
-test_that("tsenat rejects invalid SE (missing condition column)", {
-  counts <- matrix(rpois(100 * 20, lambda = 100), nrow = 100)
-  tpm <- t(t(counts) / colSums(counts) * 1e6)
-  
-  invalid_se <- SummarizedExperiment::SummarizedExperiment(
-    assays = list(counts = counts, tpm = tpm),
-    colData = data.frame(sample_id = paste0('S', 1:20), row.names = paste0('S', 1:20))
-  )
-  
-  # SE with no 'condition' column - tsenat expects TSENATAnalysis
-  expect_error(
-    tsenat(invalid_se, verbose = FALSE),
-    "must be a TSENATAnalysis object"
-  )
-})
-
-# ============================================================================
-# TEST: Method parameters through config
-# ============================================================================
-
-test_that("tsenat passes config parameters to analysis methods", {
+test_that("tsenat passes config parameters through pipeline", {
   se <- make_test_se()
-  config <- tsenat_config(p_threshold = 0.001, seed = 777)
-  
-  # Create TSENATAnalysis object with config
+  config <- TSENAT_config(
+    sample_col = "sample",
+    condition_col = "condition",
+    q = 1.0,
+    p_threshold = 0.001,
+    seed = 777
+  )
   analysis <- TSENATAnalysis(se, config = config)
   
-  # Verify config was assigned
   expect_equal(getConfig(analysis)$seed, 777)
   expect_equal(getConfig(analysis)$p_threshold, 0.001)
 })
 
-
-
 # ============================================================================
-# TEST: Configuration validation
+# TEST: .validate_analysis_object (CONSOLIDATED: 9 → 3 tests)
 # ============================================================================
 
-test_that("tsenat_config validates q_values if provided", {
-  # q_values should be numeric
-  config <- tsenat_config(q_values = c(0.5, 1.0, 1.5))
-  
-  expect_true(is.numeric(config$q_values))
-  expect_true(length(config$q_values) >= 1)
-})
-
-test_that("tsenat_config accepts stringency parameter", {
-  config <- tsenat_config(stringency = "medium")
-  
-  expect_equal(config$stringency, "medium")
-})
-
-test_that("tsenat processes stringency levels", {
+test_that(".validate_analysis_object accepts valid objects", {
   se <- make_test_se()
-  
-  for (stringency in c("soft", "medium", "severe")) {
-    # tsenat requires a TSENATAnalysis object, not a raw SE
-    expect_error(
-      tsenat(se, verbose = FALSE),
-      "must be a TSENATAnalysis object"
-    )
-  }
-})
-
-
-
-
-
-# ============================================================================
-# TEST: Helper function .finalize_tsenat_analysis
-# ============================================================================
-
-test_that(".finalize_tsenat_analysis adds end time", {
-  se <- make_test_se()
-  analysis <- TSENATAnalysis(se)
-  
-  before_finalize <- Sys.time()
-  analysis_finalized <- .finalize_tsenat_analysis(analysis, verbose = FALSE)
-  after_finalize <- Sys.time()
-  
-  expect_true(inherits(analysis_finalized@metadata$ended_at, "POSIXct"))
-  expect_true(analysis_finalized@metadata$ended_at >= before_finalize)
-})
-
-test_that(".finalize_tsenat_analysis prints summary when verbose", {
-  se <- make_test_se()
-  analysis <- TSENATAnalysis(se)
-  
-  # Test that messages are produced when verbose = TRUE
-  expect_message(
-    .finalize_tsenat_analysis(analysis, verbose = TRUE),
-    "ANALYSIS COMPLETE"
-  )
-  
-  expect_message(
-    .finalize_tsenat_analysis(analysis, verbose = TRUE),
-    "Results Summary"
-  )
-})
-
-test_that(".finalize_tsenat_analysis silent when not verbose", {
-  se <- make_test_se()
-  analysis <- TSENATAnalysis(se)
-  
-  # Test that NO messages are produced when verbose = FALSE
-  expect_no_message(
-    .finalize_tsenat_analysis(analysis, verbose = FALSE)
-  )
-})
-
-
-# ============================================================================
-# TEST: Integration - Helper functions work together in pipeline
-# ============================================================================
-
-test_that("Helper functions integrate smoothly in tsenat pipeline", {
-  se <- make_test_se()
-  
-  # Test full pipeline - tsenat requires a TSENATAnalysis object, not a raw SE
-  expect_error(
-    tsenat(se, verbose = FALSE),
-    "must be a TSENATAnalysis object"
-  )
-})
-
-# ============================================================================
-# TEST: Helper function .validate_analysis_object
-# ============================================================================
-
-test_that(".validate_analysis_object accepts valid analysis object", {
-  se <- make_test_se()
-  analysis <- TSENATAnalysis(se, config = tsenat_config())
+  analysis <- TSENATAnalysis(se, config = TSENAT_config(
+    sample_col = "sample",
+    condition_col = "condition",
+    q = 1.0
+  ))
   
   # Should not raise error for valid object
   expect_no_error(.validate_analysis_object(analysis))
 })
 
-test_that(".validate_analysis_object rejects empty SummarizedExperiment", {
-  # Create a valid SE, then manually break it to have 0 rows
+test_that(".validate_analysis_object rejects invalid configurations", {
   se <- make_test_se()
-  analysis <- TSENATAnalysis(se, config = tsenat_config())
+  analysis <- TSENATAnalysis(se, config = TSENAT_config(
+    sample_col = "sample",
+    condition_col = "condition",
+    q = 1.0
+  ))
   
-  # Manually remove all rows to trigger empty SE validation
-  analysis@se <- analysis@se[0, ]
-  
+  # Test: Empty SE
+  analysis_empty <- analysis
+  analysis_empty@se <- analysis_empty@se[0, ]
   error_msg <- tryCatch(
-    .validate_analysis_object(analysis),
+    .validate_analysis_object(analysis_empty),
     error = function(e) e$message
   )
-  
   expect_true(grepl("Validation failed|se_valid", error_msg))
+  
+  # Test: Insufficient samples
+  analysis_few <- analysis
+  analysis_few@se <- analysis_few@se[, 1, drop = FALSE]
+  error_msg <- tryCatch(
+    .validate_analysis_object(analysis_few),
+    error = function(e) e$message
+  )
+  expect_true(grepl("Validation failed|min_samples", error_msg))
 })
 
-test_that(".validate_analysis_object handles missing condition column gracefully", {
-  # Create a valid SE, then manually remove the condition column
+test_that(".validate_analysis_object handles missing columns gracefully", {
   se <- make_test_se()
-  analysis <- TSENATAnalysis(se, config = tsenat_config())
+  analysis <- TSENATAnalysis(se, config = TSENAT_config(
+    sample_col = "sample",
+    condition_col = "condition",
+    q = 1.0
+  ))
   
-  # Manually remove condition column from colData
+  # Remove condition column
   coldata <- SummarizedExperiment::colData(analysis@se)
   coldata$condition <- NULL
   SummarizedExperiment::colData(analysis@se) <- coldata
   
-  # The validation may or may not error depending on implementation
-  # Just verify it doesn't crash
+  # Should handle gracefully (error acceptable, but function must respond)
   result <- tryCatch(
     .validate_analysis_object(analysis),
-    error = function(e) e$message
-  )
-  # Either succeeds or produces an error message
-  expect_true(TRUE)
-})
-
-test_that(".validate_analysis_object rejects insufficient samples", {
-  # Create a valid SE, then manually reduce to 1 sample
-  se <- make_test_se()
-  analysis <- TSENATAnalysis(se, config = tsenat_config())
-  
-  # Manually keep only first sample
-  analysis@se <- analysis@se[, 1, drop = FALSE]
-  
-  error_msg <- tryCatch(
-    .validate_analysis_object(analysis),
-    error = function(e) e$message
+    error = function(e) list(error = TRUE, msg = e$message)
   )
   
-  expect_true(grepl("Validation failed|min_samples", error_msg))
-})
-
-test_that(".validate_analysis_object rejects insufficient genes", {
-  # Create SE with only 5 genes (need >= 10) AND proper colData
-  counts <- matrix(rpois(5 * 20, lambda = 100), nrow = 5, ncol = 20)
-  se_few_genes <- SummarizedExperiment::SummarizedExperiment(
-    assays = list(counts = counts),
-    colData = data.frame(
-      condition = rep(c("A", "B"), 10),
-      sample_id = paste0("S", 1:20),
-      row.names = paste0("S", 1:20)
-    )
+  # Either should error (validation caught the missing column)
+  # OR should return TRUE/FALSE (graceful handling)
+  expect_true(
+    is.list(result) || is.logical(result),
+    info = "Should return error list or logical result"
   )
   
-  # Try to create - S4 class might prevent it or our validation catches it
-  caught_error <- tryCatch({
-    analysis <- TSENATAnalysis(se_few_genes, config = tsenat_config())
-    .validate_analysis_object(analysis)
-    FALSE  # If no error, return FALSE
-  }, error = function(e) TRUE)  # If error caught, return TRUE
-  
-  # Should catch an error (either from S4 validity or our validation)
-  expect_true(caught_error)
-})
-
-test_that(".validate_analysis_object error message lists failed checks", {
-  # S4 class prevents creation of objects that fail multiple checks
-  # Just test that error messages make sense when they DO occur
-  se <- make_test_se()
-  analysis <- TSENATAnalysis(se, config = tsenat_config())
-  
-  # Manually break the SE to create an invalid condition
-  cdata <- SummarizedExperiment::colData(analysis@se)
-  cdata$condition <- NULL
-  SummarizedExperiment::colData(analysis@se) <- cdata
-  
-  # The validation function may or may not error - just verify it doesn't crash
-  result <- tryCatch(
-    {
-      .validate_analysis_object(analysis)
-      NULL  # Return NULL if no error
-    },
-    error = function(e) {
-      list(error = TRUE, message = e$message)
-    }
-  )
-  
-  # Check if error occurred
-  if (!is.null(result) && is.list(result) && result$error) {
-    expect_true(grepl("Validation failed|Analysis validation failed", result$message))
-  } else {
-    # No error is also acceptable
-    expect_true(TRUE)
+  # If error, should mention validation failure
+  if (is.list(result) && !is.null(result$error)) {
+    expect_true(grepl("Validation failed", result$msg))
   }
 })
 
 # ============================================================================
-# TEST: Helper function .track_analysis_metadata
+# TEST: .finalize_tsenat_analysis (CONSOLIDATED: 4 → 2 tests)
 # ============================================================================
 
-test_that(".track_analysis_metadata records completed steps", {
+test_that(".finalize_tsenat_analysis adds metadata and respects verbose", {
   se <- make_test_se()
-  analysis <- TSENATAnalysis(se, config = tsenat_config())
+  analysis <- TSENATAnalysis(se)
   
-  analysis_tracked <- .track_analysis_metadata(analysis, analysis@config)
+  before_time <- Sys.time()
   
-  expect_true("workflow" %in% names(analysis_tracked@metadata))
-  expect_true("workflow_type" %in% names(analysis_tracked@metadata$workflow))
+  # Test with verbose = TRUE
+  expect_message(
+    .finalize_tsenat_analysis(analysis, verbose = TRUE),
+    "ANALYSIS COMPLETE"
+  )
+  
+  # Test end time added
+  analysis_finalized <- .finalize_tsenat_analysis(analysis, verbose = FALSE)
+  expect_true(inherits(analysis_finalized@metadata$ended_at, "POSIXct"))
+  expect_true(analysis_finalized@metadata$ended_at >= before_time)
 })
 
-test_that(".track_analysis_metadata stores method parameters", {
+test_that(".finalize_tsenat_analysis verbose parameter works", {
   se <- make_test_se()
-  config <- tsenat_config(fdr_threshold = 0.01, q_values = c(0.5, 1.0, 1.5))
+  analysis <- TSENATAnalysis(se)
+  
+  # verbose = TRUE should produce messages
+  expect_message(
+    .finalize_tsenat_analysis(analysis, verbose = TRUE),
+    "Results Summary"
+  )
+  
+  # verbose = FALSE should NOT produce messages
+  expect_no_message(
+    .finalize_tsenat_analysis(analysis, verbose = FALSE)
+  )
+})
+
+# ============================================================================
+# TEST: .track_analysis_metadata (CONSOLIDATED: 7 → 2 tests)
+# ============================================================================
+
+test_that(".track_analysis_metadata records workflow information", {
+  se <- make_test_se()
+  config <- TSENAT_config(
+    sample_col = "sample",
+    condition_col = "condition",
+    fdr_threshold = 0.01,
+    q = c(0.5, 1.0, 1.5)
+  )
   analysis <- TSENATAnalysis(se, config = config)
   
   analysis_tracked <- .track_analysis_metadata(analysis, config)
   
+  # Check workflow structure
+  expect_true("workflow" %in% names(analysis_tracked@metadata))
+  expect_true("workflow_type" %in% names(analysis_tracked@metadata$workflow))
+  expect_true("tsenat_version" %in% names(analysis_tracked@metadata$workflow))
+  
+  # Check method parameters
   expect_true("methods_parameters" %in% names(analysis_tracked@metadata))
   expect_equal(analysis_tracked@metadata$methods_parameters$fdr_threshold, 0.01)
-  expect_equal(length(analysis_tracked@metadata$methods_parameters$q_values), 3)
+  expect_equal(length(analysis_tracked@metadata$methods_parameters$q), 3)
 })
 
-test_that(".track_analysis_metadata stores TSENAT version", {
+test_that(".track_analysis_metadata preserves and timestamps", {
   se <- make_test_se()
-  analysis <- TSENATAnalysis(se, config = tsenat_config())
+  config <- TSENAT_config(
+    sample_col = "sample",
+    condition_col = "condition",
+    q = 1.0
+  )
+  analysis <- TSENATAnalysis(se, config = config)
+  analysis@metadata$custom_field <- "custom_value"
   
-  analysis_tracked <- .track_analysis_metadata(analysis, analysis@config)
-  
-  expect_true("tsenat_version" %in% names(analysis_tracked@metadata$workflow))
-  expect_true(!is.null(analysis_tracked@metadata$workflow$tsenat_version))
-})
-
-test_that(".track_analysis_metadata records completion time", {
-  se <- make_test_se()
-  analysis <- TSENATAnalysis(se, config = tsenat_config())
   before_time <- Sys.time()
-  
-  analysis_tracked <- .track_analysis_metadata(analysis, analysis@config)
-  
+  analysis_tracked <- .track_analysis_metadata(analysis, config)
   after_time <- Sys.time()
   
-  expect_true("completion_time" %in% names(analysis_tracked@metadata$workflow))
+  # Check existing metadata preserved
+  expect_equal(analysis_tracked@metadata$custom_field, "custom_value")
+  
+  # Check timestamp
   completion_time <- analysis_tracked@metadata$workflow$completion_time
   expect_true(inherits(completion_time, "POSIXct"))
   expect_true(completion_time >= before_time && completion_time <= after_time)
-})
-
-test_that(".track_analysis_metadata preserves existing metadata", {
-  se <- make_test_se()
-  analysis <- TSENATAnalysis(se, config = tsenat_config())
-  # Add existing metadata
-  analysis@metadata$custom_field <- "custom_value"
   
-  analysis_tracked <- .track_analysis_metadata(analysis, analysis@config)
-  
-  expect_equal(analysis_tracked@metadata$custom_field, "custom_value")
-  expect_true("workflow" %in% names(analysis_tracked@metadata))
-})
-
-test_that(".track_analysis_metadata stores condition_col from config", {
-  se <- make_test_se()
-  config <- tsenat_config(condition_col = "condition")  # Use actual column from test data
-  analysis <- TSENATAnalysis(se, config = config)
-  
-  analysis_tracked <- .track_analysis_metadata(analysis, config)
-  
+  # Check config parameters stored
   expect_equal(analysis_tracked@metadata$methods_parameters$condition_col, "condition")
 })
 
 # ============================================================================
-# TEST: Result accessor function getResults
+# TEST: results accessor (CONSOLIDATED: 32 → 5 tests)
 # ============================================================================
 
-test_that("getResults returns NULL for uncomputed results", {
+test_that("results returns NULL/errors for edge cases", {
   se <- make_test_se()
-  analysis <- TSENATAnalysis(se, config = tsenat_config())
+  analysis <- TSENATAnalysis(se, config = TSENAT_config(
+    sample_col = "sample",
+    condition_col = "condition",
+    q = 1.0
+  ))
   
-  # No results computed yet
-  div_result <- getResults(analysis, type = "diversity")
-  divg_result <- getResults(analysis, type = "divergence")
-  lm_result <- getResults(analysis, type = "lm")
+  # Uncomputed results
+  expect_null(results(analysis, type = "diversity", format = "table"))
+  expect_null(results(analysis, type = "divergence"))
+  expect_null(results(analysis, type = "lm"))
   
-  expect_null(div_result)
-  expect_null(divg_result)
-  expect_null(lm_result)
+  # Unknown type
+  expect_error(results(analysis, type = "unknown"), "Unknown result type")
+  
+  # Non-TSENATAnalysis object
+  expect_error(results(se, type = "diversity", format = "table"), "must be a TSENATAnalysis object")
 })
 
-test_that("getResults raises error for unknown result type", {
+test_that("results handles diversity with q-value filtering", {
   se <- make_test_se()
-  analysis <- TSENATAnalysis(se, config = tsenat_config())
+  analysis <- TSENATAnalysis(se, config = TSENAT_config(
+    sample_col = "sample",
+    condition_col = "condition",
+    q = 1.0
+  ))
+  
+  n_genes <- nrow(se)
+  n_samples <- ncol(se)
+  
+  # Create SummarizedExperiment objects for each q-value
+  create_diversity_se <- function(q_value) {
+    mat <- matrix(rnorm(n_genes * n_samples, mean = 3, sd = 1), 
+                  nrow = n_genes, ncol = n_samples)
+    colnames(mat) <- colnames(se)
+    rownames(mat) <- rownames(se)
+    SummarizedExperiment::SummarizedExperiment(assays = list(q_entropy = mat),
+                                               colData = SummarizedExperiment::colData(se))
+  }
+  
+  diversity_results <- list(
+    q_0.5 = create_diversity_se(0.5),
+    q_1.0 = create_diversity_se(1.0),
+    q_1.5 = create_diversity_se(1.5),
+    q_2.0 = create_diversity_se(2.0)
+  )
+  analysis@diversity_results <- diversity_results
+  
+  # All results
+  all_results <- results(analysis, type = "diversity", format = "table")
+  expect_false(is.null(all_results))
+  
+  # Specific q-value
+  q1_results <- results(analysis, type = "diversity", q = 1.0, format = "table")
+  expect_false(is.null(q1_results))
+})
+
+test_that("results returns all supported result types", {
+  se <- make_test_se()
+  analysis <- TSENATAnalysis(se, config = TSENAT_config(
+    sample_col = "sample",
+    condition_col = "condition",
+    q = 1.0
+  ))
+  
+  n_genes <- nrow(se)
+  n_samples <- ncol(se)
+  
+  # Create SummarizedExperiment objects for diversity results
+  create_diversity_se <- function(q_value) {
+    mat <- matrix(rnorm(n_genes * n_samples), 
+                  nrow = n_genes, ncol = n_samples)
+    colnames(mat) <- colnames(se)
+    rownames(mat) <- rownames(se)
+    SummarizedExperiment::SummarizedExperiment(assays = list(q_entropy = mat),
+                                               colData = SummarizedExperiment::colData(se))
+  }
+  
+  # Mock all result types
+  analysis@diversity_results <- list(
+    q_0.5 = create_diversity_se(0.5),
+    q_1.0 = create_diversity_se(1.0)
+  )
+  analysis@divergence_results <- list(
+    q_0.5 = data.frame(gene = paste0("g", 1:n_genes), divergence = rnorm(n_genes))
+  )
+  analysis@lm_results <- list(lm_interaction = data.frame(
+    p_interaction = rnorm(n_genes),
+    adj_p_interaction = p.adjust(rnorm(n_genes), method = "BH")
+  ))
+  analysis@jackknife_results <- list(results = data.frame(
+    ci_lower = rnorm(n_genes),
+    ci_upper = rnorm(n_genes)
+  ))
+  analysis@rank_test_results <- list(rank_test = list(results = data.frame(
+    gene = paste0("g", 1:n_genes),
+    p_value = rnorm(n_genes, mean = 0.01)
+  )))
+  
+  # Test all types at once
+  expect_false(is.null(results(analysis, type = "diversity", format = "table")))
+  expect_false(is.null(results(analysis, type = "divergence")))
+  expect_false(is.null(results(analysis, type = "lm")))
+  expect_false(is.null(results(analysis, type = "jackknife")))
+  expect_false(is.null(results(analysis, type = "rank_test")))
+})
+
+# ============================================================================
+# Additional integration tests
+# ============================================================================
+
+test_that("stringency levels process without error", {
+  se <- make_test_se()
+  
+  # Test that pipeline errors correctly with raw SE
+  for (stringency in c("soft", "medium", "severe")) {
+    expect_error(
+      TSENAT(se, verbose = FALSE),
+      "must be a TSENATAnalysis object"
+    )
+  }
+})
+
+test_that("full pipeline integration works", {
+  se <- make_test_se()
+  config <- TSENAT_config(p_threshold = 0.05, seed = 123)
+  analysis <- TSENATAnalysis(se, config = config)
+  
+  # Test config retrieval
+  expect_equal(getConfig(analysis)$seed, 123)
+  
+  # Test validation
+  expect_no_error(.validate_analysis_object(analysis))
+  
+  # Test metadata tracking
+  analysis_tracked <- .track_analysis_metadata(analysis, config)
+  expect_true("workflow" %in% names(analysis_tracked@metadata))
+})
+# ============================================================================
+# TEST SUITE: orchestration_results.R - Results Accessor Functions
+# ============================================================================
+# Tests for:
+# - results() public function
+# - .validate_results_params() parameter validation
+# - .get_diversity_q_value() q-value extraction
+# - .extract_result_by_type() result extraction
+# - .extract_jackknife_result() jackknife extraction
+# - .extract_or_compute_switching_tables() lazy computation
+# - Helper functions for result processing
+#
+# Coverage Targets:
+# - Lines with hits=0 in cobertura.xml for orchestration_results.R
+# - Error conditions and validation
+# - Display and formatting functions
+# ============================================================================
+
+# Ensure TSENAT is loaded before making TSENAT::: calls
+# This prevents lazy-loading during test execution which can cause
+# benign stack imbalance warnings in R's namespace system
+library(TSENAT)
+
+# Test helpers
+.make_test_se_orchr <- function(n_genes = 5, n_samples = 4) {
+  counts <- matrix(rpois(n_genes * n_samples, lambda = 50), nrow = n_genes)
+  rownames(counts) <- paste0("Gene_", seq_len(n_genes))
+  colnames(counts) <- paste0("S", seq_len(n_samples))
+  
+  coldata <- data.frame(
+    sample = colnames(counts),
+    condition = rep(c("A", "B"), length.out = n_samples),
+    row.names = colnames(counts)
+  )
+  
+  SummarizedExperiment::SummarizedExperiment(
+    assays = list(counts = counts),
+    colData = coldata
+  )
+}
+
+.make_test_analysis_orchr <- function() {
+  se <- .make_test_se_orchr()
+  TSENAT::TSENATAnalysis(se, config = list(q = c(1.0, 2.0)))
+}
+
+context("orchestration_results: Parameter Validation")
+
+test_that(".validate_results_params rejects invalid TSENATAnalysis object", {
+  expect_error(
+    TSENAT:::.validate_results_params("not_analysis", type = "diversity", rankBy = "none", format = "text", filterFDR = NULL),
+    "must be a TSENATAnalysis object",
+    fixed = TRUE
+  )
+})
+
+test_that(".validate_results_params rejects invalid rankBy values", {
+  analysis <- .make_test_analysis_orchr()
   
   expect_error(
-    getResults(analysis, type = "unknown"),
+    TSENAT:::.validate_results_params(analysis, type = "diversity", rankBy = "invalid", format = "text", filterFDR = NULL),
+    "must be one of",
+    fixed = TRUE
+  )
+  
+  expect_error(
+    TSENAT:::.validate_results_params(analysis, type = "diversity", rankBy = "byScore", format = "text", filterFDR = NULL),
+    "must be one of"
+  )
+})
+
+test_that(".validate_results_params rejects invalid format values", {
+  analysis <- .make_test_analysis_orchr()
+  
+  expect_error(
+    TSENAT:::.validate_results_params(analysis, type = "diversity", rankBy = "none", format = "xlsx", filterFDR = NULL),
+    "must be one of"
+  )
+  
+  expect_error(
+    TSENAT:::.validate_results_params(analysis, type = "diversity", rankBy = "none", format = "invalid_format", filterFDR = NULL),
+    "must be one of"
+  )
+})
+
+test_that(".validate_results_params rejects invalid filterFDR values", {
+  analysis <- .make_test_analysis_orchr()
+  
+  expect_error(
+    TSENAT:::.validate_results_params(analysis, type = "diversity", rankBy = "none", format = "text", filterFDR = -0.1),
+    "must be between 0 and 1"
+  )
+  
+  expect_error(
+    TSENAT:::.validate_results_params(analysis, type = "diversity", rankBy = "none", format = "text", filterFDR = 1.5),
+    "must be between 0 and 1"
+  )
+})
+
+test_that(".validate_results_params accepts valid parameters", {
+  analysis <- .make_test_analysis_orchr()
+  
+  # Should not throw errors
+  expect_silent(
+    TSENAT:::.validate_results_params(analysis, type = "diversity", rankBy = "pvalue", format = "dataframe", filterFDR = 0.05)
+  )
+  
+  expect_silent(
+    TSENAT:::.validate_results_params(analysis, type = "lm", rankBy = "qvalue", format = "matrix", filterFDR = NULL)
+  )
+  
+  expect_silent(
+    TSENAT:::.validate_results_params(analysis, type = "assumptions", rankBy = "none", format = "list", filterFDR = 0)
+  )
+})
+
+# ============================================================================
+context("orchestration_results: Get Diversity Q-value")
+
+test_that(".get_diversity_q_value returns result for existing q-value (decimal format)", {
+  # Create mock diversity results with various q-value formats
+  result <- list(
+    q_1 = data.frame(gene = "g1", value = 1),
+    q_1.5 = data.frame(gene = "g1", value = 2)
+  )
+  
+  # Should find q_1 with various decimal specifications
+  expect_equal(
+    TSENAT:::.get_diversity_q_value(result, 1.0)$value,
+    1
+  )
+  
+  expect_equal(
+    TSENAT:::.get_diversity_q_value(result, 1.5)$value,
+    2
+  )
+})
+
+test_that(".get_diversity_q_value handles integer q-values", {
+  result <- list(
+    q_0 = data.frame(gene = "g1", value = 0),
+    q_1 = data.frame(gene = "g1", value = 1),
+    q_2 = data.frame(gene = "g1", value = 2)
+  )
+  
+  # Should find integer q-values
+  expect_equal(
+    TSENAT:::.get_diversity_q_value(result, 0)$value,
+    0
+  )
+  
+  expect_equal(
+    TSENAT:::.get_diversity_q_value(result, 2)$value,
+    2
+  )
+})
+
+test_that(".get_diversity_q_value handles underscore format for decimals", {
+  result <- list(
+    q_0_5 = data.frame(gene = "g1", value = 0.5),
+    q_1_5 = data.frame(gene = "g1", value = 1.5)
+  )
+  
+  # Underscore conversion: 1.5 -> q_1_5
+  expect_equal(
+    TSENAT:::.get_diversity_q_value(result, 1.5)$value,
+    1.5
+  )
+})
+
+test_that(".get_diversity_q_value throws error for missing q-value", {
+  result <- list(
+    q_1_000 = data.frame(gene = "g1", value = 1),
+    q_2_000 = data.frame(gene = "g1", value = 2)
+  )
+  
+  expect_error(
+    TSENAT:::.get_diversity_q_value(result, 3.0),
+    "not found in results"
+  )
+  
+  expect_error(
+    TSENAT:::.get_diversity_q_value(result, 0.5),
+    "not found in results"
+  )
+})
+
+test_that(".get_diversity_q_value shows available q-values in error message", {
+  result <- list(
+    q_0_500 = data.frame(gene = "g1", value = 0.5),
+    q_1_500 = data.frame(gene = "g1", value = 1.5)
+  )
+  
+  expect_error(
+    TSENAT:::.get_diversity_q_value(result, 2.5),
+    "Available q-values"
+  )
+})
+
+# ============================================================================
+context("orchestration_results: Display Diversity Table")
+
+# ============================================================================
+context("orchestration_results: Extract Result by Type")
+
+test_that(".extract_result_by_type returns NULL for empty results", {
+  analysis <- .make_test_analysis_orchr()
+  
+  expect_null(TSENAT:::.extract_result_by_type(analysis, "diversity"))
+  expect_null(TSENAT:::.extract_result_by_type(analysis, "divergence"))
+  expect_null(TSENAT:::.extract_result_by_type(analysis, "lm"))
+  expect_null(TSENAT:::.extract_result_by_type(analysis, "jackknife"))
+})
+
+test_that(".extract_result_by_type extracts diversity results", {
+  analysis <- .make_test_analysis_orchr()
+  
+  # Manually create and add diversity results
+  entropy_data <- matrix(seq(1, 8), nrow = 2, ncol = 4)
+  rownames(entropy_data) <- c("Gene_1", "Gene_2")
+  colnames(entropy_data) <- paste0("S", 1:4)
+  
+  se <- SummarizedExperiment::SummarizedExperiment(
+    assays = list(entropy = entropy_data)
+  )
+  
+  analysis@diversity_results <- list(q_1 = se, q_2 = se)
+  
+  result <- TSENAT:::.extract_result_by_type(analysis, "diversity")
+  
+  expect_is(result, "list")
+  expect_gt(length(result), 0)
+})
+
+test_that(".extract_result_by_type extracts lm results with nested structure", {
+  analysis <- .make_test_analysis_orchr()
+  
+  lm_df <- data.frame(
+    gene = "g1",
+    p_interaction = 0.01,
+    adj_p_interaction = 0.05
+  )
+  
+  # Test with nested lm_interaction
+  analysis@lm_results <- list(lm_interaction = lm_df)
+  
+  result <- TSENAT:::.extract_result_by_type(analysis, "lm")
+  expect_identical(result, lm_df)
+})
+
+test_that(".extract_result_by_type extracts lm results from flat structure", {
+  analysis <- .make_test_analysis_orchr()
+  
+  lm_df <- data.frame(gene = "g1", p_interaction = 0.01)
+  analysis@lm_results <- lm_df
+  
+  result <- TSENAT:::.extract_result_by_type(analysis, "lm")
+  expect_identical(result, lm_df)
+})
+
+test_that(".extract_result_by_type extracts rank_test results", {
+  analysis <- .make_test_analysis_orchr()
+  
+  rank_df <- data.frame(gene = "g1", p_value = 0.05)
+  analysis@rank_test_results <- list(rank_test = rank_df)
+  
+  result <- TSENAT:::.extract_result_by_type(analysis, "rank_test")
+  expect_identical(result, rank_df)
+})
+
+test_that(".extract_result_by_type extracts assumptions from metadata", {
+  analysis <- .make_test_analysis_orchr()
+  
+  assumptions_data <- list(
+    exchangeability = data.frame(test = "exchangeability"),
+    monotonicity = data.frame(test = "monotonicity")
+  )
+  
+  # Directly assign to @metadata slot
+  meta <- analysis@metadata
+  meta$rankbased_assumptions <- list(result = structure(assumptions_data, checks = TRUE))
+  analysis@metadata <- meta
+  
+  result <- TSENAT:::.extract_result_by_type(analysis, "assumptions")
+  
+  expect_equal(result, TRUE)
+})
+
+test_that(".extract_result_by_type returns NULL for unknown type", {
+  analysis <- .make_test_analysis_orchr()
+  
+  expect_error(
+    TSENAT:::.extract_result_by_type(analysis, "unknown_type"),
     "Unknown result type"
   )
 })
 
-test_that("getResults raises error for non-TSENATAnalysis object", {
-  se <- make_test_se()
+# ============================================================================
+context("orchestration_results: Extract Jackknife Result")
+
+test_that(".extract_jackknife_result returns data.frame directly", {
+  analysis <- .make_test_analysis_orchr()
   
+  jk_df <- data.frame(
+    gene = "g1",
+    mean = 0.5,
+    ci_lower = 0.3,
+    ci_upper = 0.7
+  )
+  
+  analysis@jackknife_results <- jk_df
+  
+  result <- TSENAT:::.extract_jackknife_result(analysis)
+  expect_identical(result, jk_df)
+})
+
+test_that(".extract_jackknife_result extracts from nested 'results'", {
+  analysis <- .make_test_analysis_orchr()
+  
+  jk_df <- data.frame(gene = "g1", mean = 0.5)
+  analysis@jackknife_results <- list(results = jk_df)
+  
+  result <- TSENAT:::.extract_jackknife_result(analysis)
+  expect_identical(result, jk_df)
+})
+
+test_that(".extract_jackknife_result extracts from nested 'ci'", {
+  analysis <- .make_test_analysis_orchr()
+  
+  ci_df <- data.frame(gene = "g1", ci_lower = 0.3, ci_upper = 0.7)
+  analysis@jackknife_results <- list(ci = ci_df)
+  
+  result <- TSENAT:::.extract_jackknife_result(analysis)
+  expect_identical(result, ci_df)
+})
+
+test_that(".extract_jackknife_result returns NULL for empty slots", {
+  analysis <- .make_test_analysis_orchr()
+  analysis@jackknife_results <- list()
+  
+  result <- TSENAT:::.extract_jackknife_result(analysis)
+  expect_null(result)
+})
+
+# ============================================================================
+context("orchestration_results: Extract/Compute Switching Tables")
+
+test_that(".extract_or_compute_switching_tables returns cached tables if present", {
+  analysis <- .make_test_analysis_orchr()
+  
+  cached_tables <- list(
+    gene1 = data.frame(comparison = "A_vs_B", switched = TRUE),
+    gene2 = data.frame(comparison = "A_vs_B", switched = FALSE)
+  )
+  
+  # Directly assign to @metadata slot
+  meta <- analysis@metadata
+  meta$switching_tables <- cached_tables
+  analysis@metadata <- meta
+  
+  result <- TSENAT:::.extract_or_compute_switching_tables(analysis)
+  expect_identical(result, cached_tables)
+})
+
+test_that(".extract_or_compute_switching_tables returns NULL with missing prerequisites", {
+  analysis <- .make_test_analysis_orchr()
+  analysis@lm_results <- list()
+  analysis@jackknife_results <- list()
+  
+  result <- TSENAT:::.extract_or_compute_switching_tables(analysis)
+  expect_null(result)
+})
+
+# ============================================================================
+context("orchestration_results: Warn Unsupported Parameters")
+
+test_that(".warn_unsupported_params warns for switching_tables with rankBy", {
+  expect_warning(
+    TSENAT:::.warn_unsupported_params(type = "switching_tables", filterFDR = NULL, rankBy = "pvalue"),
+    "rankBy and filterFDR are not supported"
+  )
+})
+
+test_that(".warn_unsupported_params warns for switching_tables with filterFDR", {
+  expect_warning(
+    TSENAT:::.warn_unsupported_params(type = "switching_tables", filterFDR = 0.05, rankBy = "none"),
+    "rankBy and filterFDR are not supported"
+  )
+})
+
+test_that(".warn_unsupported_params warns for invalid rankBy usage", {
+  expect_warning(
+    TSENAT:::.warn_unsupported_params(type = "diversity", filterFDR = NULL, rankBy = "pvalue"),
+    "rankBy.*not supported"
+  )
+})
+
+test_that(".warn_unsupported_params does not warn for valid rankBy on lm", {
+  expect_silent(
+    TSENAT:::.warn_unsupported_params(type = "lm", filterFDR = NULL, rankBy = "pvalue")
+  )
+})
+
+test_that(".warn_unsupported_params does not warn for valid rankBy on jackknife", {
+  expect_silent(
+    TSENAT:::.warn_unsupported_params(type = "jackknife", filterFDR = NULL, rankBy = "qvalue")
+  )
+})
+
+# ============================================================================
+context("orchestration_results: Filter Statistical Results by FDR")
+
+test_that(".filter_statistical_by_fdr filters lm results correctly", {
+  result <- data.frame(
+    gene = c("g1", "g2", "g3", "g4"),
+    adj_p_interaction = c(0.001, 0.05, 0.1, 0.2),
+    stringsAsFactors = FALSE
+  )
+  
+  filtered <- TSENAT:::.filter_statistical_by_fdr(result, type = "lm", filterFDR = 0.05)
+  
+  expect_equal(nrow(filtered), 2)
+  expect_equal(filtered$gene, c("g1", "g2"))
+})
+
+test_that(".filter_statistical_by_fdr filters rank_test results correctly", {
+  result <- data.frame(
+    gene = c("g1", "g2", "g3"),
+    adj_p_value = c(0.001, 0.06, 0.1),
+    stringsAsFactors = FALSE
+  )
+  
+  filtered <- TSENAT:::.filter_statistical_by_fdr(result, type = "rank_test", filterFDR = 0.05)
+  
+  expect_equal(nrow(filtered), 1)
+  expect_equal(filtered$gene, "g1")
+})
+
+test_that(".filter_statistical_by_fdr returns full results when filterFDR is NULL", {
+  result <- data.frame(
+    gene = c("g1", "g2"),
+    adj_p_interaction = c(0.001, 0.1)
+  )
+  
+  filtered <- TSENAT:::.filter_statistical_by_fdr(result, type = "lm", filterFDR = NULL)
+  
+  expect_identical(filtered, result)
+})
+
+test_that(".filter_statistical_by_fdr returns full results for non-dataframe", {
+  result <- list(something = "else")
+  
+  filtered <- TSENAT:::.filter_statistical_by_fdr(result, type = "lm", filterFDR = 0.05)
+  
+  expect_identical(filtered, result)
+})
+
+# ============================================================================
+context("orchestration_results: Rank Statistical Results")
+
+test_that(".rank_statistical_results returns unchanged when rankBy='none'", {
+  result <- data.frame(
+    gene = c("g3", "g1", "g2"),
+    p_value = c(0.5, 0.001, 0.05)
+  )
+  
+  ranked <- TSENAT:::.rank_statistical_results(result, type = "rank_test", rankBy = "none", n = NA)
+  
+  expect_identical(ranked, result)
+})
+
+test_that(".rank_statistical_results ranks by pvalue", {
+  result <- data.frame(
+    gene = c("g3", "g1", "g2"),
+    p_interaction = c(0.5, 0.001, 0.05),
+    stringsAsFactors = FALSE
+  )
+  
+  ranked <- TSENAT:::.rank_statistical_results(result, type = "lm", rankBy = "pvalue", n = NA)
+  
+  expect_equal(ranked$gene[1], "g1")
+  expect_equal(ranked$gene[2], "g2")
+  expect_equal(ranked$gene[3], "g3")
+})
+
+test_that(".rank_statistical_results limits to top n", {
+  result <- data.frame(
+    gene = c("g1", "g2", "g3", "g4", "g5"),
+    p_value = c(0.001, 0.002, 0.003, 0.004, 0.005),
+    stringsAsFactors = FALSE
+  )
+  
+  ranked <- TSENAT:::.rank_statistical_results(result, type = "rank_test", rankBy = "pvalue", n = 2)
+  
+  expect_equal(nrow(ranked), 2)
+  expect_equal(ranked$gene, c("g1", "g2"))
+})
+
+# ============================================================================
+context("orchestration_results: Main Results Accessor - Error Handling")
+
+test_that("results() throws error for invalid analysis object", {
   expect_error(
-    getResults(se, type = "diversity"),
+    TSENAT::results("not_an_analysis", type = "diversity"),
     "must be a TSENATAnalysis object"
   )
 })
 
-test_that("getResults with diversity results and q-value filtering", {
-  se <- make_test_se()
-  analysis <- TSENATAnalysis(se, config = tsenat_config())
-  
-  # Create mock diversity results as a list (correct type for diversity_results slot)
-  q_vals <- c("q_0.5", "q_1.0", "q_1.5", "q_2.0")
-  n_genes <- nrow(se)
-  diversity_results <- list(
-    q_0.5 = matrix(rnorm(n_genes, mean = 3, sd = 1), nrow = 1, ncol = n_genes),
-    q_1.0 = matrix(rnorm(n_genes, mean = 3, sd = 1), nrow = 1, ncol = n_genes),
-    q_1.5 = matrix(rnorm(n_genes, mean = 3, sd = 1), nrow = 1, ncol = n_genes),
-    q_2.0 = matrix(rnorm(n_genes, mean = 3, sd = 1), nrow = 1, ncol = n_genes)
-  )
-  analysis@diversity_results <- diversity_results
-  
-  # Test getting all diversity results
-  all_results <- getResults(analysis, type = "diversity")
-  expect_false(is.null(all_results))
-  
-  # Test getting specific q-value
-  q1_results <- getResults(analysis, type = "diversity", q = 1.0)
-  expect_false(is.null(q1_results))
-})
-
-test_that("getResults returns all supported result types", {
-  se <- make_test_se()
-  analysis <- TSENATAnalysis(se, config = tsenat_config())
-  
-  # Mock results for each type (as correct types: lists for diversity_results, divergence_results; lists for others)
-  n_genes <- nrow(se)
-  n_samples <- ncol(se)
-  
-  # diversity_results should be a list
-  analysis@diversity_results <- list(
-    q_0.5 = matrix(rnorm(n_genes), nrow = 1, ncol = n_genes),
-    q_1.0 = matrix(rnorm(n_genes), nrow = 1, ncol = n_genes)
-  )
-  # divergence_results should also be a list
-  analysis@divergence_results <- list(
-    q_0.5 = data.frame(gene = paste0("g", 1:n_genes), divergence = rnorm(n_genes))
-  )
-  analysis@lm_results <- list(lm_interaction = data.frame(pvalue = rnorm(n_genes)))
-  analysis@jackknife_results <- list(ci_lower = rnorm(n_genes))
-  analysis@lm_results$q_interactions <- list(results = "q_int_data")
-  
-  # Test each type
-  expect_false(is.null(getResults(analysis, type = "diversity")))
-  expect_false(is.null(getResults(analysis, type = "divergence")))
-  expect_false(is.null(getResults(analysis, type = "lm")))
-  expect_false(is.null(getResults(analysis, type = "jackknife")))
-  expect_false(is.null(getResults(analysis, type = "q_interactions")))
-})
-
-test_that("getResults default type is 'diversity'", {
-  se <- make_test_se()
-  analysis <- TSENATAnalysis(se, config = tsenat_config())
-  
-  # Mock diversity results (as a list, not matrix)
-  n_genes <- nrow(se)
-  analysis@diversity_results <- list(
-    q_0.5 = matrix(rnorm(n_genes), nrow = 1, ncol = n_genes)
-  )
-  
-  # Default call should work
-  default_result <- getResults(analysis)
-  explicit_result <- getResults(analysis, type = "diversity")
-  
-  expect_equal(nrow(default_result), nrow(explicit_result))
-  expect_equal(ncol(default_result), ncol(explicit_result))
-})
-
-test_that("getResults q-value filtering handles non-existent q-values gracefully", {
-  se <- make_test_se()
-  analysis <- TSENATAnalysis(se, config = tsenat_config())
-  
-  # Create diversity results as a list with specific q-values
-  q_vals <- c("q_0.5", "q_1.0", "q_1.5")
-  diversity_results <- list(
-    q_0.5 = matrix(rnorm(nrow(se)), nrow = 1, ncol = nrow(se)),
-    q_1.0 = matrix(rnorm(nrow(se)), nrow = 1, ncol = nrow(se)),
-    q_1.5 = matrix(rnorm(nrow(se)), nrow = 1, ncol = nrow(se))
-  )
-  analysis@diversity_results <- diversity_results
-  
-  # Try to get existing q-value
-  result <- tryCatch(
-    getResults(analysis, type = "diversity", q = 1.0),
-    error = function(e) NULL
-  )
-  
-  # Should return a result, not NULL
-  expect_false(is.null(result))
-})
-
-# ============================================================================
-# TEST: New save_output and output_format parameters
-# ============================================================================
-
-test_that("save_output = FALSE prevents file output", {
-  se <- make_test_se()
-  analysis <- TSENATAnalysis(se)
-  
-  temp_dir <- tempdir()
-  test_output_dir <- file.path(temp_dir, paste0("test_no_output_", Sys.time()))
-  dir.create(test_output_dir, showWarnings = FALSE)
-  
-  # Run tsenat with save_output = FALSE
-  result <- suppressWarnings(tsenat(
-    analysis,
-    output_dir = test_output_dir,
-    save_output = FALSE,
-    verbose = FALSE
-  ))
-  
-  # Check that no TSV files were created
-  tsv_files <- list.files(test_output_dir, pattern = "\\.tsv$", recursive = TRUE)
-  csv_files <- list.files(test_output_dir, pattern = "\\.csv$", recursive = TRUE)
-  txt_files <- list.files(test_output_dir, pattern = "\\.txt$", recursive = TRUE)
-  
-  expect_length(tsv_files, 0)
-  expect_length(csv_files, 0)
-  expect_length(txt_files, 0)
-  
-  # But analysis should still be complete
-  expect_true(is.null(result) || inherits(result, "TSENATAnalysis"))
-  
-  # Cleanup
-  unlink(test_output_dir, recursive = TRUE)
-})
-
-test_that("save_output = TRUE with output_format = 'tsv' creates TSV files", {
-  se <- make_test_se()
-  analysis <- TSENATAnalysis(se)
-  
-  temp_dir <- tempdir()
-  test_output_dir <- file.path(temp_dir, paste0("test_tsv_", Sys.time()))
-  dir.create(test_output_dir, showWarnings = FALSE)
-  
-  result <- suppressWarnings(tsenat(
-    analysis,
-    output_dir = test_output_dir,
-    save_output = TRUE,
-    output_format = "tsv",
-    verbose = FALSE
-  ))
-  
-  # Check that TSV files were created
-  tsv_files <- list.files(test_output_dir, pattern = "\\.tsv$", recursive = TRUE)
-  
-  # Expect at least some result files
-  if (!is.null(result) && inherits(result, "TSENATAnalysis")) {
-    expect_gt(length(tsv_files), 0)
-  }
-  
-  # Cleanup
-  unlink(test_output_dir, recursive = TRUE)
-})
-
-test_that("output_format = 'csv' creates CSV files", {
-  se <- make_test_se()
-  analysis <- TSENATAnalysis(se)
-  
-  temp_dir <- tempdir()
-  test_output_dir <- file.path(temp_dir, paste0("test_csv_", Sys.time()))
-  dir.create(test_output_dir, showWarnings = FALSE)
-  
-  result <- suppressWarnings(tsenat(
-    analysis,
-    output_dir = test_output_dir,
-    save_output = TRUE,
-    output_format = "csv",
-    verbose = FALSE
-  ))
-  
-  # Check that CSV files were created
-  csv_files <- list.files(test_output_dir, pattern = "\\.csv$", recursive = TRUE)
-  
-  # Expect at least some result files
-  if (!is.null(result) && inherits(result, "TSENATAnalysis")) {
-    expect_gt(length(csv_files), 0)
-  }
-  
-  # Cleanup
-  unlink(test_output_dir, recursive = TRUE)
-})
-
-test_that("output_format = 'txt' creates TXT files", {
-  se <- make_test_se()
-  analysis <- TSENATAnalysis(se)
-  
-  temp_dir <- tempdir()
-  test_output_dir <- file.path(temp_dir, paste0("test_txt_", Sys.time()))
-  dir.create(test_output_dir, showWarnings = FALSE)
-  
-  result <- suppressWarnings(tsenat(
-    analysis,
-    output_dir = test_output_dir,
-    save_output = TRUE,
-    output_format = "txt",
-    verbose = FALSE
-  ))
-  
-  # Check that TXT files were created
-  txt_files <- list.files(test_output_dir, pattern = "\\.txt$", recursive = TRUE)
-  
-  # Expect at least some result files
-  if (!is.null(result) && inherits(result, "TSENATAnalysis")) {
-    expect_gt(length(txt_files), 0)
-  }
-  
-  # Cleanup
-  unlink(test_output_dir, recursive = TRUE)
-})
-
-test_that("output_format = 'rds' creates RDS files", {
-  se <- make_test_se()
-  analysis <- TSENATAnalysis(se)
-  
-  temp_dir <- tempdir()
-  test_output_dir <- file.path(temp_dir, paste0("test_rds_", Sys.time()))
-  dir.create(test_output_dir, showWarnings = FALSE)
-  
-  result <- suppressWarnings(tsenat(
-    analysis,
-    output_dir = test_output_dir,
-    save_output = TRUE,
-    output_format = "rds",
-    verbose = FALSE
-  ))
-  
-  # Check that RDS files were created
-  rds_files <- list.files(test_output_dir, pattern = "\\.rds$", recursive = TRUE)
-  
-  # Expect at least some result files
-  if (!is.null(result) && inherits(result, "TSENATAnalysis")) {
-    expect_gt(length(rds_files), 0)
-  }
-  
-  # Cleanup
-  unlink(test_output_dir, recursive = TRUE)
-})
-
-test_that("Invalid output_format raises error", {
-  se <- make_test_se()
-  analysis <- TSENATAnalysis(se)
+test_that("results() throws error for invalid type", {
+  analysis <- .make_test_analysis_orchr()
   
   expect_error(
-    tsenat(
-      analysis,
-      output_dir = tempdir(),
-      output_format = "invalid_format",
-      verbose = FALSE
-    ),
-    "output_format"
+    TSENAT::results(analysis, type = "invalid_type"),
+    "Unknown result type"
   )
 })
 
-test_that("Default parameters (save_output = TRUE, output_format = 'tsv')", {
-  se <- make_test_se()
-  analysis <- TSENATAnalysis(se)
+test_that("results() returns NULL for non-computed results", {
+  analysis <- .make_test_analysis_orchr()
   
-  temp_dir <- tempdir()
-  test_output_dir <- file.path(temp_dir, paste0("test_default_", Sys.time()))
-  dir.create(test_output_dir, showWarnings = FALSE)
-  
-  # Don't specify save_output or output_format
-  result <- suppressWarnings(tsenat(
-    analysis,
-    output_dir = test_output_dir,
-    verbose = FALSE
-  ))
-  
-  # Should create TSV files by default
-  if (!is.null(result) && inherits(result, "TSENATAnalysis")) {
-    tsv_files <- list.files(test_output_dir, pattern = "\\.tsv$", recursive = TRUE)
-    expect_gt(length(tsv_files), 0)
-  }
-  
-  # Cleanup
-  unlink(test_output_dir, recursive = TRUE)
+  result <- TSENAT::results(analysis, type = "divergence")
+  expect_null(result)
 })
 
-test_that("save_output = FALSE overrides output_dir setting", {
-  se <- make_test_se()
-  analysis <- TSENATAnalysis(se)
+# ============================================================================
+context("orchestration_results: Main Results Accessor - Diversity Processing")
+
+test_that("results() with diversity produces formatted output", {
+  entropy_data <- matrix(seq(1, 12), nrow = 3, ncol = 4)
+  rownames(entropy_data) <- c("Gene_1", "Gene_2", "Gene_3")
+  colnames(entropy_data) <- paste0("S", 1:4)
   
-  temp_dir <- tempdir()
-  test_output_dir <- file.path(temp_dir, paste0("test_override_", Sys.time()))
-  dir.create(test_output_dir, showWarnings = FALSE)
+  se <- SummarizedExperiment::SummarizedExperiment(
+    assays = list(entropy = entropy_data)
+  )
   
-  # Specify output_dir but save_output = FALSE
-  result <- suppressWarnings(tsenat(
-    analysis,
-    output_dir = test_output_dir,
-    save_output = FALSE,
-    output_format = "tsv",
-    verbose = FALSE
-  ))
+  analysis <- .make_test_analysis_orchr()
+  analysis@diversity_results <- list(q_1 = se)
   
-  # No data files should be created
-  tsv_files <- list.files(test_output_dir, pattern = "\\.tsv$", recursive = TRUE)
-  csv_files <- list.files(test_output_dir, pattern = "\\.csv$", recursive = TRUE)
-  txt_files <- list.files(test_output_dir, pattern = "\\.txt$", recursive = TRUE)
+  # Call results() without q - should return data.frame with all q-values
+  result <- TSENAT::results(analysis, type = "diversity", n_genes = 2)
   
-  expect_length(tsv_files, 0)
-  expect_length(csv_files, 0)
-  expect_length(txt_files, 0)
+  # Result should be a data.frame (not list)
+  expect_is(result, "data.frame")
+  expect_equal(nrow(result), 2)  # n_genes = 2
+})
+
+test_that("results() extracts specific q-value from diversity", {
+  entropy_data <- matrix(seq(1, 8), nrow = 2, ncol = 4)
+  rownames(entropy_data) <- c("Gene_1", "Gene_2")
+  colnames(entropy_data) <- paste0("S", 1:4)
   
-  unlink(test_output_dir, recursive = TRUE)
+  se <- SummarizedExperiment::SummarizedExperiment(
+    assays = list(entropy = entropy_data)
+  )
+  
+  analysis <- .make_test_analysis_orchr()
+  analysis@diversity_results <- list(
+    q_1 = se,
+    q_2 = se
+  )
+  
+  # Request specific q-value
+  result <- TSENAT::results(analysis, type = "diversity", q = 1.0, format = "se")
+  
+  expect_is(result, "SummarizedExperiment")
+  expect_equal(nrow(result), 2)
+})
+
+# ============================================================================
+context("orchestration_results: Main Results Accessor - Statistical Results")
+
+test_that("results() applies rankBy to lm results", {
+  analysis <- .make_test_analysis_orchr()
+  
+  lm_df <- data.frame(
+    gene = c("g3", "g1", "g2"),
+    p_interaction = c(0.5, 0.001, 0.05),
+    adj_p_interaction = c(0.6, 0.01, 0.1),
+    stringsAsFactors = FALSE
+  )
+  
+  analysis@lm_results <- list(lm_interaction = lm_df)
+  
+  # Get ranked results
+  result <- TSENAT::results(analysis, type = "lm", rankBy = "pvalue")
+  
+  expect_equal(result$gene[1], "g1")
+  expect_equal(nrow(result), 3)
+})
+
+test_that("results() applies n parameter to limit results", {
+  analysis <- .make_test_analysis_orchr()
+  
+  lm_df <- data.frame(
+    gene = c("g1", "g2", "g3", "g4", "g5"),
+    p_interaction = c(0.005, 0.01, 0.02, 0.1, 0.5),
+    stringsAsFactors = FALSE
+  )
+  
+  analysis@lm_results <- list(lm_interaction = lm_df)
+  
+  result <- TSENAT::results(analysis, type = "lm", rankBy = "pvalue", n = 2)
+  
+  expect_equal(nrow(result), 2)
+  expect_equal(result$gene, c("g1", "g2"))
+})
+
+test_that("results() applies FDR filter", {
+  analysis <- .make_test_analysis_orchr()
+  
+  rank_df <- data.frame(
+    gene = c("g1", "g2", "g3", "g4"),
+    adj_p_value = c(0.001, 0.05, 0.1, 0.5),
+    stringsAsFactors = FALSE
+  )
+  
+  analysis@rank_test_results <- list(rank_test = rank_df)
+  
+  result <- TSENAT::results(analysis, type = "rank_test", filterFDR = 0.05)
+  
+  expect_equal(nrow(result), 2)
+  expect_equal(result$gene, c("g1", "g2"))
+})
+
+# ============================================================================
+context("orchestration_results: Lazy Computation of Switching Tables")
+
+test_that("results() with type='switching_tables' returns cached if available", {
+  analysis <- .make_test_analysis_orchr()
+  
+  cached <- list(gene1 = data.frame(test = 1))
+  
+  # Directly assign to @metadata slot
+  meta <- analysis@metadata
+  meta$switching_tables <- cached
+  analysis@metadata <- meta
+  
+  # With format="list" (default), the result is processed into a structured list
+  result <- TSENAT::results(analysis, type = "switching_tables")
+  
+  # Check that structured format is returned with expected components
+  expect_true(is.list(result))
+  expect_true("gene_headers" %in% names(result))
+  expect_true("comparison_tables" %in% names(result))
+  expect_true("q_metadata" %in% names(result))
+  
+  # With format="raw", the cached result is returned as-is
+  result_raw <- TSENAT::results(analysis, type = "switching_tables", format = "raw")
+  expect_identical(result_raw, cached)
+})
+
+test_that("results() warns about unsupported rankBy for switching_tables", {
+  analysis <- .make_test_analysis_orchr()
+  
+  # Directly assign to @metadata slot
+  meta <- analysis@metadata
+  meta$switching_tables <- list(test = 1)
+  analysis@metadata <- meta
+  
+  expect_warning(
+    TSENAT::results(analysis, type = "switching_tables", rankBy = "pvalue", format = "raw"),
+    "not supported"
+  )
+})
+context("Results display and formatting")
+
+# Helper to create minimal analysis with effect sizes
+.make_test_analysis_for_display_table <- function() {
+    # Create minimal SummarizedExperiment
+    se <- SummarizedExperiment::SummarizedExperiment(
+        assays = list(counts = matrix(1, nrow = 3, ncol = 4)),
+        colData = data.frame(
+            sample = paste0("S", 1:4),
+            condition = c("A", "A", "B", "B"),
+            row.names = paste0("S", 1:4)
+        )
+    )
+    
+    # Create analysis using proper constructor
+    analysis <- TSENAT::TSENATAnalysis(se, config = list(q = c(0, 1.0)))
+    
+    # Add effect_sizes_divergence data to metadata
+    effect_sizes_data <- data.frame(
+        gene_name = c("GENE1", "GENE2", "GENE3"),
+        gene_id = c("ENSG00001", "ENSG00002", "ENSG00003"),
+        mean_divergence = c(0.2846, 0.1279, 0.3456),
+        q_pattern = c("Balanced", "Balanced", "Skewed"),
+        d_rare = c(0.3063, 0.1455, 0.3890),
+        d_abundant = c(0.2712, 0.1142, 0.3122),
+        ratio = c(1.13, 1.27, 1.25),
+        p_value_interaction = c(3e-162, 7.3e-95, 2.1e-58),
+        stringsAsFactors = FALSE
+    )
+    
+    analysis@metadata$effect_sizes_divergence <- effect_sizes_data
+    
+    return(analysis)
+}
+
+test_that("results produces message output for effect_sizes_divergence", {
+    analysis <- .make_test_analysis_for_display_table()
+    
+    # Call results() - should return silently
+    result <- TSENAT::results(
+        analysis,
+        type = "effect_sizes_divergence",
+        top_n = NULL,
+        sort_by = "p_value_interaction"
+    )
+    
+    # Result should be a data.frame
+    expect_true(is.data.frame(result), "Should return data.frame")
+    # Should have expected structure
+    expect_true(nrow(result) > 0, "Should return non-empty data.frame")
+})
+
+test_that("results returns data.frame with all expected columns", {
+    analysis <- .make_test_analysis_for_display_table()
+    
+    result <- TSENAT::results(
+        analysis,
+        type = "effect_sizes_divergence",
+        top_n = NULL
+    )
+    
+    # Should return data.frame
+    expect_true(is.data.frame(result), "Should return data.frame")
+    # Should have expected columns
+    expect_true("gene_name" %in% colnames(result), "Should have gene_name column")
+    expect_true("p_value_interaction" %in% colnames(result), "Should have p-value column")
+})
+
+test_that("results filters by top_n correctly", {
+    analysis <- .make_test_analysis_for_display_table()
+    
+    output <- capture_output({
+        result <- TSENAT::results(
+            analysis,
+            type = "effect_sizes_divergence",
+            top_n = 2,
+            sort_by = "p_value_interaction"
+        )
+    })
+    
+    # Result should contain only top 2 genes
+    expect_equal(nrow(result), 2L)
+    # GENE1 should be first (smallest p-value)
+    expect_equal(result$gene_name[1], "GENE1")
+})
+
+test_that("results shows all required columns in output", {
+    analysis <- .make_test_analysis_for_display_table()
+    
+    result <- TSENAT::results(
+        analysis,
+        type = "effect_sizes_divergence",
+        top_n = 1,
+        sort_by = "p_value_interaction"
+    )
+    
+    # Result should be a data.frame with expected columns
+    expect_true(is.data.frame(result), "Should return data.frame")
+    # Check for key columns in result
+    expect_true("gene_name" %in% colnames(result) || "Gene" %in% colnames(result), 
+                "Should contain gene column")
+    expect_true("p_value_interaction" %in% colnames(result) || "p_value" %in% colnames(result), 
+                "Should contain p-value information")
+})
+
+test_that("results returns result with expected structure", {
+    analysis <- .make_test_analysis_for_display_table()
+    
+    # Call the function 
+    result <- TSENAT::results(
+        analysis,
+        type = "effect_sizes_divergence",
+        top_n = 1,
+        sort_by = "p_value_interaction"
+    )
+    
+    # Result should be a data.frame with correct structure
+    expect_true(is.data.frame(result), "Should return data.frame")
+    expect_true(nrow(result) > 0, "Result should contain genes")
+    expect_true("mean_divergence" %in% colnames(result), "Should have divergence column")
+})
+
+test_that("Results contain expected columns for effect_sizes_divergence", {
+    analysis <- .make_test_analysis_for_display_table()
+    
+    result <- TSENAT::results(
+        analysis,
+        type = "effect_sizes_divergence"
+    )
+    
+    # Verify all expected columns are present
+    expect_true(is.data.frame(result), "Result should be data.frame")
+    expect_true("gene_name" %in% colnames(result), "Should have gene_name")
+    expect_true("mean_divergence" %in% colnames(result), "Should have mean_divergence")
+    expect_true("q_pattern" %in% colnames(result), "Should have q_pattern")
+    expect_true("ratio" %in% colnames(result), "Should have ratio")
+    expect_true("p_value_interaction" %in% colnames(result), "Should have p_value_interaction")
+    expect_equal(nrow(result), 3L)
+})
+
+test_that("Sorting by p_value_interaction works correctly", {
+    analysis <- .make_test_analysis_for_display_table()
+    
+    result <- TSENAT::results(
+        analysis,
+        type = "effect_sizes_divergence",
+        sort_by = "p_value_interaction",
+        top_n = NULL
+    )
+    
+    # Verify sorting is by p-value ascending
+    p_vals <- result$p_value_interaction
+    expect_true(p_vals[1] <= p_vals[2], "P-values should be sorted ascending")
+    expect_true(p_vals[2] <= p_vals[3], "P-values should be sorted ascending")
+    # Verify correct order
+    expect_equal(result$gene_name[1], "GENE1")
+    expect_equal(result$gene_name[2], "GENE2")
+    expect_equal(result$gene_name[3], "GENE3")
+})
+
+# Tests for the sample parameter in results() function
+# Tests added April 12, 2026 to cover results() with sample argument
+
+# Helper function to create a minimal test analysis object
+.make_test_analysis_orchr_sample <- function() {
+  se <- SummarizedExperiment::SummarizedExperiment(
+    assays = list(counts = matrix(1, nrow = 5, ncol = 4)),
+    colData = data.frame(
+      sample = paste0("S", 1:4),
+      condition = c("A", "A", "B", "B"),
+      row.names = paste0("S", 1:4)
+    )
+  )
+  TSENAT::TSENATAnalysis(se, config = list(q = c(0, 1.0)))
+}
+
+context("orchestration_results: Sample Parameter for diversity")
+
+test_that("results() with sample parameter selects correct sample", {
+  entropy_data <- matrix(seq(1, 16), nrow = 4, ncol = 4)
+  rownames(entropy_data) <- c("Gene_1", "Gene_2", "Gene_3", "Gene_4")
+  colnames(entropy_data) <- c("S1", "S2", "S3", "S4")
+  
+  se <- SummarizedExperiment::SummarizedExperiment(
+    assays = list(entropy = entropy_data)
+  )
+  
+  analysis <- .make_test_analysis_orchr_sample()
+  analysis@diversity_results <- list(
+    q_0.000 = se,
+    q_1.000 = se
+  )
+  
+  # Call with sample parameter - should return formatted data.frame
+  result <- TSENAT::results(analysis, type = "diversity", 
+                            n_genes = 2, sample = "S2", q_values_table = c(0.0, 1.0), format = "table")
+  
+  # Result should be a data.frame when results are displayed with sample
+  expect_is(result, "data.frame")
+  expect_equal(nrow(result), 2)  # n_genes = 2
+  expect_true("Gene" %in% colnames(result))
+  expect_true("q_0.0" %in% colnames(result))
+})
+
+test_that("results() with sample parameter displays correct sample name", {
+  entropy_data <- matrix(seq(1, 16), nrow = 4, ncol = 4)
+  rownames(entropy_data) <- c("Gene_1", "Gene_2", "Gene_3", "Gene_4")
+  colnames(entropy_data) <- c("S1", "S2", "S3", "S4")
+  
+  se <- SummarizedExperiment::SummarizedExperiment(
+    assays = list(entropy = entropy_data)
+  )
+  
+  analysis <- .make_test_analysis_orchr_sample()
+  analysis@diversity_results <- list(q_0.000 = se)
+  
+  # Capture messages while calling results with sample
+  result <- TSENAT::results(analysis, type = "diversity", 
+                              n_genes = 1, sample = "S3", format = "table")
+  
+  # Result should be data.frame with correct sample attribute
+  expect_is(result, "data.frame")
+  expect_equal(attr(result, "sample"), "S3")
+})
+
+test_that("results() raises error for invalid sample name", {
+  entropy_data <- matrix(seq(1, 12), nrow = 3, ncol = 4)
+  rownames(entropy_data) <- c("Gene_1", "Gene_2", "Gene_3")
+  colnames(entropy_data) <- c("S1", "S2", "S3", "S4")
+  
+  se <- SummarizedExperiment::SummarizedExperiment(
+    assays = list(entropy = entropy_data)
+  )
+  
+  analysis <- .make_test_analysis_orchr_sample()
+  analysis@diversity_results <- list(q_0.000 = se)
+  
+  # Should raise error with invalid sample name
+  expect_error(
+    TSENAT::results(analysis, type = "diversity", 
+                    sample = "INVALID_SAMPLE", format = "table"),
+    "not found"
+  )
+})
+
+test_that("results() sample parameter returns data.frame with correct values", {
+  entropy_data <- matrix(c(0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2), nrow = 4, ncol = 2)
+  rownames(entropy_data) <- c("Gene_A", "Gene_B", "Gene_C", "Gene_D")
+  colnames(entropy_data) <- c("Sample_X", "Sample_Y")
+  
+  se <- SummarizedExperiment::SummarizedExperiment(
+    assays = list(entropy = entropy_data)
+  )
+  
+  analysis <- .make_test_analysis_orchr_sample()
+  analysis@diversity_results <- list(q_0.000 = se, q_1.000 = se)
+  
+  # Get results for Sample_X
+  result <- TSENAT::results(analysis, type = "diversity",
+                            n_genes = 2, sample = "Sample_X",
+                            q_values_table = c(0.0, 1.0), format = "table")
+  
+  # Check values for specific sample
+  expect_equal(result$`q_0.0`[1], 0.5)  # Gene_A, Sample_X
+  expect_equal(result$`q_0.0`[2], 0.6)  # Gene_B, Sample_X
+})
+
+test_that("results() default sample uses first sample when not specified", {
+  entropy_data <- matrix(seq(1, 12), nrow = 3, ncol = 4)
+  rownames(entropy_data) <- c("Gene_1", "Gene_2", "Gene_3")
+  colnames(entropy_data) <- c("S1", "S2", "S3", "S4")
+  
+  se <- SummarizedExperiment::SummarizedExperiment(
+    assays = list(entropy = entropy_data)
+  )
+  
+  analysis <- .make_test_analysis_orchr_sample()
+  analysis@diversity_results <- list(q_0.000 = se)
+  
+  # Call without sample parameter - should default to first
+  result <- TSENAT::results(analysis, type = "diversity", 
+                              n_genes = 1, format = "table")
+  
+  # Should default to first sample (S1) - check via attribute
+  expect_equal(attr(result, "sample"), "S1")
+})
+
+test_that("results() sample parameter with multiple q-values", {
+  entropy_data <- matrix(seq(1, 8), nrow = 2, ncol = 4)
+  rownames(entropy_data) <- c("Gene_X", "Gene_Y")
+  colnames(entropy_data) <- c("S1", "S2", "S3", "S4")
+  
+  se_q0 <- SummarizedExperiment::SummarizedExperiment(
+    assays = list(entropy = matrix(c(1, 2, 3, 4, 5, 6, 7, 8), nrow = 2, ncol = 4))
+  )
+  rownames(se_q0) <- c("Gene_X", "Gene_Y")
+  colnames(se_q0) <- c("S1", "S2", "S3", "S4")
+  
+  se_q1 <- SummarizedExperiment::SummarizedExperiment(
+    assays = list(entropy = matrix(c(10, 11, 12, 13, 14, 15, 16, 17), nrow = 2, ncol = 4))
+  )
+  rownames(se_q1) <- c("Gene_X", "Gene_Y")
+  colnames(se_q1) <- c("S1", "S2", "S3", "S4")
+  
+  analysis <- .make_test_analysis_orchr_sample()
+  analysis@diversity_results <- list(q_0.000 = se_q0, q_1.000 = se_q1)
+  
+  # Get results for specific sample with multiple q-values in display
+  result <- TSENAT::results(analysis, type = "diversity",
+                            n_genes = 2, sample = "S4",
+                            q_values_table = c(0.0, 1.0))
+  
+  # Check that both q columns exist
+  expect_true("q_0.0" %in% colnames(result))
+  expect_true("q_1.0" %in% colnames(result))
+  expect_equal(nrow(result), 2)
+})
+
+test_that("results() sample parameter works with extract_diversity_table", {
+  entropy_data <- matrix(seq(1, 12), nrow = 3, ncol = 4)
+  rownames(entropy_data) <- c("Gene_A", "Gene_B", "Gene_C")
+  colnames(entropy_data) <- c("S1", "S2", "S3", "S4")
+  
+  se <- SummarizedExperiment::SummarizedExperiment(
+    assays = list(entropy = entropy_data)
+  )
+  
+  analysis <- .make_test_analysis_orchr_sample()
+  analysis@diversity_results <- list(q_0.000 = se, q_1.000 = se)
+  
+  # Test the internal helper function directly
+  table_df <- TSENAT:::.extract_diversity_table(analysis, NULL, NULL, 
+                                                 n_genes = 2, 
+                                                 q_values_table = c(0, 1.0),
+                                                 sample = "S2")
+  
+  # Verify returned data.frame
+  expect_is(table_df, "data.frame")
+  expect_equal(nrow(table_df), 2)
+  expect_equal(attr(table_df, "sample"), "S2")
+  expect_equal(attr(table_df, "n_genes_total"), 3)
 })

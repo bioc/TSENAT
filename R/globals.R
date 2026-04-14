@@ -8,7 +8,7 @@
 #' @noRd
 #' @importFrom dplyr arrange filter group_by mutate pull select summarise %>%
 #' @importFrom stats IQR aggregate anova aov chisq.test coef cor fitted
-#' friedman.test formula kruskal.test lm loess loess.control median
+#' formula lm loess loess.control median
 #' model.frame model.matrix na.omit p.adjust pchisq pnorm pt qnorm quantile
 #' residuals rmultinom rpois sd setNames t.test var weighted.mean
 #' wilcox.test xtabs
@@ -24,8 +24,8 @@ if (getRversion() >= "2.15.1") {
     utils::globalVariables(c("xval", "x", "y", "padj", "padj_num", "padj_clean",
         "label_flag", "sample_q", "qnum", "significant", "prcomp", "predict", ".data",
         "divergence", "lower", "upper", "central", "spread", "ci_lower", "ci_upper",
-        "entropy", "entropy_fit", "p_gam", "p_friedman", "agreement", "p_value",
-        "method", "direction", "gene", "calculate_tsallis_divergence_paired_gene"))
+        "entropy", "entropy_fit", "p_gam", "agreement", "p_value", "method", "direction",
+        "gene", "calculate_tsallis_divergence_paired_gene"))
 }
 
 # ============================================================================
@@ -43,14 +43,14 @@ if (getRversion() >= "2.15.1") {
 #'   \item{\code{diversity}}{No dependencies}
 #'   \item{\code{jackknife}}{Requires diversity}
 #'   \item{\code{divergence}}{Requires diversity}
-#'   \item{\code{q_interactions}}{Requires diversity}
+#'   \item{\code{rank_test}}{Requires diversity}
 #'   \item{\code{lm_interaction}}{Requires diversity}
 #' }
 #'
 
 #' @noRd
 DEPENDENCIES <- list(diversity = character(0), jackknife = "diversity", divergence = "diversity",
-    q_interactions = "diversity", lm_interaction = "diversity")
+    rank_test = "diversity", lm_interaction = "diversity")
 
 #' Method Execution Order
 #'
@@ -61,7 +61,7 @@ DEPENDENCIES <- list(diversity = character(0), jackknife = "diversity", divergen
 #'
 
 #' @noRd
-METHOD_ORDER <- c("diversity", "jackknife", "lm_interaction", "divergence", "q_interactions")
+METHOD_ORDER <- c("diversity", "jackknife", "lm_interaction", "divergence", "rank_test")
 
 # ============================================================================
 # COLOR UTILITIES - Publication-quality visualization standards
@@ -309,7 +309,7 @@ METHOD_ORDER <- c("diversity", "jackknife", "lm_interaction", "divergence", "q_i
 #' - Optional major gridlines for q-value axis
 #' - Wider plot margins for axis labels
 #'
-#' Used by: plot_tsallis_q_curve_s4(), .plot_lm_interaction_gam(),
+#' Used by: plot_diversity_spectrum(), .plot_lm(),
 #' and similar spectrum/profile plots.
 #'
 

@@ -1,10 +1,10 @@
-# Comprehensive tests for Salmon I/O functions and build_analysis_s4 integration
+# Comprehensive tests for Salmon I/O functions and build_analysis integration
 library(TSENAT)
 library(testthat)
 
-# Comprehensive tests for Salmon I/O functions and build_analysis_s4 integration
+# Comprehensive tests for Salmon I/O functions and build_analysis integration
 # Tests for: .detect_salmon_samples(), .validate_salmon_files(), .read_salmon_samples()
-# And: build_analysis_s4() with salmon_dir and salmon data parameters
+# And: build_analysis() with salmon_dir and salmon data parameters
 
 # ===========================================================================
 # SETUP HELPERS: Create mock Salmon output structure
@@ -418,10 +418,10 @@ test_that(".read_salmon_samples rejects empty file_paths", {
 })
 
 # ===========================================================================
-# TESTS: build_analysis_s4() with Salmon integration
+# TESTS: build_analysis() with Salmon integration
 # ===========================================================================
 
-test_that("build_analysis_s4 works with salmon_dir parameter", {
+test_that("build_analysis works with salmon_dir parameter", {
   skip_if_not_installed("TSENAT")
   
   tmpdir <- tempdir()
@@ -446,12 +446,12 @@ test_that("build_analysis_s4 works with salmon_dir parameter", {
   readr::write_tsv(tx2gene_df, tx2gene_file)
   
   # Build analysis using salmon_dir
-  config <- tsenat_config(
+  config <- TSENAT_config(
     sample_col = "sample",
     condition_col = "condition"
   )
   
-  analysis <- build_analysis_s4(
+  analysis <- build_analysis(
     config = config,
     salmon_dir = salmon_setup$salmon_dir,
     tx2gene = tx2gene_file,
@@ -466,7 +466,7 @@ test_that("build_analysis_s4 works with salmon_dir parameter", {
   expect_gt(nrow(se), 0)  # Some genes/transcripts
 })
 
-test_that("build_analysis_s4 with salmon_dir stores TPM and effective_length", {
+test_that("build_analysis with salmon_dir stores TPM and effective_length", {
   skip_if_not_installed("TSENAT")
   
   tmpdir <- tempdir()
@@ -488,12 +488,12 @@ test_that("build_analysis_s4 with salmon_dir stores TPM and effective_length", {
   )
   readr::write_tsv(tx2gene_df, tx2gene_file)
   
-  config <- tsenat_config(
+  config <- TSENAT_config(
     sample_col = "sample",
     condition_col = "condition"
   )
   
-  analysis <- build_analysis_s4(
+  analysis <- build_analysis(
     config = config,
     salmon_dir = salmon_setup$salmon_dir,
     tx2gene = tx2gene_file,
@@ -511,7 +511,7 @@ test_that("build_analysis_s4 with salmon_dir stores TPM and effective_length", {
   expect_equal(length(metadata(se)$effective_length), 100)
 })
 
-test_that("build_analysis_s4 with salmon direct parameters works", {
+test_that("build_analysis with salmon direct parameters works", {
   skip_if_not_installed("TSENAT")
   
   tmpdir <- tempdir()
@@ -549,12 +549,12 @@ test_that("build_analysis_s4 with salmon direct parameters works", {
     salmon_data$effective_length
   }
   
-  config <- tsenat_config(
+  config <- TSENAT_config(
     sample_col = "sample",
     condition_col = "condition"
   )
   
-  analysis <- build_analysis_s4(
+  analysis <- build_analysis(
     config = config,
     readcounts = salmon_data$counts,
     tx2gene = tx2gene_file,
@@ -570,7 +570,7 @@ test_that("build_analysis_s4 with salmon direct parameters works", {
   expect_equal(dim(se), c(100, 2))
 })
 
-test_that("build_analysis_s4 handles skip=TRUE for unmapped transcripts", {
+test_that("build_analysis handles skip=TRUE for unmapped transcripts", {
   skip_if_not_installed("TSENAT")
   
   tmpdir <- tempdir()
@@ -601,12 +601,12 @@ test_that("build_analysis_s4 handles skip=TRUE for unmapped transcripts", {
   )
   
   # With skip=TRUE, should use only mapped transcripts
-  config <- tsenat_config(
+  config <- TSENAT_config(
     sample_col = "sample",
     condition_col = "condition"
   )
   
-  analysis <- build_analysis_s4(
+  analysis <- build_analysis(
     config = config,
     readcounts = salmon_data$counts,
     tx2gene = tx2gene_file,
@@ -621,7 +621,7 @@ test_that("build_analysis_s4 handles skip=TRUE for unmapped transcripts", {
   expect_equal(nrow(se), 80)  # Only mapped transcripts retained
 })
 
-test_that("build_analysis_s4 with verbose=TRUE shows progress", {
+test_that("build_analysis with verbose=TRUE shows progress", {
   skip_if_not_installed("TSENAT")
   
   tmpdir <- tempdir()
@@ -645,13 +645,13 @@ test_that("build_analysis_s4 with verbose=TRUE shows progress", {
   
   # Test that verbose=TRUE produces messages
   # Use expect_message to verify messages are produced during execution
-  config <- tsenat_config(
+  config <- TSENAT_config(
     sample_col = "sample",
     condition_col = "condition"
   )
   
   expect_message(
-    analysis <- build_analysis_s4(
+    analysis <- build_analysis(
       config = config,
       salmon_dir = salmon_setup$salmon_dir,
       tx2gene = tx2gene_file,
@@ -720,12 +720,12 @@ test_that("Full Salmon workflow: detect → read → build_analysis creates corr
   }
   
   # Step 5: Build analysis
-  config <- tsenat_config(
+  config <- TSENAT_config(
     sample_col = "sample",
     condition_col = "condition"
   )
   
-  analysis <- build_analysis_s4(
+  analysis <- build_analysis(
     config = config,
     readcounts = salmon_data$counts,
     tx2gene = tx2gene_file,

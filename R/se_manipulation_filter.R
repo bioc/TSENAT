@@ -94,6 +94,15 @@
         stop("'se' must be a SummarizedExperiment", call. = FALSE)
     }
 
+    # Validate that the primary assay (assay_name) is numeric - must be checked
+    # even if we use TPM for filtering
+    assays_list <- SummarizedExperiment::assays(se)
+    if (!is.null(assay_name) && assay_name %in% names(assays_list)) {
+        if (!is.numeric(assays_list[[assay_name]])) {
+            stop("Assay '", assay_name, "' must be numeric.", call. = FALSE)
+        }
+    }
+
     # Phase 1: Consolidate parameter resolution (manual vs stringency-based)
     params <- .resolve_filter_parameters(se, min_samples, min_tpm, stringency, pair_col,
         tpm_assay_name, assay_name, min_tx_per_gene, min_isoform_abundance, verbose = verbose)
@@ -162,24 +171,23 @@
             tpm_assay_name)))
     }
 
-    # Priority 2: metadata
+    # Priority 2: metadata TPM (SALMON preprocessed)
     md <- S4Vectors::metadata(se)
     if (!is.null(md$tpm) && is.matrix(md$tpm)) {
         return(list(mat = as.matrix(md$tpm), source = "metadata$tpm (SALMON preprocessed)"))
     }
-    if (!is.null(md$tpm) && is.matrix(md$tpm)) {
-        return(list(mat = as.matrix(md$tpm), source = "metadata$tpm"))
-    }
 
-    # Priority 3: auto-detect by name
+    # Priority 3: auto-detect 'tpm' assay by name
     if ("tpm" %in% names(assays_list)) {
         return(list(mat = as.matrix(assays_list[["tpm"]]), source = "assay 'tpm' (auto-detected)"))
     }
+
+    # Priority 4: auto-detect 'abundance' assay (tximport format)
     if ("abundance" %in% names(assays_list)) {
         return(list(mat = as.matrix(assays_list[["abundance"]]), source = "assay 'abundance' (tximport format)"))
     }
 
-    # No TPM found - error instead of fallback
+    # No TPM found - error
     return(NULL)
 }
 
@@ -283,7 +291,13 @@
         min_tx_per_gene <- 2L
         min_isoform_abundance <- 0.01  # 1% - permissive
     } else if (stringency == "medium") {
-        min_samples <- max(3L, ceiling(0.5 * n_samples))
+        # For paired designs with few pairs (< 3), relax the min_samples
+        # requirement
+        if (!is.null(n_pairs) && n_pairs < 3) {
+            min_samples <- ceiling(0.5 * n_samples)
+        } else {
+            min_samples <- max(3L, ceiling(0.5 * n_samples))
+        }
         min_tx_per_gene <- 2L
         min_isoform_abundance <- 0.05  # 5% - balanced (default)
     } else if (stringency == "severe") {
@@ -545,23 +559,18 @@
     # Get assays and discover TPM source
     assays_list <- SummarizedExperiment::assays(se)
     tpm_result <- .get_assay_filtering(se, assays_list, tpm_assay_name, assay_name)
-    
+
     # Validate that TPM was found
     if (is.null(tpm_result)) {
         stop("TPM data is required for diversity filtering but was not found.\n",
-             "To resolve this, ensure TPM is provided when building the analysis:\n\n",
-             "  analysis <- build_analysis_s4(\n",
-             "    readcounts = readcounts,\n",
-             "    metadata = metadata_df,\n",
-             "    tx2gene = gff3_file,\n",
-             "    tpm = tpm,                    # Required: TPM matrix from SALMON\n",
-             "    effective_length = effective_length,\n",
-             "    config = config\n",
-             "  )\n\n",
-             "TPM will be stored in metadata(se)$tpm and used for filtering.",
-             call. = FALSE)
+            "To resolve this, ensure TPM is provided when building the analysis:\n\n",
+            "  analysis <- build_analysis(\n", "    readcounts = readcounts,\n",
+            "    metadata = metadata_df,\n", "    tx2gene = gff3_file,\n", "    tpm = tpm,                    # Required: TPM matrix from SALMON\n",
+            "    effective_length = effective_length,\n", "    config = config\n",
+            "  )\n\n", "TPM will be stored in metadata(se)$tpm and used for filtering.",
+            call. = FALSE)
     }
-    
+
     assay_mat <- tpm_result$mat
     assay_source <- tpm_result$source
 
@@ -597,7 +606,7 @@
             if (is.na(pair_col)) {
                 # No pair column found - treat as unpaired design
                 if (verbose) {
-                    message("No pair column detected. Treating as unpaired design.")
+                  message("No pair column detected. Treating as unpaired design.")
                 }
                 pair_col <- NULL
             } else if (verbose) {
@@ -617,7 +626,8 @@
 
         # Calculate stringency-based thresholds
         n_samples <- ncol(se)
-        n_pairs <- if (!is.null(pair_col)) length(unique(col_data[[pair_col]])) else NULL
+        n_pairs <- if (!is.null(pair_col))
+            length(unique(col_data[[pair_col]])) else NULL
         stringency_result <- .calculate_stringency_thresholds(stringency, n_samples,
             n_pairs)
         min_samples <- stringency_result$min_samples
@@ -806,17 +816,17 @@
 #'
 #' # Subset to top genes (use 200 to ensure adequate data for downstream
 #' analysis)
-#' small_analysis <- filter_analysis_s4(analysis, min_samples = 1,
+#' small_analysis <- filter_analysis(analysis, min_samples = 1,
 #' subset_n_genes = 200)
 #'
 #' # Subset to genes with minimum 1 total count across all samples
 #' # This ensures data adequacy filtering (recommended: min_count = 10-20
 #' for robust estimates)
-#' filtered <- filter_analysis_s4(analysis, min_samples = 1, subset_n_genes
+#' filtered <- filter_analysis(analysis, min_samples = 1, subset_n_genes
 #' = 100, subset_min_count = 1)
 #'
 #' # Subset to specific genes only
-#' subset_genes <- filter_analysis_s4(
+#' subset_genes <- filter_analysis(
 #'   analysis,
 #'   min_samples = 1,
 #'   subset_genes = c('TX_1', 'TX_2', 'TX_3'),
@@ -824,7 +834,7 @@
 #' )
 #'
 #' # Random selection of genes (reproducible with seed)
-#' random_subset <- filter_analysis_s4(
+#' random_subset <- filter_analysis(
 #'   analysis,
 #'   min_samples = 1,
 #'   subset_n_genes = 8,
@@ -834,7 +844,7 @@
 #' )
 #'
 #' # Keep specific samples only
-#' control_only <- filter_analysis_s4(
+#' control_only <- filter_analysis(
 #'   analysis,
 #'   min_samples = 1,
 #'   subset_samples = colnames(se(analysis))[

@@ -1,9 +1,9 @@
 #' Storey's Pi0 Estimation and Q-Value Calculation
 #' 
-#' Implements adaptive false discovery rate (FDR) control using Storey's π₀ 
+#' Implements adaptive false discovery rate (FDR) control using Storey's \eqn{\pi_0} 
 #' estimation method. This allows for more powerful inference than
 #' Benjamini-Hochberg
-#' when a substantial proportion of null hypotheses are true (large π₀).
+#' when a substantial proportion of null hypotheses are true (large \eqn{\pi_0}).
 #' 
 #' @details
 #' 
@@ -20,8 +20,8 @@
 #' Example workflow:
 #' ```
 #' 1. [For multi-q correlation-adjusted analysis, see
-#' .calculate_lm_interaction() with multicorr='westfall-young']
-#' 2. Or: Use .rank_test_q_condition() for rank-based multi-q testing with
+#' .calculate_lm() with multicorr='westfall-young']
+#' 2. Or: Use .calculate_srh() for rank-based multi-q testing with
 #' WY control
 #'   3. Then: pi0_obj <- .estimate_storey_pi0(adjusted_pvalues)
 #' 4. Then: qvals <- .compute_storey_qvalues(adjusted_pvalues, pi0 =
@@ -31,27 +31,27 @@
 #' **Why Westfall-Young First?**
 #' - Westfall-Young corrects for q-value AR(1) correlation structure
 #' - WY-adjusted p-values satisfy exchangeability (independence-like property)
-#' - Storey π₀ estimation becomes mathematically valid
+#' - Storey \eqn{\pi_0} estimation becomes mathematically valid
 #' - Type I error properly controlled at α level
 #' - Combined approach: more powerful than either method alone
 #' 
-#' **Storey's π₀ Estimation:**
-#' 
-#' The proportion of true null hypotheses (π₀) is estimated from the p-value 
+#' **Storey's \eqn{\pi_0} Estimation:**
+#'
+#' The proportion of true null hypotheses (\eqn{\pi_0}) is estimated from the p-value
 #' distribution using the method of Storey (2002):
 #' 
-#' π₀(λ) = (# p-values > λ) / ((1-λ) * m)
+#' \eqn{\pi_0(\lambda)} = (# p-values > \eqn{\lambda}) / ((1-\eqn{\lambda}) * m)
 #' 
 #' where λ is a threshold (typically 0.5) and m is the number of tests.
 #' 
-#' This is more adaptive than assuming π₀ = 1 (as in Benjamini-Hochberg), 
+#' This is more adaptive than assuming \eqn{\pi_0} = 1 (as in Benjamini-Hochberg), 
 #' allowing increased power when many signals are present.
 #' 
 #' **Q-Value Conversion:**
 #' 
 #' Once π₀ is estimated, q-values are computed as:
 #' 
-#' q(p) = π₀ * (rank(p) / m) * FDR_level
+#' \eqn{q(p) = \pi_0 * (rank(p) / m) * FDR_level}
 #' 
 #' This maintains FDR <= α while incorporating the estimated proportion of 
 #' true signals.
@@ -61,7 +61,7 @@
 #'   Westfall-Young preprocessed p-values only (already correlation-adjusted).
 #' Direct application to raw multi-q p-values violates the independence
 #' assumption.
-#' @param lambda Optional threshold for π₀ estimation (default: 0.5). 
+#' @param lambda Optional threshold for \eqn{\pi_0} estimation (default: 0.5). 
 #'   Common range: 0.3-0.9. Higher λ uses more conservative p-values.
 #' @param pi0_method Character specifying π₀ estimation method:
 #'   - 'lambda' (default): Uses fixed λ (robust, conservative)
@@ -333,15 +333,15 @@
 # WESTFALL-YOUNG PERMUTATION HELPER (March 2026)
 # ════════════════════════════════════════════════════════════════════════════════
 # Consolidates redundant WY permutation logic shared between: 1.
-# .calculate_lm_interaction() - parametric tests (GAM, LMM, GEE) 2.
-# .rank_test_q_condition() - rank-based tests (Kruskal-Wallis, conditional
-# rank) DESIGN PATTERN: - Core permutation loop is identical in both functions
-# (~70% code duplication) - Model refitting logic differs (parametric vs
-# rank-based) - Solution: Extract permutation machinery, supply model-specific
-# refit_fn callback USAGE: perm_result <- .westfall_young_permutation( n_genes
-# = nrow(results), wy_randomizations = 1000, permute_fn = function() { ...
-# return permutation_assignment ... }, refit_fn = function(perm_assignment) {
-# ... return perm_pvalues_vector ... }, verbose = FALSE ) RETURNS: List with: -
+# .calculate_lm() - parametric tests (GAM, LMM, GEE) 2.  .calculate_srh() -
+# rank-based tests (Scheirer-Ray-Hare only, March 2026) rank) DESIGN PATTERN: -
+# Core permutation loop is identical in both functions (~70% code duplication)
+# - Model refitting logic differs (parametric vs rank-based) - Solution:
+# Extract permutation machinery, supply model-specific refit_fn callback USAGE:
+# perm_result <- .westfall_young_permutation( n_genes = nrow(results),
+# wy_randomizations = 1000, permute_fn = function() { ...  return
+# permutation_assignment ... }, refit_fn = function(perm_assignment) { ...
+# return perm_pvalues_vector ... }, verbose = FALSE ) RETURNS: List with: -
 # perm_minima: numeric vector of length wy_randomizations (minimum p-value per
 # permutation) - n_permutations: integer (wy_randomizations) - message:
 # character string (if verbose=TRUE) WESTFALL-YOUNG STEP-DOWN PROCEDURE
