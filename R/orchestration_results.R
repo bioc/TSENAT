@@ -884,7 +884,7 @@ results <- function(analysis, type, q = NULL, rankBy = "none", n = NA, filterFDR
         check <- result$exchangeability
         status_val <- if (!is.null(check$status))
             check$status else "unknown"
-        rows[[length(rows) + 1]] <- list(Characteristic = "Exchangeability", Test = "Permutation test",
+        rows[[length(rows) + 1]] <- list(Test = "Exchangeability (Permutation test)",
             Result = paste0("p=", format_value(check$p_value)), Interpretation = paste0(toupper(substring(status_val,
                 1, 1)), substring(status_val, 2)))
     }
@@ -897,7 +897,7 @@ results <- function(analysis, type, q = NULL, rankBy = "none", n = NA, filterFDR
             if (abs(check$mean_correlation) < 0.3)
                 "Heterogeneous" else "Homogeneous"
         } else "Unknown"
-        rows[[length(rows) + 1]] <- list(Characteristic = "Monotonicity", Test = "Spearman rho",
+        rows[[length(rows) + 1]] <- list(Test = "Monotonicity (Spearman rho)",
             Result = paste0("r=", r_val), Interpretation = interp)
     }
 
@@ -912,7 +912,7 @@ results <- function(analysis, type, q = NULL, rankBy = "none", n = NA, filterFDR
             if (check$icc_simplified < 0.5)
                 "Low" else "Moderate"
         } else "Unknown"
-        rows[[length(rows) + 1]] <- list(Characteristic = "Consistency", Test = "Kendall's W / ICC",
+        rows[[length(rows) + 1]] <- list(Test = "Consistency (Kendall's W / ICC)",
             Result = paste0("W=", w_val, ", ICC=", icc_val), Interpretation = interp)
     }
 
@@ -936,7 +936,7 @@ results <- function(analysis, type, q = NULL, rankBy = "none", n = NA, filterFDR
             interp <- if (!val_valid || has_error)
                 "Unknown" else if (metric$overall_concurvity < 0.5)
                 "Low" else "High"
-            rows[[length(rows) + 1]] <- list(Characteristic = "Concurvity", Test = "Smooth collinearity",
+            rows[[length(rows) + 1]] <- list(Test = "Concurvity (Smooth collinearity)",
                 Result = result_str, Interpretation = interp)
         }
 
@@ -954,7 +954,7 @@ results <- function(analysis, type, q = NULL, rankBy = "none", n = NA, filterFDR
                 "Unknown" else if (metric$edf_ratio < 0.1)
                 "Over-smoothed" else if (metric$edf_ratio > 0.9)
                 "Under-smoothed" else "Adequate"
-            rows[[length(rows) + 1]] <- list(Characteristic = "EDF Ratio", Test = "Smoothing",
+            rows[[length(rows) + 1]] <- list(Test = "EDF Ratio (Smoothing)",
                 Result = result_str, Interpretation = interp)
         }
 
@@ -972,7 +972,7 @@ results <- function(analysis, type, q = NULL, rankBy = "none", n = NA, filterFDR
             interp <- if (!val_valid || has_error)
                 "Unknown" else if (metric$r2_improvement_percent < 1)
                 "Use linear" else "Use GAM"
-            rows[[length(rows) + 1]] <- list(Characteristic = "Non-linearity", Test = "Delta R^2 vs LM",
+            rows[[length(rows) + 1]] <- list(Test = "Non-linearity (Delta R^2 vs LM)",
                 Result = result_str, Interpretation = interp)
         }
 
@@ -989,8 +989,8 @@ results <- function(analysis, type, q = NULL, rankBy = "none", n = NA, filterFDR
             }
             interp <- if (!val_valid || has_error)
                 "Unknown" else "Adequate"
-            rows[[length(rows) + 1]] <- list(Characteristic = "Basis Dimension",
-                Test = "Spline basis", Result = result_str, Interpretation = interp)
+            rows[[length(rows) + 1]] <- list(Test = "Basis Dimension (Spline basis)",
+                Result = result_str, Interpretation = interp)
         }
     }
 
@@ -1011,8 +1011,10 @@ results <- function(analysis, type, q = NULL, rankBy = "none", n = NA, filterFDR
 
             # Format result: just extract the essential value from details
             result_val <- if (!is.null(metric$details)) {
-                # Extract just the numeric value if possible
-                gsub("<.*?>|\\s+\\(.*\\)", "", metric$details)  # Remove HTML/parenthetical info
+                # Remove HTML, parenthetical info, and interpretive adjectives
+                cleaned <- gsub("<.*?>|\\s+\\(.*\\)", "", metric$details)
+                # Remove trailing interpretive phrases (e.g., " - homogeneous", " - suitable", ". Poor", ". Moderate")
+                gsub("\\s*[-.]\\s*(homogeneous|heterogeneous|suitable|independent|Poor|Moderate|over-smoothed|under-smoothed|Adequate|homogeneous|Rare|dimens|boot).*$", "", cleaned, ignore.case = TRUE)
             } else "N/A"
 
             test_val <- if (!is.null(metric$method))
@@ -1025,8 +1027,8 @@ results <- function(analysis, type, q = NULL, rankBy = "none", n = NA, filterFDR
             interp_formatted <- paste0(toupper(substring(interp_val, 1, 1)), substring(interp_val,
                 2))
 
-            row_item <- list(Characteristic = capitalize_first(metric_name), Test = capitalize_first(test_val),
-                Result = result_truncated, Interpretation = interp_formatted)
+            row_item <- list(Test = capitalize_first(metric_name), Result = result_truncated, 
+                Interpretation = interp_formatted)
             rows[[length(rows) + 1]] <- row_item
         }
     }
@@ -1048,7 +1050,10 @@ results <- function(analysis, type, q = NULL, rankBy = "none", n = NA, filterFDR
 
             # Format result: just extract the essential value from details
             result_val <- if (!is.null(metric$details)) {
-                gsub("<.*?>|\\s+\\(.*\\)", "", metric$details)  # Remove HTML/parenthetical info
+                # Remove HTML, parenthetical info, and interpretive adjectives
+                cleaned <- gsub("<.*?>|\\s+\\(.*\\)", "", metric$details)
+                # Remove trailing interpretive phrases
+                gsub("\\s*[-.]\\s*(homogeneous|heterogeneous|suitable|independent|Poor|Moderate|over-smoothed|under-smoothed|Adequate|Rare|dimens|boot).*$", "", cleaned, ignore.case = TRUE)
             } else "N/A"
 
             test_val <- if (!is.null(metric$method))
@@ -1061,8 +1066,8 @@ results <- function(analysis, type, q = NULL, rankBy = "none", n = NA, filterFDR
             interp_formatted <- paste0(toupper(substring(interp_val, 1, 1)), substring(interp_val,
                 2))
 
-            row_item <- list(Characteristic = capitalize_first(metric_name), Test = capitalize_first(test_val),
-                Result = result_truncated, Interpretation = interp_formatted)
+            row_item <- list(Test = capitalize_first(metric_name), Result = result_truncated, 
+                Interpretation = interp_formatted)
             rows[[length(rows) + 1]] <- row_item
         }
     }
@@ -1084,7 +1089,10 @@ results <- function(analysis, type, q = NULL, rankBy = "none", n = NA, filterFDR
 
             # Format result: just extract the essential value from details
             result_val <- if (!is.null(metric$details)) {
-                gsub("<.*?>|\\s+\\(.*\\)", "", metric$details)  # Remove HTML/parenthetical info
+                # Remove HTML, parenthetical info, and interpretive adjectives
+                cleaned <- gsub("<.*?>|\\s+\\(.*\\)", "", metric$details)
+                # Remove trailing interpretive phrases
+                gsub("\\s*[-.]\\s*(homogeneous|heterogeneous|suitable|independent|Poor|Moderate|over-smoothed|under-smoothed|Adequate|Rare|dimens|boot).*$", "", cleaned, ignore.case = TRUE)
             } else "N/A"
 
             test_val <- if (!is.null(metric$method))
@@ -1097,8 +1105,8 @@ results <- function(analysis, type, q = NULL, rankBy = "none", n = NA, filterFDR
             interp_formatted <- paste0(toupper(substring(interp_val, 1, 1)), substring(interp_val,
                 2))
 
-            row_item <- list(Characteristic = capitalize_first(metric_name), Test = capitalize_first(test_val),
-                Result = result_truncated, Interpretation = interp_formatted)
+            row_item <- list(Test = capitalize_first(metric_name), Result = result_truncated, 
+                Interpretation = interp_formatted)
             rows[[length(rows) + 1]] <- row_item
         }
     }
@@ -1354,6 +1362,34 @@ print.assumptions_text <- function(x, ...) {
 # ============================================================================
 
 #' @noRd
+# Calculate column widths for text formatting (pure function - cycle-free)
+# BREAKING CYCLE: Extracted column width calculation for independent testing
+.calculate_column_widths <- function(df_char) {
+    vapply(seq_len(ncol(df_char)), function(j) {
+        col_data <- df_char[[j]]
+        # Handle NA values: nchar(NA) returns NA, so replace with nchar("NA")
+        widths <- nchar(col_data)
+        widths[is.na(widths)] <- nchar("NA")  # Replace NA nchar with nchar("NA")
+        max(nchar(colnames(df_char)[j]), max(widths))
+    }, numeric(1))
+}
+
+# Format a single row with column widths (pure function - cycle-free)
+# BREAKING CYCLE: Extracted row formatting for independent testing
+.format_table_row <- function(values, col_widths) {
+    paste(mapply(function(val, width) {
+        sprintf("%-*s", width, val)
+    }, values, col_widths), collapse = " ")
+}
+
+# Format table header (pure function - cycle-free)
+# BREAKING CYCLE: Extracted header formatting for independent testing
+.format_table_header <- function(colnames, col_widths) {
+    paste(mapply(function(name, width) {
+        sprintf("%-*s", width, name)
+    }, colnames, col_widths), collapse = " ")
+}
+
 .format_data_frame_as_text <- function(df) {
     if (nrow(df) == 0) {
         return("")
@@ -1363,20 +1399,14 @@ print.assumptions_text <- function(x, ...) {
     df_char <- as.data.frame(lapply(df, as.character), stringsAsFactors = FALSE)
 
     # Calculate column widths
-    col_widths <- vapply(seq_len(ncol(df_char)), function(j) {
-        max(nchar(colnames(df_char)[j]), max(nchar(df_char[[j]])))
-    }, numeric(1))
+    col_widths <- .calculate_column_widths(df_char)
 
     # Format header
-    header <- paste(mapply(function(name, width) {
-        sprintf("%-*s", width, name)
-    }, colnames(df_char), col_widths), collapse = " ")
+    header <- .format_table_header(colnames(df_char), col_widths)
 
     # Format rows
     rows <- apply(df_char, 1, function(row) {
-        paste(mapply(function(val, width) {
-            sprintf("%-*s", width, val)
-        }, row, col_widths), collapse = " ")
+        .format_table_row(row, col_widths)
     })
 
     # Combine and add newlines

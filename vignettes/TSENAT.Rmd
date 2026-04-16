@@ -16,6 +16,7 @@ output:
     latex_engine: xelatex
 header-includes:
   - \usepackage{float}
+  - \usepackage{tabu}
 bibliography: TSENAT.bib
 suppress-bibliography: true
 vignette: |
@@ -129,31 +130,27 @@ print(p_qcurve)
 
 # What is Entropy and Tsallis Entropy?
 
-The concept of **entropy** originated in Claude Shannon's landmark 1948 paper on information theory [@I051], which established that information content could be quantified mathematically through the fundamental concepts of uncertainty and surprise. Shannon entropy became the foundation for understanding complexity across mathematics, physics, and biology—if you draw a transcript from a distribution, how predictable is the outcome?
+## Historical Foundation and Intellectual Progression
 
-However, Shannon entropy treats all elements equally, regardless of their frequency: it weights rare and common elements identically. This led mathematicians and physicists to explore **generalized entropy families** that could emphasize different aspects of distributions. Two major generalizations emerged: Rényi's parametric family of entropies and Tsallis entropy, both of which introduced tunable parameters that allow sensitivity to rare versus abundant elements.
+The concept of entropy originated in Claude Shannon's landmark 1948 paper on information theory [@I051], which established that information content could be quantified mathematically. Shannon entropy became the foundation for understanding complexity across mathematics, physics, and biology—if you draw a transcript from a distribution, how predictable is the outcome?
 
-The key insight is that Tsallis and Rényi entropies, despite appearing different mathematically, can be unified within a coherent framework through generalized logarithmic and exponential functions [@I063]. Both frameworks answer a fundamental question: **What organizational scales matter?** By changing the q parameter, you shift emphasis from rare (low q) to abundant (high q) elements—qualitatively different perspectives on the same distribution.
+However, Shannon entropy treats all elements equally, regardless of their frequency: it weights rare and common elements identically. This limitation led mathematicians and physicists to explore generalized entropy families, most notably Rényi's parametric family and Tsallis entropy. Both introduced tunable parameters that allow sensitivity to shift between rare and abundant elements. Remarkably, despite appearing different mathematically, Tsallis and Rényi entropies can be unified within a coherent framework through generalized logarithmic and exponential functions [@I063]—both answer the fundamental question: What organizational scales matter?
 
-More recently, **Hill numbers** [@I021] provided a modern ecological framework that reinterprets all generalized entropy measures as "true diversity" of different orders. This formulation clarified that diversity questions have scale-dependent answers: rare species and dominant species reveal different ecological (or in our case, transcriptomic) truths. The Hill numbers framework unified richness (q=0), Shannon entropy (q=1), Simpson/Gini (q=2), and higher-order generalizations under a single mathematical umbrella.
-
-TSENAT applies this intellectual progression to RNA-seq data: instead of asking only "which genes change abundance," it asks "how does the organization of isoforms change across multiple scales of complexity?" By leveraging Tsallis entropy's multi-scale nature and the Hill numbers interpretation, TSENAT captures the full diversity spectrum of isoform organization, revealing biological signals invisible to traditional abundance-focused methods.
+More recently, Hill numbers [@I021] provided a modern ecological framework that reinterprets all generalized entropy measures as "true diversity" of different orders. This formulation clarified a crucial insight: diversity questions have scale-dependent answers. The Hill numbers framework unified richness (q=0), Shannon entropy (q=1), Simpson/Gini (q=2), and higher-order generalizations under a single mathematical umbrella—formalizing the idea that rare species and dominant species reveal different ecological (or in our case, transcriptomic) truths.
 
 ## Why This Matters for RNA-seq: The Isoform Complexity Problem
 
-Standard RNA-seq analysis measures *whether* transcript abundance changes between conditions. But a critical complementary question remains underexplored: *how* does the diversity of isoforms change? A gene may show little change in total abundance while dramatically reshuffling its isoform repertoire—a phenomenon that current methods largely miss.
+Standard RNA-seq analysis measures whether transcript abundance changes between conditions. But a critical complementary question remains underexplored: how does the diversity of isoforms change? A gene may show little change in total abundance while dramatically reshuffling its isoform repertoire—a phenomenon that current methods largely miss.
 
-**Entropy** quantifies precisely this: the complexity, richness, and balance of isoform heterogeneity. By measuring entropy across different biological scales (the parameter `q` introduced above), researchers can detect whether changes are driven by shifts in rare isoforms (low q) or reorganization of dominant variants (high q). The beauty of the Tsallis framework is that you obtain a complete picture of isoform heterogeneity by computing across a range of entropic indices—a "q-curve"—revealing which aspects of isoform organization change between conditions.
+Entropy quantifies precisely this: the complexity, richness, and balance of isoform heterogeneity. By measuring entropy across different biological scales (using the parameter q discussed below), researchers can detect whether changes are driven by shifts in rare isoforms or reorganization of dominant variants. The beauty of the Tsallis framework is that you obtain a complete picture of isoform heterogeneity by computing across a range of entropic indices—a "q-curve"—revealing which aspects of isoform organization change between conditions.
 
 ## Mathematical Foundation and Interpretation
 
 ### Tsallis Entropy: Definition and Intuition
 
-For a discrete probability vector $p = (p_1, \ldots, p_n)$ representing isoform proportions within a gene, Tsallis entropy is defined as:
+For a discrete probability vector p=(p₁,…,pₙ) representing isoform proportions within a gene, Tsallis entropy is defined as:
 
-\[
-S_q(p) = \frac{1-\sum_{i=1}^n p_i^q}{q-1}.
-\]
+$$S_q(p)=\frac{1-\sum_{i=1}^{n}p_i^q}{q-1}$$
 
 This parametric family unites diverse entropy concepts under a single framework:
 
@@ -161,41 +158,39 @@ This parametric family unites diverse entropy concepts under a single framework:
 - **Mathematical elegance**: Reduces to well-known diversity indices at specific entropic indices
 - **Practical flexibility**: Enables data-driven exploration across the full diversity spectrum
 
-### Information-Theoretic Meaning
+### The q Parameter: A Sensitivity Dial for Distribution Scales
 
-From an information theory perspective [@I051; @I002], entropy measures the uncertainty or surprise when drawing a single transcript from an isoform distribution. Higher entropy means the draw is less predictable (many similarly abundant isoforms), while lower entropy means one or a few isoforms dominate. This distinction is crucial: two genes with identical total abundance may have dramatically different isoform complexity.
+From an information theory perspective [@I051; @I002], entropy measures the uncertainty when drawing a single transcript from an isoform distribution. Higher entropy means the draw is less predictable (many similarly abundant isoforms), while lower entropy means one or a few isoforms dominate.
 
-The **q parameter acts as a sensitivity dial** that controls which aspects of the distribution become visible:
+The q parameter acts as a sensitivity dial that controls which aspects of the distribution become visible:
 
 - **q < 1** (e.g., 0.5): Emphasizes rare, low-abundance isoforms; useful for discovering cryptic or condition-specific variants.
 - **q = 1**: Recovers Shannon entropy; provides balanced sensitivity across all abundance scales.
 - **q > 1**: Emphasizes dominant, abundant isoforms; captures core expression architecture.
 
-## Biological Potentiality: Why TSENAT Matters
+This principle formalizes what cannot be implemented in classical Shannon analysis: the ability "not to set rare and common events on the same footing, as in standard statistics, but to enhance or depress them according to the parameter chosen" [@I005; @I007; @I009].
 
-Tsallis entropy is grounded in Shannon's foundational information theory [@I051], generalized by Renyi's family of entropies [@I003], and extended by Tsallis [@I002]. The key innovation is a tunable parameter `q` that controls sensitivity to different aspects of the diversity distribution-which aspects of isoform heterogeneity become visible depends on the entropic index chosen [@I005; @I007; @I009].
+### Biological Interpretation: Richness and Evenness
 
-As stated explicitly in the mathematical literature: "This introduces the formal possibility not to set rare and common events on the same footing, as in BG or Shannon statistics, but it enhances or depresses them according to the parameter chosen." This principle is formalized in the Hill numbers framework [@I021], which unifies diverse entropy-based measures (richness, Shannon, Simpson) as different manifestations of the same parametric family with varying sensitivity to abundance scales.
+The concept of "true diversity" [@I021] emphasizes that diversity decomposes into two independent components: species richness (how many distinct isoforms exist) and evenness (how evenly distributed they are across the population). Two genes can have identical Shannon entropy yet differ dramatically in isoform structure: one might be dominated by a single abundant isoform with many rare variants (revealing complexity at low q sensitivity), while another distributes transcripts equally across many isoforms (maintaining heterogeneity across all q values). This distinction is crucial: no single entropic index captures the complete complexity landscape.
 
-The flexibility is crucial for isoform analysis. The concept of "true diversity" [@I021] emphasizes that diversity can be decomposed into two independent components: species richness (how many distinct isoforms exist) and evenness (how evenly distributed they are across the population). Two genes can have identical Shannon entropy yet differ dramatically in isoform structure: one might be dominated by a single abundant isoform (maximizing apparent heterogeneity at low `q` where rare variants matter), while another distributes transcripts across many isoforms equally (maximizing heterogeneity across all `q` values).
+## Why Multi-Scale Entropy Matters: Biological Contexts
 
-## Applications and Evidence: Why Multi-Scale Entropy Matters
+The multi-scale nature of Tsallis entropy makes it suited for exploring isoform complexity across diverse biological contexts. Different biological processes prioritize different organizational scales:
 
-The multi-scale nature of Tsallis entropy makes it suited for exploring isoform complexity across diverse biological contexts. By measuring information content at different entropic indices, researchers can detect patterns invisible to traditional transcript abundance measures alone. The recent emphasis on information-theoretic approaches in computational biology [@I029, @I034] reflects broader recognition that complex biological systems encode information across multiple organizational scales.
+**Isoform complexity as a biological signal**: Isoform switching—reorganization of the isoform landscape without necessarily changing total gene abundance—reflects strategic shifts in protein function driven by splicing regulation. Evidence from single-cell transcriptomics demonstrates that transcript-level complexity varies systematically across cell types and developmental states [@ISO010], validating that isoform heterogeneity is a genuine biological phenomenon rather than noise. By measuring information content at different entropic indices, researchers can detect patterns invisible to traditional transcript abundance measures alone:
 
-### Biological Contexts Where Scale-Dependent Analysis Reveals Hidden Complexity
-
-**Isoform complexity as a biological signal**: Isoform switching—reorganization of the isoform landscape without necessarily changing total gene abundance—reflects strategic shifts in protein function driven by splicing regulation. Evidence from single-cell transcriptomics demonstrates that transcript-level complexity varies systematically across cell types and developmental states [@ISO010], validating that isoform heterogeneity is a genuine biological phenomenon rather than noise. Different biological processes prioritize different organizational scales [@Y005]:
-
-- Changes in rare isoform usage (revealed through low `q` sensitivity) might reflect exploratory or error-correction mechanisms
-- Shifts in dominant isoform selection (revealed through high `q` sensitivity) might reflect functional specialization or robustness demands
+- Changes in rare isoform usage (revealed through low q sensitivity) might reflect exploratory or error-correction mechanisms
+- Shifts in dominant isoform selection (revealed through high q sensitivity) might reflect functional specialization or robustness demands
 - The full q-curve reveals whether cellular transitions involve wholesale reorganization or targeted adjustments
 
-TSENAT enables detection of these changes through entropy-based approaches, which capture whether complexity is increasing (diversity spreading across isoforms) or decreasing (consolidation onto dominant isoforms).
+TSENAT enables detection of these changes through entropy-based approaches, which capture whether complexity is increasing (diversity spreading across isoforms) or decreasing (consolidation onto dominant isoforms). The recent emphasis on information-theoretic approaches in computational biology [@I029; @I034] reflects broader recognition that complex biological systems encode information across multiple organizational scales.
 
-**Beyond classical abundance measures**: Traditional RNA-seq analysis focuses on fold-changes and differential abundance. Since isoform reorganization can occur independently of total abundance changes, entropy-based approaches complement classical methods by detecting complexity shifts that transcript-level statistics alone cannot reveal.
+## Beyond Classical Abundance Measures
 
-### Mechanistic Evidence from Disease and Evolution
+Traditional RNA-seq analysis focuses on fold-changes and differential abundance. Since isoform reorganization can occur independently of total abundance changes, entropy-based approaches complement classical methods by detecting complexity shifts that transcript-level statistics alone cannot reveal. Standard statistical tests (t-tests, DESeq2, etc.) miss the phenomenon entirely: a gene can show zero fold-change while experiencing dramatic isoform reshuffling. This represents a fundamental analytical gap that entropy-based methods address.
+
+## Mechanistic Evidence: Disease and Evolution
 
 Peer-reviewed literature provides strong empirical support for entropy-based analysis in biological contexts:
 
@@ -343,7 +338,7 @@ first_sample_name <- NULL
 for (q_val in q_values_to_show) {
     # Use tryCatch to gracefully handle q-values that don't exist
     div_q <- tryCatch({
-        results(analysis, type = "diversity", q = q_val)
+        results(analysis, type = "diversity", q = q_val, format = "se")
     }, error = function(e) {
         NULL
     })
@@ -379,17 +374,8 @@ if (!is.null(sample_data) && nrow(sample_data) > 0) {
         caption = paste0("**Table 1:** Tsallis entropy for first 4 genes across three diversity scales (sample: ", 
                          first_sample_name, ")"),
         digits = 5,
-        row.names = FALSE,
-        format = if (knitr::is_latex_output()) "latex" else "html",
-        longtable = knitr::is_latex_output(),
-        linesep = ""
-    ) %>%
-    kableExtra::kable_styling(
-      bootstrap_options = c("striped", "hover"),
-      full_width = TRUE,
-      latex_options = c("scale_down")
-    ) %>%
-    kableExtra::scroll_box(width = "100%", height = "auto")
+        row.names = FALSE
+    )
 } else {
   cat("Note: Diversity results not available for the requested q-values. ",
       "Ensure calculate_diversity() was run with appropriate q-value configuration.")
@@ -447,17 +433,8 @@ if (!is.null(sample_qc) && nrow(sample_qc) > 0) {
       sample_qc[, cols_to_show],
       caption = "**Table 2 | Sample Influence Assessment via M-estimation.** Ranked by magnitude of resampling-based influence values. Columns: Sample identifier; condition; proportion affected; distance from centroid; outlier status. M-estimation identifies influential samples for sensitivity analysis.",
       digits = 4,
-      row.names = FALSE,
-      format = if (knitr::is_latex_output()) "latex" else "html",
-      longtable = knitr::is_latex_output(),
-      linesep = ""
-  ) %>%
-  kableExtra::kable_styling(
-    bootstrap_options = c("striped", "hover"),
-    full_width = TRUE,
-    latex_options = c("scale_down")
-  ) %>%
-  kableExtra::scroll_box(width = "100%", height = "auto")
+      row.names = FALSE
+  )
 }
 ```
 
@@ -496,7 +473,7 @@ if (!is.null(lm_res) && is.data.frame(lm_res) && nrow(lm_res) > 0) {
     display <- head(lm_res, 6)
     
     # Select only most informative columns
-    key_cols <- c("gene", "gene_name", "p_interaction", "adj_p_interaction", 
+    key_cols <- c("gene", "p_interaction", "adj_p_interaction", 
                   "effect_size", "test_statistic", "model_converged", "heteroscedasticity_detected")
     key_cols <- key_cols[key_cols %in% colnames(display)]
     display <- display[, key_cols]
@@ -515,17 +492,8 @@ if (!is.null(lm_res) && is.data.frame(lm_res) && nrow(lm_res) > 0) {
     
     knitr::kable(display, 
                 caption = "**Table 3 | Leading genes with scale-dependent condition effects from generalized additive models.** We display the 6 genes with lowest adjusted p-values (*q* < 0.05). Benjamini-Hochberg correction applied; columns show gene identifier, effect size, test statistic, convergence status, and heteroscedasticity detection. Methods: GAMs with *q* and condition as smooth predictors [@S190].",
-                col.names = c("Gene", "Gene Name", "P-value", "Adj. P-value", "Effect Size", "Test Statistic", "Model Converged", "Heteroscedasticity"),
-                digits = 4, row.names = FALSE,
-                format = if (knitr::is_latex_output()) "latex" else "html",
-                longtable = knitr::is_latex_output(),
-                linesep = "") %>%
-    kableExtra::kable_styling(
-      bootstrap_options = c("striped", "hover"),
-      full_width = TRUE,
-      latex_options = c("scale_down")
-    ) %>%
-    kableExtra::scroll_box(width = "100%", height = "auto")
+                col.names = c("Gene", "P-value", "Adj. P-value", "Effect Size", "Test Statistic", "Model Converged", "Heteroscedasticity"),
+                digits = 4, row.names = FALSE)
 }
 ```
 
@@ -588,7 +556,12 @@ if (exists("tables_result") && is.list(tables_result) &&
     !is.null(tables_result$gene_headers) && length(tables_result$gene_headers) > 0) {
   # Iterate over the prepared comparison tables and display top 2 genes
   for (gene_idx in 1:min(2, length(tables_result$gene_headers))) {
-    cat("#### Gene: ", tables_result$gene_headers[gene_idx], "\n\n", sep="")
+    # Print gene header with proper spacing and formatting
+    if (knitr::is_latex_output()) {
+      cat("\n\n\\subsection*{Gene: ", tables_result$gene_headers[gene_idx], "}\n\n", sep="")
+    } else {
+      cat("\n\n### Gene: ", tables_result$gene_headers[gene_idx], "\n\n", sep="")
+    }
     
     comparison_data <- tables_result$comparison_tables[[gene_idx]]
     q_metadata <- tables_result$q_metadata[[gene_idx]]
@@ -596,27 +569,32 @@ if (exists("tables_result") && is.list(tables_result) &&
     if (!is.null(comparison_data) && !is.null(q_metadata)) {
       # Create display labels for column names (for knitr::kable)
       q_values_available <- q_metadata$q_values_available
+      # Filter to show only q=0.50, q=1.00, q=1.50
+      q_indices <- which(sapply(q_values_available, function(qk) {
+        q_num <- q_metadata$q_key_to_value[[qk]]
+        q_num %in% c(0.50, 1.00, 1.50)
+      }))
+      q_values_to_show <- q_values_available[q_indices]
+      
       col_display <- c(
         "Transcript",
-        sapply(q_values_available, function(qk) {
+        sapply(q_values_to_show, function(qk) {
           q_num <- q_metadata$q_key_to_value[[qk]]
           paste0("q=", sprintf("%.2f", q_num))
         }),
         "Direction Consistency"
       )
       
-      print(knitr::kable(comparison_data, 
+      # Select only these columns from comparison_data
+      cols_to_keep <- c(1, q_indices + 1, ncol(comparison_data))
+      comparison_data_filtered <- comparison_data[, cols_to_keep, drop = FALSE]
+      
+      # Render table with kableExtra
+      table_output <- knitr::kable(comparison_data_filtered, 
                          digits = 3, 
-                         col.names = col_display, 
-                         format = if (knitr::is_latex_output()) "latex" else "html", 
-                         longtable = knitr::is_latex_output(), 
-                         linesep = "") %>%
-            kableExtra::kable_styling(
-              bootstrap_options = c("striped", "hover"),
-              full_width = TRUE,
-              latex_options = c("scale_down")
-            ) %>%
-            kableExtra::scroll_box(width = "100%", height = "auto"))
+                         col.names = col_display,
+                         align = c("l", rep("c", ncol(comparison_data_filtered) - 2), "r"))
+      print(table_output)
     }
     
     cat("\n")
@@ -680,17 +658,8 @@ if (exists("analysis")) {
             div_table,
             caption = "**Table 3 | Pairwise Tsallis divergence estimates.** Divergence (distance) between conditions from Tsallis entropy framework. Columns: gene identifier; pairwise comparison; divergence value; confidence interval (95%). Ranked by magnitude.",
             digits = 5,
-            row.names = TRUE,
-            format = if (knitr::is_latex_output()) "latex" else "html",
-            longtable = knitr::is_latex_output(),
-            linesep = ""
-        ) %>%
-        kableExtra::kable_styling(
-          bootstrap_options = c("striped", "hover"),
-          full_width = TRUE,
-          latex_options = c("scale_down")
-        ) %>%
-        kableExtra::scroll_box(width = "100%", height = "auto")
+            row.names = TRUE
+        )
     } else if (is.list(div_results) && length(div_results) > 0) {
         # If stored as list per q-value, extract first q-value results
         first_q_result <- div_results[[1]]
@@ -701,17 +670,8 @@ if (exists("analysis")) {
                 div_table,
                 caption = "**Table 4 | Pairwise Tsallis divergence from list-based results.** Alternative representation of divergence metrics for leading genes. Columns: gene identifier; pairwise comparison; divergence value; uncertainty. Asymmetry ($D(A \\to B) \\ne D(B \\to A)$) reflects information-theoretic properties. Ordered by divergence magnitude.",
                 digits = 5,
-                row.names = TRUE,
-                format = if (knitr::is_latex_output()) "latex" else "html",
-                longtable = knitr::is_latex_output(),
-                linesep = ""
-            ) %>%
-            kableExtra::kable_styling(
-              bootstrap_options = c("striped", "hover"),
-              full_width = TRUE,
-              latex_options = c("scale_down")
-            ) %>%
-            kableExtra::scroll_box(width = "100%", height = "auto")
+                row.names = TRUE
+            )
         }
     }
 }
@@ -761,17 +721,8 @@ knitr::kable(
     top_genes_display, 
     caption = "Top 6 Genes by Effect Size (Tsallis Divergence)",
     digits = 4,
-    row.names = FALSE,
-    format = if (knitr::is_latex_output()) "latex" else "html",
-    longtable = knitr::is_latex_output(),
-    linesep = ""
-) %>%
-kableExtra::kable_styling(
-  bootstrap_options = c("striped", "hover"),
-  full_width = TRUE,
-  latex_options = c("scale_down")
-) %>%
-kableExtra::scroll_box(width = "100%", height = "auto")
+    row.names = FALSE
+)
 ```
 
 ### Interpretation of Pattern Types:
