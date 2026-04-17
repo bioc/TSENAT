@@ -993,7 +993,8 @@ print.rank_assumptions <- function(x, ...) {
 
     for (gene_idx in gene_indices) {
         entropy_curve <- data[gene_idx, ]
-        gam_data <- data.frame(q = q_values, entropy = entropy_curve)
+        # Convert vector to ensure proper dataframe construction (prevents rowname warning)
+        gam_data <- data.frame(q = q_values, entropy = as.numeric(entropy_curve))
         gam_data <- gam_data[!is.na(gam_data$entropy), , drop = FALSE]
 
         if (nrow(gam_data) < 5)
@@ -1128,13 +1129,13 @@ print.rank_assumptions <- function(x, ...) {
     }
 
     tryCatch({
-        # Assess correlation structure suitability without fitting GEE Compute
-        # autocorrelation across observations to infer structure (vectorized)
+        # Assess correlation structure suitability without fitting GEE
+        # Compute autocorrelation across observations to infer structure (vectorized)
 
-        # Option 1: Independence structure assessment - vectorized autocorr
-        # computation Check if data shows autocorrelation (would violate
-        # independence) Note: vapply already protected against invalid
-        # correlation calculations by guards above
+        # Option 1: Independence structure assessment
+        #   Vectorized autocorrelation computation
+        #   Check if data shows autocorrelation (would violate independence)
+        #   Note: vapply already protected against invalid correlation calculations
         autocorr_vals <- vapply(seq_len(ncol(data)), function(j) {
             col_data <- data[, j]
             col_data <- col_data[!is.na(col_data)]
