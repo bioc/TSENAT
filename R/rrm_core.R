@@ -1,10 +1,10 @@
-#' Linear-model interaction test for Tsallis entropy
+#' Regularized/penalized regression interaction testing for Tsallis entropy
 #'
-#' For each gene, fit a linear model of the form `entropy ~ q * group` and
-#' extract the p-value for the interaction term (whether the effect of `q`
-#' differs between groups). The function expects a `SummarizedExperiment`
-#' produced by `.calculate_diversity()` when multiple `q` values have been
-#' computed (column names contain `_q=`).
+#' For each gene, fit a regularized/penalized regression model (GAM, LMM, GEE, or FPCA) 
+#' of the form `entropy ~ q * group` with AR(1) correlation structure and extract the 
+#' p-value for the interaction term (whether the effect of `q` differs between groups). 
+#' The function expects a `SummarizedExperiment` produced by `.calculate_diversity()` 
+#' when multiple `q` values have been computed (column names contain `_q=`).
 #'
 #' @param se A `SummarizedExperiment` containing a `diversity` assay produced
 #'   by `.calculate_diversity(..., q = <vector>)`.
@@ -30,7 +30,7 @@
 #'       repeated q-measures.
 #'   }
 #'   Q-values are mathematically dependent (Papers S168-S175: AR(1) covariance
-#'   structures). Linear models without correlation structure should not be used.
+#'   structures). Regularized regression models without correlation structure should not be used.
 #' @param pvalue Type of p-value to compute: one of
 #'   \code{c('satterthwaite', 'lrt', 'both')} (default: 'satterthwaite').
 #'   Note: For method='lmm', only LRT p-values are available (Satterthwaite
@@ -239,10 +239,10 @@
 #'     row.names = colnames(se)
 #'   )
 #'
-#'   # Run linear model interaction analysis
-#'   results <- TSENAT:::.calculate_lm(se, condition_col = 'condition')
+#'   # Run regularized regression interaction analysis
+#'   results <- TSENAT:::.calculate_rrm(se, condition_col = 'condition')
 #' @noRd
-.calculate_lm <- function(se, condition_col = "condition", min_obs = 5, method = c("lmm",
+.calculate_rrm <- function(se, condition_col = "condition", min_obs = 5, method = c("lmm",
     "gam", "fpca", "gee"), pvalue = c("satterthwaite", "lrt", "both"), subject_col = NULL,
     paired = FALSE, nthreads = 1, assay_name = "diversity", pcorr = "BH", verbose = FALSE,
     bias_correction = TRUE, regularization = c("pca", "lasso", "elasticnet", "gamsel",
@@ -270,23 +270,23 @@
     }
     
     if (verbose) {
-        message("[calculate_lm_interaction] method=", method)
+        message("[calculate_rrm_interaction] method=", method)
     }
     
     # ========================================================================
     # STAGE 2: DEPENDENCY & STRUCTURE VALIDATION
     # ========================================================================
     
-    .validate_lm_method_dependencies(method)
+    .validate_rrm_method_dependencies(method)
     
-    validated <- .validate_lm_interaction_input(method = method, pvalue = pvalue,
+    validated <- .validate_rrm_interaction_input(method = method, pvalue = pvalue,
         corstr = corstr, regularization = regularization, multicorr = multicorr,
         pcorr = pcorr, storey = storey, wy_randomizations = wy_randomizations, 
         paired = paired, subject_col = subject_col, se = se, verbose = verbose)
     
     subject_col <- validated$subject_col
     
-    .validate_lm_data_structure(se, condition_col, assay_name)
+    .validate_rrm_data_structure(se, condition_col, assay_name)
     
     # ========================================================================
     # STAGE 3: DATA PREPARATION & FITTING
@@ -298,7 +298,7 @@
     mat <- SummarizedExperiment::assay(se, assay_name)
     
     if (verbose)
-        message("[.calculate_lm] Starting .fit_all_genes() for ", nrow(mat), " genes")
+        message("[.calculate_rrm] Starting .fit_all_genes() for ", nrow(mat), " genes")
     
     # Wrap fitting in try-error to catch any errors during fitting
     res <- try(.fit_all_genes(mat = mat, se = se, metadata = metadata, method = method,
@@ -313,13 +313,13 @@
         } else {
             as.character(res)
         }
-        warning("[.calculate_lm] .fit_all_genes() failed with: ", error_msg, 
+        warning("[.calculate_rrm] .fit_all_genes() failed with: ", error_msg, 
             "\n[Returning empty results]", call. = FALSE)
         res <- data.frame()
     }
     
     if (verbose && nrow(res) > 0)
-        message("[.calculate_lm] .fit_all_genes() completed successfully with ",
+        message("[.calculate_rrm] .fit_all_genes() completed successfully with ",
             nrow(res), " results")
     
     # ========================================================================
@@ -353,7 +353,7 @@
     res <- .map_gene_annotations(res = res, se = se, verbose = verbose)
     
     # Post-process: add gene column, optionally add model data
-    .postprocess_lm_results(res = res, return_model_data = return_model_data, 
+    .postprocess_rrm_results(res = res, return_model_data = return_model_data, 
         se = se, mat = mat, metadata = metadata, method = method,
         pvalue = pvalue, multicorr = multicorr, assay_name = assay_name,
         bias_correction = bias_correction, regularization = regularization, 
@@ -361,7 +361,7 @@
 }
 
 # Validate method-specific dependencies (cyclomatic complexity reducer)
-.validate_lm_method_dependencies <- function(method) {
+.validate_rrm_method_dependencies <- function(method) {
     if (method == "lmm" && !requireNamespace("nlme", quietly = TRUE)) {
         stop("Package 'nlme' is required for method='lmm'", call. = FALSE)
     }
@@ -377,7 +377,7 @@
 
 # Validate required columns and assays (cyclomatic complexity reducer)
 # REFACTORING: Extract validation into separate function
-.validate_lm_data_structure <- function(se, condition_col, assay_name) {
+.validate_rrm_data_structure <- function(se, condition_col, assay_name) {
     cd_colnames <- colnames(SummarizedExperiment::colData(se))
     if (!(condition_col %in% cd_colnames)) {
         stop(sprintf("condition_col '%s' not found in colData. Available columns: %s",
@@ -391,9 +391,9 @@
     invisible(TRUE)
 }
 
-# Post-process LM results (cyclomatic complexity reducer)
+# Post-process RRM results (cyclomatic complexity reducer)
 # REFACTORING: Extract post-processing into separate function
-.postprocess_lm_results <- function(res, return_model_data = FALSE, se = NULL, 
+.postprocess_rrm_results <- function(res, return_model_data = FALSE, se = NULL, 
                                    mat = NULL, metadata = NULL, method = NULL, 
                                    pvalue = NULL, multicorr = NULL, assay_name = NULL,
                                    bias_correction = NULL, regularization = NULL, 
@@ -422,15 +422,15 @@
 
 
 
-#' Extract Results from calculate_lm_interaction Output
+#' Extract Results from calculate_rrm Output
 #'
 #' Helper function to extract results data.frame from
-#' calculate_lm_interaction output,
+#' calculate_rrm output,
 #' which may be either a data.frame (when return_model_data=FALSE) or a list 
 #' (when return_model_data=TRUE). This ensures compatibility with plotting and 
 #' analysis functions regardless of return format.
 #'
-#' @param lm_result Result from .calculate_lm(), either a
+#' @param rrm_result Result from .calculate_rrm(), either a
 #' data.frame or a list
 #'
 #' @return The results data.frame with columns gene, p_interaction,
@@ -438,12 +438,12 @@
 #'
 
 #' @noRd
-.extract_lm_results <- function(lm_result) {
-    if (is.data.frame(lm_result)) {
-        return(lm_result)
-    } else if (is.list(lm_result) && "results" %in% names(lm_result)) {
-        return(lm_result$results)
+.extract_rrm_results <- function(rrm_result) {
+    if (is.data.frame(rrm_result)) {
+        return(rrm_result)
+    } else if (is.list(rrm_result) && "results" %in% names(rrm_result)) {
+        return(rrm_result$results)
     } else {
-        stop("lm_result must be either a data.frame or a list with 'results' component from .calculate_lm()")
+        stop("rrm_result must be either a data.frame or a list with 'results' component from .calculate_rrm()")
     }
 }
