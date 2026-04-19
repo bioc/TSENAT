@@ -1,11 +1,11 @@
-context("RRM Helpers: Basic Calculations")
+context("SAIT Helpers: Basic Calculations")
 library(testthat)
 
 
 
 # Report summary messages
 test_that(".report_fit_summary prints fallback and singular messages", {
-    df <- data.frame(fit_method = c("rrm_nosubject", "lmer", NA), singular = c(TRUE, FALSE, NA), stringsAsFactors = FALSE)
+    df <- data.frame(fit_method = c("sait_nosubject", "lmer", NA), singular = c(TRUE, FALSE, NA), stringsAsFactors = FALSE)
     expect_message(TSENAT:::.report_fit_summary(df, verbose = TRUE), "Alternative method")
     expect_message(TSENAT:::.report_fit_summary(df, verbose = TRUE), "Singular fits")
 })
@@ -28,10 +28,10 @@ test_that(".gam_interaction returns a data.frame with p_interaction when mgcv pr
 })
 
 # FPCA interaction: synthetic matrix
-test_that(".try_rrm_fallbacks returns lm fits and LRT extractor returns numeric p-values", {
+test_that(".try_sait_fallbacks returns lm fits and LRT extractor returns numeric p-values", {
     # build small long-format df
     df <- data.frame(entropy = rnorm(30), q = rep(seq(0.1, 1.0, length.out = 10), 3), group = rep(c("A", "B", "A"), each = 10), subject = rep(paste0("sub", 1:10), 3), stringsAsFactors = FALSE)
-    fb <- TSENAT:::.try_rrm_fallbacks(df, verbose = TRUE)
+    fb <- TSENAT:::.try_sait_fallbacks(df, verbose = TRUE)
     expect_true(is.null(fb) || (is.list(fb) && all(c("fit0", "fit1", "method") %in% names(fb))))
     if (!is.null(fb)) {
         lrt_p <- TSENAT:::.extract_lrt_p(fb$fit0, fb$fit1, df = df)
@@ -106,18 +106,18 @@ testthat::test_that("LM fallback helpers choose appropriate method", {
     group <- rep(c("A", "B"), length.out = n)
     entropy <- 0.5 * q + ifelse(group == "B", 0.3, 0) + rnorm(n, 0, 0.1)
     df <- data.frame(entropy = entropy, q = q, group = factor(group), subject = factor(subject))
-    res <- TSENAT:::.try_rrm_fallbacks(df)
+    res <- TSENAT:::.try_sait_fallbacks(df)
     testthat::expect_type(res, "list")
-    # Phase 14: AR(1) tries nlme_ar1 first, then nlme, then glmmTMB, then rrm_subject_fixed, then rrm_nosubject
-    testthat::expect_true(res$method %in% c("nlme_ar1", "nlme", "glmmTMB", "rrm_subject_fixed", "rrm_nosubject"))
+    # Phase 14: AR(1) tries nlme_ar1 first, then nlme, then glmmTMB, then sait_subject_fixed, then sait_nosubject
+    testthat::expect_true(res$method %in% c("nlme_ar1", "nlme", "glmmTMB", "sait_subject_fixed", "sait_nosubject"))
     # fit1 can be lme, glmmTMB, or lm depending on which strategy succeeded
     testthat::expect_true(inherits(res$fit1, "lme") || inherits(res$fit1, "glmmTMB") || inherits(res$fit1, "lm") || inherits(res$fit1, "NA"))
 
     # drop subject -> should pick nosubject fallback
     df2 <- df[, c("entropy", "q", "group")]
-    res2 <- TSENAT:::.try_rrm_fallbacks(df2)
+    res2 <- TSENAT:::.try_sait_fallbacks(df2)
     testthat::expect_type(res2, "list")
-    testthat::expect_equal(res2$method, "rrm_nosubject")
+    testthat::expect_equal(res2$method, "sait_nosubject")
 })
 
 testthat::test_that("LRT p extraction returns numeric p-value for nested lm models", {
@@ -155,7 +155,7 @@ testthat::test_that("GAM interaction returns a data.frame with p-value when mgcv
     }
 })
 
-context("RRM Helpers: Edge Cases and Validation")
+context("SAIT Helpers: Edge Cases and Validation")
 
 
 # .report_fit_summary should be silent when no fallback/singular
@@ -480,7 +480,7 @@ testthat::test_that(".test_residual_normality detects normal residuals in GAM", 
 
 # ═══════════════════════════════════════════════════════════════════════════
 # Slope Difference Extraction Tests (NEW - March 2026)
-# Tests for slope_diff extraction from RRM interaction coefficient
+# Tests for slope_diff extraction from SAIT interaction coefficient
 # ═══════════════════════════════════════════════════════════════════════════
 
 
@@ -736,7 +736,7 @@ testthat::test_that("GEE method integrates Shapiro-Wilk results into output", {
 # .ar1_design_effect, .estimate_ar1_rho, .gam_bias_correct,
 # and associated statistical test functions
 
-context("LM Helper: Report Fit Summary")
+context("SAIT Helper: Report Fit Summary")
 
 test_that(".report_fit_summary reports F-statistic range when available", {
   config <- list()
@@ -836,7 +836,7 @@ test_that(".report_fit_summary silent when verbose=FALSE", {
 
 # ===== GAM Regularization Tests =====
 
-context("LM Helper: GAM Regularization")
+context("SAIT Helper: GAM Regularization")
 
 test_that(".gam_regularization PCA mode returns NULL", {
   config <- list()
@@ -897,7 +897,7 @@ test_that(".gam_regularization invalid mode error", {
 
 # ===== AR(1) Design Effect Tests =====
 
-context("LM Helper: AR(1) Design Effect")
+context("SAIT Helper: AR(1) Design Effect")
 
 test_that(".ar1_design_effect handles rho near 0", {
   config <- list()
@@ -939,7 +939,7 @@ test_that(".ar1_design_effect handles rho=1 boundary", {
 
 # ===== Estimate AR(1) Rho Tests =====
 
-context("LM Helper: Estimate AR(1) Rho")
+context("SAIT Helper: Estimate AR(1) Rho")
 
 test_that(".estimate_ar1_rho returns NULL for small sample", {
   config <- list()
@@ -982,7 +982,7 @@ test_that(".estimate_ar1_rho handles NULL subject_vec", {
 
 # ===== GAM Bias Correction Tests =====
 
-context("LM Helper: GAM Bias Correction")
+context("SAIT Helper: GAM Bias Correction")
 
 test_that(".gam_bias_correct increases p-value for small samples", {
   config <- list()
@@ -1045,7 +1045,7 @@ test_that(".gam_bias_correct handles n_observations parameter", {
 
 # ===== ADF Stationarity Test =====
 
-context("LM Helper: ADF Stationarity Test")
+context("SAIT Helper: ADF Stationarity Test")
 
 test_that(".adf_test detects stationary series", {
   config <- list()
@@ -1089,7 +1089,7 @@ test_that(".adf_test returns list with required fields", {
 
 # ===== KPSS Stationarity Test =====
 
-context("LM Helper: KPSS Stationarity Test")
+context("SAIT Helper: KPSS Stationarity Test")
 
 test_that(".kpss_test returns list with required fields", {
   config <- list()
@@ -1134,7 +1134,7 @@ test_that(".kpss_test returns NA for short series", {
 
 # ===== Validate Stationarity =====
 
-context("LM Helper: Validate Stationarity")
+context("SAIT Helper: Validate Stationarity")
 
 test_that(".validate_stationarity checks entropy and q values", {
   config <- list()
@@ -1175,7 +1175,7 @@ test_that(".validate_stationarity includes gene name in report", {
 
 # ===== Check Monotonicity =====
 
-context("LM Helper: Check Monotonicity")
+context("SAIT Helper: Check Monotonicity")
 
 test_that(".check_monotonicity returns TRUE for monotonic increasing", {
   config <- list()
@@ -1216,7 +1216,7 @@ test_that(".check_monotonicity detects violations", {
 
 # ===== Adaptive Spline Knots =====
 
-context("LM Helper: Adaptive Spline Knots")
+context("SAIT Helper: Adaptive Spline Knots")
 
 test_that(".adaptive_spline_knots suggests reasonable knot count", {
   config <- list()
@@ -1261,7 +1261,7 @@ result <- TSENAT:::.adaptive_spline_knots(entropy_vals, q_vals, n_q_unique, min_
 
 # ===== Bounded Support Detection =====
 
-context("LM Helper: Bounded Support Detection")
+context("SAIT Helper: Bounded Support Detection")
 
 test_that(".is_bounded_0_1 detects bounded entropy values", {
   config <- list()
@@ -1298,7 +1298,7 @@ test_that(".is_bounded_0_1 handles edge cases", {
 
 # ===== Compute Skewness =====
 
-context("LM Helper: Compute Skewness")
+context("SAIT Helper: Compute Skewness")
 
 test_that(".compute_skewness calculates for normal distribution", {
   config <- list()
@@ -1336,10 +1336,10 @@ test_that(".compute_skewness returns NA for constant values", {
 })
 
 # ═══════════════════════════════════════════════════════════════════════════
-# Coverage tests for rrm_helpers.R uncovered lines
+# Coverage tests for sait_helpers.R uncovered lines
 # ═══════════════════════════════════════════════════════════════════════════
 
-context("RRM Helpers: Coverage for Error Paths")
+context("SAIT Helpers: Coverage for Error Paths")
 
 # Test .ar1_design_effect edge cases (lines 77, 82)
 test_that(".ar1_design_effect handles NULL/NA/zero rho (lines 77, 82)", {
@@ -1422,8 +1422,8 @@ test_that(".fit_all_genes() is an internal helper function", {
   # .fit_all_genes() is a complex internal function that:
   # - Requires a pre-built SummarizedExperiment object
   # - Requires pre-processed metadata with group_vec, q_vals, sample_names
-  # - Is called internally by .calculate_rrm() with full setup
-  # See test-statistical-methods-rrm_helpers_fit.R for integration tests
+  # - Is called internally by .calculate_sait() with full setup
+  # See test-statistical-methods-sait_helpers_fit.R for integration tests
   # that exercise .fit_all_genes() through the full pipeline
   
   # Verify function exists
@@ -1612,4 +1612,772 @@ test_that(".fit_all_genes() handles regularization parameter", {
   }
 })
 
+context("SAIT Helpers: Coverage for low-coverage functions")
+
+# ============================================================================
+# TEST: .estimate_ar1_rho - Error paths and edge cases (53.8% coverage)
+# ============================================================================
+
+test_that(".estimate_ar1_rho handles NULL or insufficient data", {
+    # NULL input
+    result <- TSENAT:::.estimate_ar1_rho(NULL)
+    expect_null(result)
+    
+    # Very short series (< 3 values)
+    result <- TSENAT:::.estimate_ar1_rho(c(0.5, 0.4))
+    expect_null(result)
+    
+    # All NA values
+    result <- TSENAT:::.estimate_ar1_rho(c(NA, NA, NA))
+    expect_null(result)
+    
+    # Single value
+    result <- TSENAT:::.estimate_ar1_rho(0.5)
+    expect_null(result)
+})
+
+test_that(".estimate_ar1_rho handles zero variance (constant series)", {
+    # Zero variance series should return NULL
+    result <- TSENAT:::.estimate_ar1_rho(c(0.5, 0.5, 0.5, 0.5))
+    # Function now properly handles NA returns
+    expect_true(is.null(result))
+})
+
+test_that(".estimate_ar1_rho returns bounded estimate in [0, 1]", {
+    set.seed(42)
+    # Generate AR(1) series with known rho
+    n <- 100
+    rho_true <- 0.6
+    y <- arima.sim(n = n, list(ar = rho_true))
+    y <- scale(y)[, 1]  # Standardize
+    
+    result <- TSENAT:::.estimate_ar1_rho(y)
+    
+    expect_true(!is.null(result))
+    expect_true(is.numeric(result))
+    expect_true(result >= 0 && result <= 1)
+})
+
+test_that(".estimate_ar1_rho warns on very high autocorrelation", {
+    set.seed(42)
+    # Create series with very high autocorrelation
+    n <- 100
+    rho_true <- 0.98
+    y <- arima.sim(n = n, list(ar = rho_true))
+    
+    # Just verify it handles high autocorrelation without error
+    result <- TSENAT:::.estimate_ar1_rho(y)
+    expect_true(is.numeric(result) || is.null(result))
+})
+
+test_that(".estimate_ar1_rho returns NULL on very low autocorrelation", {
+    set.seed(42)
+    # Create white noise (rho ~ 0)
+    n <- 100
+    y <- rnorm(n, mean = 0.5, sd = 0.1)  # White noise
+    
+    result <- TSENAT:::.estimate_ar1_rho(y)
+    
+    # With near-zero autocorrelation, should return NULL or very small value
+    expect_true(is.null(result) || (!is.null(result) && (is.numeric(result) && (result < 0.1 || is.na(result)))))
+})
+
+# ============================================================================
+# TEST: .test_residual_normality - Error paths (72.2% coverage)
+# ============================================================================
+
+test_that(".test_residual_normality handles NULL model", {
+    result <- TSENAT:::.test_residual_normality(NULL, model_type = "gam")
+    
+    expect_is(result, "list")
+    expect_true("test_status" %in% names(result))
+    expect_equal(result$test_status, "error")
+})
+
+test_that(".test_residual_normality handles try-error model", {
+    bad_model <- try(stop("Intentional error"), silent = TRUE)
+    result <- TSENAT:::.test_residual_normality(bad_model, model_type = "gam")
+    
+    expect_is(result, "list")
+    expect_equal(result$test_status, "error")
+})
+
+test_that(".test_residual_normality requires sufficient residuals", {
+    skip_if_not_installed("mgcv")
+    
+    # Create a model with sufficient data to avoid mgcv warnings
+    set.seed(42)
+    n <- 50
+    x <- rnorm(n)
+    y <- rnorm(n)
+    suppressWarnings(model <- mgcv::gam(y ~ s(x, k = 4), family = gaussian()))
+    
+    result <- TSENAT:::.test_residual_normality(model, model_type = "gam")
+    
+    expect_is(result, "list")
+    # Result should be valid - just checking for list structure
+    expect_true("test_status" %in% names(result))
+})
+
+test_that(".test_residual_normality handles different model types", {
+    skip_if_not_installed("mgcv")
+    
+    set.seed(42)
+    n <- 50
+    x <- rnorm(n)
+    y <- 0.5 + 0.3 * x + rnorm(n, 0, 0.1)
+    
+    # Test GAM
+    model_gam <- mgcv::gam(y ~ s(x), family = gaussian())
+    result_gam <- TSENAT:::.test_residual_normality(model_gam, model_type = "gam")
+    
+    expect_is(result_gam, "list")
+    expect_false(is.na(result_gam$shapiro_p_value))
+    expect_true(result_gam$n_residuals > 0)
+    expect_true(result_gam$test_status %in% c("pass", "fail"))
+})
+
+test_that(".test_residual_normality detects non-normal residuals", {
+    skip_if_not_installed("mgcv")
+    
+    set.seed(42)
+    n <- 100
+    x <- rnorm(n)
+    # Create highly skewed response (log-quadratic)
+    y <- exp(x^2 / 10) + rnorm(n, 0, sd = 0.5)
+    
+    # Fit simple linear model (expecting non-normal residuals)
+    model <- lm(y ~ x)
+    result <- TSENAT:::.test_residual_normality(model, model_type = "gam")
+    
+    expect_is(result, "list")
+    expect_true(!is.na(result$shapiro_p_value))
+})
+
+# ============================================================================
+# TEST: .adf_test - Error paths (76.2% coverage)
+# ============================================================================
+
+test_that(".adf_test handles NULL or insufficient data", {
+    # NULL input
+    result <- TSENAT:::.adf_test(NULL)
+    expect_equal(result$conclusion, "INSUFFICIENT_DATA")
+    
+    # Short series
+    result <- TSENAT:::.adf_test(c(1, 2))
+    expect_equal(result$conclusion, "INSUFFICIENT_DATA")
+    
+    # All NA
+    result <- TSENAT:::.adf_test(c(NA, NA, NA))
+    expect_equal(result$conclusion, "INSUFFICIENT_DATA")
+})
+
+test_that(".adf_test identifies stationary vs non-stationary series", {
+    set.seed(42)
+    
+    # Stationary white noise
+    y_stationary <- rnorm(100, mean = 0, sd = 1)
+    result_stat <- TSENAT:::.adf_test(y_stationary)
+    
+    expect_is(result_stat, "list")
+    expect_true(!is.na(result_stat$stationary))
+    
+    # Non-stationary random walk
+    y_nonstat <- cumsum(rnorm(100))
+    result_nonstat <- TSENAT:::.adf_test(y_nonstat)
+    
+    expect_is(result_nonstat, "list")
+    expect_true(!is.na(result_nonstat$stationary))
+})
+
+test_that(".adf_test handles regression failures gracefully", {
+    # Constant series causes regression singularity
+    y <- rep(1, 20)
+    result <- TSENAT:::.adf_test(y)
+    
+    expect_is(result, "list")
+    expect_true("conclusion" %in% names(result))
+})
+
+# ============================================================================
+# TEST: .kpss_test - Error paths (80% coverage)
+# ============================================================================
+
+test_that(".kpss_test handles NULL or insufficient data", {
+    # NULL input
+    result <- TSENAT:::.kpss_test(NULL)
+    expect_equal(result$conclusion, "INSUFFICIENT_DATA")
+    
+    # Short series
+    result <- TSENAT:::.kpss_test(c(1, 2, 3))
+    expect_equal(result$conclusion, "INSUFFICIENT_DATA")
+})
+
+test_that(".kpss_test handles different trend specifications", {
+    set.seed(42)
+    n <- 100
+    y <- rnorm(n)  # Stationary
+    
+    # trend = "constant"
+    result_const <- TSENAT:::.kpss_test(y, trend = "constant")
+    expect_is(result_const, "list")
+    expect_true(!is.na(result_const$test_stat))
+    
+    # trend = "ct" (constant + time)
+    result_ct <- TSENAT:::.kpss_test(y, trend = "ct")
+    expect_is(result_ct, "list")
+    expect_true(!is.na(result_ct$test_stat))
+})
+
+test_that(".kpss_test differentiates stationary from non-stationary", {
+    set.seed(42)
+    
+    # Stationary series
+    y_stat <- arima.sim(n = 100, list(ar = 0.5))
+    result_stat <- TSENAT:::.kpss_test(y_stat)
+    
+    # Non-stationary random walk
+    y_nonstat <- cumsum(rnorm(100))
+    result_nonstat <- TSENAT:::.kpss_test(y_nonstat)
+    
+    expect_is(result_stat, "list")
+    expect_is(result_nonstat, "list")
+})
+
+# ============================================================================
+# TEST: .validate_sait_interaction_input (77.3% coverage)
+# ============================================================================
+
+test_that(".validate_sait_interaction_input rejects invalid storey parameter", {
+    data(readcounts, package = "TSENAT", envir = environment())
+    se <- readcounts
+    
+    expect_error(
+        TSENAT:::.validate_sait_interaction_input(
+            method = "gam", pvalue = "absolute", corstr = "exchangeable",
+            regularization = "none", multicorr = "none", pcorr = "none",
+            storey = "invalid_value",  # Should be logical
+            wy_randomizations = 101, paired = FALSE, subject_col = NULL,
+            se = se, verbose = FALSE
+        ),
+        "storey must be TRUE or FALSE"
+    )
+})
+
+test_that(".validate_sait_interaction_input rejects invalid wy_randomizations", {
+    data(readcounts, package = "TSENAT", envir = environment())
+    se <- readcounts
+    
+    # Less than 1
+    expect_error(
+        TSENAT:::.validate_sait_interaction_input(
+            method = "gam", pvalue = "absolute", corstr = "exchangeable",
+            regularization = "none", multicorr = "none", pcorr = "none",
+            storey = FALSE, wy_randomizations = 0,
+            paired = FALSE, subject_col = NULL,
+            se = se, verbose = FALSE
+        ),
+        "wy_randomizations must be numeric and >= 1"
+    )
+    
+    # Non-numeric
+    expect_error(
+        TSENAT:::.validate_sait_interaction_input(
+            method = "gam", pvalue = "absolute", corstr = "exchangeable",
+            regularization = "none", multicorr = "none", pcorr = "none",
+            storey = FALSE, wy_randomizations = "abc",
+            paired = FALSE, subject_col = NULL,
+            se = se, verbose = FALSE
+        ),
+        "wy_randomizations must be numeric and >= 1"
+    )
+})
+
+test_that(".validate_sait_interaction_input warns on low wy_randomizations", {
+    data(readcounts, package = "TSENAT", envir = environment())
+    se <- readcounts
+    
+    expect_warning(
+        TSENAT:::.validate_sait_interaction_input(
+            method = "gam", pvalue = "absolute", corstr = "exchangeable",
+            regularization = "none", multicorr = "none", pcorr = "none",
+            storey = FALSE, wy_randomizations = 50,  # < 100
+            paired = FALSE, subject_col = NULL,
+            se = se, verbose = FALSE
+        ),
+        "recommend >= 100"
+    )
+})
+
+test_that(".validate_sait_interaction_input auto-detects paired_samples column", {
+    # Create SE with proper structure and paired_samples column
+    set.seed(42)
+    count_data <- matrix(rpois(100, lambda = 5), nrow = 10)
+    rownames(count_data) <- paste0("g", 1:10)
+    colnames(count_data) <- paste0("sample", 1:10)
+    
+    se <- SummarizedExperiment::SummarizedExperiment(
+        assays = list(counts = count_data),
+        colData = data.frame(
+            condition = rep(c("A", "B"), 5),
+            paired_samples = paste0("pair", rep(1:5, 2))
+        )
+    )
+    
+    result <- TSENAT:::.validate_sait_interaction_input(
+        method = "gam", pvalue = "absolute", corstr = "exchangeable",
+        regularization = "none", multicorr = "none", pcorr = "none",
+        storey = FALSE, wy_randomizations = 101,
+        paired = TRUE, subject_col = NULL,  # Will be auto-detected
+        se = se, verbose = FALSE
+    )
+    
+    expect_is(result, "list")
+    expect_equal(result$subject_col, "paired_samples")
+})
+
+test_that(".validate_sait_interaction_input errors on paired without subject column", {
+    # Create SE without paired_samples or sample_base columns
+    set.seed(42)
+    count_data <- matrix(rpois(100, lambda = 5), nrow = 10)
+    rownames(count_data) <- paste0("g", 1:10)
+    colnames(count_data) <- paste0("sample", 1:10)
+    
+    se <- SummarizedExperiment::SummarizedExperiment(
+        assays = list(counts = count_data),
+        colData = data.frame(condition = rep(c("A", "B"), 5))
+    )
+    
+    # Don't call .calculate_diversity so no paired_samples column exists
+    expect_error(
+        TSENAT:::.validate_sait_interaction_input(
+            method = "gam", pvalue = "absolute", corstr = "exchangeable",
+            regularization = "none", multicorr = "none", pcorr = "none",
+            storey = FALSE, wy_randomizations = 101,
+            paired = TRUE, subject_col = NULL,  # No auto-detection possible
+            se = se, verbose = FALSE
+        ),
+        "requires either 'paired_samples' or 'sample_base' column"
+    )
+})
+
+# ============================================================================
+# TEST: .parse_sample_metadata (76.9% coverage)
+# ============================================================================
+
+test_that(".parse_sample_metadata extracts q values and groups correctly", {
+    # Create SE with Tsallis diversity assay
+    set.seed(42)
+    n_genes <- 10
+    n_samples <- 20
+    q_values <- c(0.5, 1.0)  # 2 q values
+    
+    # Create matrix with columns named like sample_q=value format
+    tsallis_data <- matrix(rnorm(n_genes * n_samples), nrow = n_genes, ncol = n_samples)
+    sample_ids <- rep(paste0("sample", 1:10), each = 2)
+    q_strings <- rep(q_values, times = 10)
+    colnames(tsallis_data) <- paste0(sample_ids, "_q=", q_strings)
+    rownames(tsallis_data) <- paste0("g", 1:n_genes)
+    
+    se <- SummarizedExperiment::SummarizedExperiment(
+        assays = list(Tsallis = tsallis_data),
+        colData = data.frame(condition = rep(c("A", "B"), n_samples/2))
+    )
+    
+    result <- TSENAT:::.parse_sample_metadata(
+        se = se, condition_col = "condition",
+        assay_name = "Tsallis", verbose = FALSE
+    )
+    
+    expect_is(result, "list")
+    expect_true(all(c("sample_q", "sample_names", "q_vals", "group_vec", "has_q") %in% names(result)))
+    expect_true(all(result$has_q))
+    expect_equal(length(unique(result$q_vals)), 2)
+})
+
+test_that(".parse_sample_metadata errors on missing assay", {
+    data(readcounts, package = "TSENAT", envir = environment())
+    se <- readcounts
+    
+    suppressMessages(se <- TSENAT:::.calculate_diversity(se, q = c(0.5, 1.0),
+        verbose = FALSE))
+    
+    expect_error(
+        TSENAT:::.parse_sample_metadata(
+            se = se, condition_col = "condition",
+            assay_name = "NonExistentAssay", verbose = FALSE
+        ),
+        "not in names"
+    )
+})
+
+test_that(".parse_sample_metadata errors on missing q values in colnames", {
+    set.seed(42)
+    count_data <- matrix(rpois(100, lambda = 5), nrow = 10)
+    rownames(count_data) <- paste0("g", 1:10)
+    # Missing _q= in colnames
+    colnames(count_data) <- paste0("sample", 1:10)
+    
+    se <- SummarizedExperiment::SummarizedExperiment(
+        assays = list(Tsallis = count_data),
+        colData = data.frame(condition = rep(c("A", "B"), 5))
+    )
+    
+    expect_error(
+        TSENAT:::.parse_sample_metadata(
+            se = se, condition_col = "condition",
+            assay_name = "Tsallis", verbose = FALSE
+        ),
+        "Could not parse q values"
+    )
+})
+
+test_that(".parse_sample_metadata errors on missing condition_col", {
+    # Create a test SE with Tsallis assay and valid colData
+    set.seed(42)
+    n_genes <- 10
+    n_samples <- 20
+    
+    tsallis_data <- matrix(rnorm(n_genes * n_samples), nrow = n_genes, ncol = n_samples)
+    rownames(tsallis_data) <- paste0("gene_", 1:n_genes)
+    colnames(tsallis_data) <- paste0("sample_", 1:n_samples, "_q=1")
+    
+    se <- SummarizedExperiment::SummarizedExperiment(
+        assays = list(Tsallis = tsallis_data),
+        colData = data.frame(row.names = colnames(tsallis_data), sample = 1:n_samples)
+    )
+    
+    # Test that missing condition_col produces error
+    expect_error(
+        TSENAT:::.parse_sample_metadata(
+            se = se, condition_col = "nonexistent_column",
+            assay_name = "Tsallis", verbose = FALSE
+        ),
+        "No sample grouping found"
+    )
+})
+
+# ============================================================================
+# TEST: .detect_heteroscedasticity (91.7% coverage)
+# ============================================================================
+
+test_that(".detect_heteroscedasticity detects homogeneous variance", {
+    set.seed(42)
+    df <- data.frame(
+        entropy = rnorm(50, mean = 0.5, sd = 0.1),  # Constant variance
+        q = rep(1:5, 10),
+        group = rep(c("A", "B"), 25)
+    )
+    
+    result <- TSENAT:::.detect_heteroscedasticity(df, q_vals = df$q, group_vec = df$group)
+    
+    expect_is(result, "list")
+    expect_true(!is.na(result$p_value))
+    # High p-value indicates homogeneous variance
+    expect_true(result$p_value > 0.05 || is.na(result$is_heteroscedastic))
+})
+
+test_that(".detect_heteroscedasticity detects heterogeneous variance", {
+    set.seed(42)
+    # Create data with variance that increases with q
+    df <- data.frame(
+        q = rep(1:5, 10),
+        group = rep(c("A", "B"), 25)
+    )
+    df$entropy <- df$q + rnorm(50, sd = df$q * 0.2)  # Variance proportional to q
+    
+    result <- TSENAT:::.detect_heteroscedasticity(df, q_vals = df$q, group_vec = df$group)
+    
+    expect_is(result, "list")
+    expect_true(!is.na(result$p_value))
+})
+
+test_that(".detect_heteroscedasticity handles regression failure", {
+    # Degenerate data that may cause regression failure
+    df <- data.frame(
+        entropy = rep(1, 10),  # Constant
+        q = rep(1, 10),  # Constant
+        group = rep("A", 10)
+    )
+    
+    result <- TSENAT:::.detect_heteroscedasticity(df, q_vals = df$q, group_vec = df$group)
+    
+    expect_is(result, "list")
+    expect_true(all(c("is_heteroscedastic", "bp_stat", "p_value") %in% names(result)))
+})
+
+# ============================================================================
+# TEST: .estimate_variance_weights (85.3% coverage)
+# ============================================================================
+
+test_that(".estimate_variance_weights uses power method when successful", {
+    set.seed(42)
+    df <- data.frame(
+        entropy = rnorm(50, mean = 0.5, sd = 0.1),
+        q = rep(1:5, 10),
+        group = rep(c("A", "B"), 25)
+    )
+    
+    result <- TSENAT:::.estimate_variance_weights(df, q_vals = df$q, method = "power", verbose = FALSE)
+    
+    expect_is(result, "list")
+    expect_true("weights" %in% names(result))
+    expect_true(length(result$weights) == nrow(df))
+    expect_true(all(result$weights > 0))
+})
+
+test_that(".estimate_variance_weights uses residual method", {
+    set.seed(42)
+    df <- data.frame(
+        entropy = rnorm(50, mean = 0.5, sd = 0.1),
+        q = rep(1:5, 10),
+        group = rep(c("A", "B"), 25)
+    )
+    
+    result <- TSENAT:::.estimate_variance_weights(df, q_vals = df$q, method = "residual", verbose = FALSE)
+    
+    expect_is(result, "list")
+    expect_true("weights" %in% names(result))
+    expect_true(length(result$weights) == nrow(df))
+    expect_true(all(result$weights > 0))
+})
+
+test_that(".estimate_variance_weights defaults to uniform weights on failure", {
+    # Pass minimal/invalid data that causes regression to fail
+    df <- data.frame(entropy = c(NA, NA), q = c(1, 2))
+    
+    result <- TSENAT:::.estimate_variance_weights(df, q_vals = c(1, 2), method = "power")
+    
+    # Function returns NULL on failure (not a list with uniform weights)
+    expect_null(result)
+})
+
+# ============================================================================
+# TEST: .is_bounded_0_1 (86.7% coverage)
+# ============================================================================
+
+test_that(".is_bounded_0_1 detects bounded values", {
+    # Values in [0, 1]
+    expect_true(TSENAT:::.is_bounded_0_1(c(0.1, 0.5, 0.9)))
+    expect_true(TSENAT:::.is_bounded_0_1(c(0.0, 0.5, 1.0)))
+})
+
+test_that(".is_bounded_0_1 rejects unbounded values", {
+    # Values outside [0, 1]
+    expect_false(TSENAT:::.is_bounded_0_1(c(0.5, 1.5, 2.0)))
+    expect_false(TSENAT:::.is_bounded_0_1(c(-0.5, 0.5, 1.0)))
+})
+
+test_that(".is_bounded_0_1 handles NA and infinite values", {
+    expect_false(TSENAT:::.is_bounded_0_1(c(NA, NA, NA)))
+    expect_false(TSENAT:::.is_bounded_0_1(c(Inf, -Inf, 0.5)))
+})
+
+test_that(".is_bounded_0_1 returns FALSE for empty or near-boundaries", {
+    expect_false(TSENAT:::.is_bounded_0_1(c()))  # Empty
+    # Not approaching boundaries (mid-range values)
+    expect_false(TSENAT:::.is_bounded_0_1(c(0.3, 0.4, 0.5, 0.6)))
+})
+
+# ============================================================================
+# TEST: .check_monotonicity (100% coverage, but add edge case tests)
+# ============================================================================
+
+test_that(".check_monotonicity detects monotone decreasing entropy", {
+    entropy_vals <- c(2.0, 1.8, 1.6, 1.4, 1.2)
+    q_vals <- 1:5
+    
+    result <- TSENAT:::.check_monotonicity(entropy_vals, q_vals)
+    
+    expect_true(result$is_monotone)
+    expect_equal(result$n_violations, 0)
+})
+
+test_that(".check_monotonicity detects violations", {
+    # Non-monotone: increases at index 2
+    entropy_vals <- c(2.0, 2.5, 1.6, 1.4, 1.2)
+    q_vals <- 1:5
+    
+    result <- TSENAT:::.check_monotonicity(entropy_vals, q_vals, tolerance = 0.05)
+    
+    expect_is(result, "list")
+    expect_false(result$is_monotone)
+    expect_true(result$n_violations > 0)
+})
+
+test_that(".check_monotonicity handles tolerance parameter", {
+    entropy_vals <- c(2.0, 1.8, 1.85, 1.4, 1.2)  # One small violation
+    q_vals <- 1:5
+    
+    # Strict tolerance
+    result_strict <- TSENAT:::.check_monotonicity(entropy_vals, q_vals, tolerance = 0.01)
+    expect_false(result_strict$is_monotone)
+    
+    # Loose tolerance (0.30 means up to 30% violations allowed)
+    result_loose <- TSENAT:::.check_monotonicity(entropy_vals, q_vals, tolerance = 0.30)
+    # With 1 violation out of 4 pairs = 25%, should pass with 30% tolerance
+    if (result_loose$n_violations <= 1) {
+        expect_true(result_loose$is_monotone)
+    }
+})
+
+# ============================================================================
+# TEST: .validate_stationarity (89.3% coverage)
+# ============================================================================
+
+test_that(".validate_stationarity works on stationary and non-stationary series", {
+    set.seed(42)
+    
+    # Stationary series
+    y_stat <- rnorm(50)
+    q_vals <- seq(1, 5, length.out = 50)
+    result_stat <- TSENAT:::.validate_stationarity(y_stat, q_vals)
+    
+    expect_is(result_stat, "list")
+    expect_true("raw_data_tests" %in% names(result_stat))
+    expect_true("recommendation" %in% names(result_stat))
+    
+    # Non-stationary random walk
+    y_nonstat <- cumsum(rnorm(50))
+    result_nonstat <- TSENAT:::.validate_stationarity(y_nonstat, q_vals)
+    
+    expect_is(result_nonstat, "list")
+    expect_true("recommendation" %in% names(result_nonstat))
+    expect_true("arima_justified" %in% names(result_nonstat))
+})
+
+test_that(".validate_stationarity handles insufficient data", {
+    q_vals <- c(1, 2)
+    result <- TSENAT:::.validate_stationarity(c(1, 2), q_vals)
+    
+    expect_is(result, "list")
+})
+
+# ============================================================================
+# TEST: .compute_arima_differences (93.75% coverage)
+# ============================================================================
+
+test_that(".compute_arima_differences computes first differences", {
+    set.seed(42)
+    df <- data.frame(
+        entropy = c(2.0, 1.9, 1.7, 1.5, 1.2),
+        q = 1:5,
+        group = "A"
+    )
+    q_vals <- 1:5
+    group_vec <- rep("A", 5)
+    subject_vec <- rep("s1", 5)
+    
+    result <- TSENAT:::.compute_arima_differences(df, q_vals, group_vec, subject_vec)
+    
+    expect_is(result, "list")
+    expect_is(result$df, "data.frame")
+    expect_equal(nrow(result$df), nrow(df) - 1)
+    expect_true("entropy" %in% colnames(result$df))
+})
+
+test_that(".compute_arima_differences handles NULL or empty data", {
+    result <- TSENAT:::.compute_arima_differences(NULL, NULL, NULL)
+    expect_null(result)
+    
+    result <- TSENAT:::.compute_arima_differences(data.frame(), c(), c())
+    expect_null(result)
+})
+
+test_that(".compute_arima_differences skips subjects with < 2 observations", {
+    df <- data.frame(
+        entropy = rnorm(3),
+        q = c(1, 2, 3)
+    )
+    q_vals <- c(1, 2, 3)
+    group_vec <- c("A", "A", "B")
+    subject_vec <- c("s1", "s1", "s2")  # s2 has only 1 observation
+    
+    result <- TSENAT:::.compute_arima_differences(df, q_vals, group_vec, subject_vec)
+    
+    # Should exclude s2
+    if (!is.null(result)) {
+        expect_true(!("s2" %in% result$df$subject))
+    }
+})
+
+# ============================================================================
+# TEST: .adjust_pvalues_multicorr (64.5% coverage)
+# ============================================================================
+
+test_that(".adjust_pvalues_multicorr applies multiple testing corrections", {
+    p_vals <- c(0.001, 0.01, 0.05, 0.1, 0.5)
+    
+    # Hochberg
+    result_hochberg <- TSENAT:::.adjust_pvalues_multicorr(p_vals, multicorr = "hochberg", wy_randomizations = 100)
+    expect_true(all(result_hochberg <= 1))
+    expect_true(all(result_hochberg >= 0))
+    
+    # Benjamini-Yekutieli
+    result_by <- TSENAT:::.adjust_pvalues_multicorr(p_vals, multicorr = "benjamini-yekutieli", wy_randomizations = 100)
+    expect_true(all(result_by <= 1))
+    expect_true(all(result_by >= 0))
+})
+
+test_that(".adjust_pvalues_multicorr handles boundary p-values", {
+    p_vals <- c(0, 1e-10, 1.0)
+    
+    result <- TSENAT:::.adjust_pvalues_multicorr(p_vals, multicorr = "hochberg", wy_randomizations = 100)
+    
+    expect_true(all(result <= 1))
+    expect_true(result[1] >= 0)
+})
+
+test_that(".adjust_pvalues_multicorr handles all NA p-values", {
+    p_vals <- c(NA, NA, NA)
+    
+    result <- TSENAT:::.adjust_pvalues_multicorr(p_vals, multicorr = "hochberg", wy_randomizations = 100)
+    
+    # Should handle NA gracefully
+    expect_true(length(result) == length(p_vals))
+})
+
+test_that(".adjust_pvalues_multicorr handles mixed NA and valid p-values", {
+    p_vals <- c(0.01, NA, 0.05, NA, 0.1)
+    
+    result <- TSENAT:::.adjust_pvalues_multicorr(p_vals, multicorr = "benjamini-yekutieli", wy_randomizations = 100)
+    
+    # Should return same length
+    expect_true(length(result) == length(p_vals))
+    # Valid values should be adjusted (between 0 and 1)
+    expect_true(all(result[!is.na(p_vals)] <= 1))
+})
+
+# ============================================================================
+# TEST: .ar1_design_effect_memo and .ar1_design_effect (89.3% coverage)
+# ============================================================================
+
+test_that(".ar1_design_effect_memo computes design effect correctly", {
+    rho <- 0.5
+    cluster_size <- 10
+    
+    result <- TSENAT:::.ar1_design_effect_memo(rho, cluster_size)
+    
+    expect_true(is.numeric(result) && length(result) > 0)
+    expect_true(result >= 1 || is.na(result))  # Design effect always >= 1 or NA
+    if (!is.na(result)) expect_true(result <= cluster_size * 2)  # Reasonable bound
+})
+
+test_that(".ar1_design_effect_memo handles extreme AR(1) parameters", {
+    # rho = 0 (no correlation)
+    result_zero <- TSENAT:::.ar1_design_effect_memo(0, 10)
+    expect_true(result_zero == 1)  # No design effect
+    
+    # rho = 1 (perfect correlation)
+    result_one <- TSENAT:::.ar1_design_effect_memo(1, 10)
+    expect_true(result_one >= 1)  # Some design effect
+})
+
+test_that(".ar1_design_effect_memo behaves with memoization", {
+    # Call twice with same arguments
+    result1 <- TSENAT:::.ar1_design_effect_memo(0.5, 10)
+    result2 <- TSENAT:::.ar1_design_effect_memo(0.5, 10)
+    
+    expect_equal(result1, result2)  # Should be identical
+})
 

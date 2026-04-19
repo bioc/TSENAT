@@ -44,13 +44,13 @@ if (getRversion() >= "2.15.1") {
 #'   \item{\code{jackknife}}{Requires diversity}
 #'   \item{\code{divergence}}{Requires diversity}
 #'   \item{\code{rank_test}}{Requires diversity}
-#'   \item{\code{rrm_interaction}}{Requires diversity}
+#'   \item{\code{sait_interaction}}{Requires diversity}
 #' }
 #'
 
 #' @noRd
 DEPENDENCIES <- list(diversity = character(0), jackknife = "diversity", divergence = "diversity",
-    rank_test = "diversity", rrm_interaction = "diversity")
+    rank_test = "diversity", sait_interaction = "diversity")
 
 #' Method Execution Order
 #'
@@ -61,7 +61,7 @@ DEPENDENCIES <- list(diversity = character(0), jackknife = "diversity", divergen
 #'
 
 #' @noRd
-METHOD_ORDER <- c("diversity", "jackknife", "rrm_interaction", "divergence", "rank_test")
+METHOD_ORDER <- c("diversity", "jackknife", "sait_interaction", "divergence", "rank_test")
 
 # ============================================================================
 # COLOR UTILITIES - Publication-quality visualization standards
@@ -240,7 +240,7 @@ METHOD_ORDER <- c("diversity", "jackknife", "rrm_interaction", "divergence", "ra
 #'
 
 #' @noRd
-.theme_base <- function(base_size = 11) {
+.theme_base <- function(base_size = 12) {
     ggplot2::theme_minimal(base_size = base_size) + ggplot2::theme(plot.title = ggplot2::element_text(hjust = 0.5,
         face = "bold", size = base_size * 1.3, margin = ggplot2::margin(b = 8)),
         plot.subtitle = ggplot2::element_text(hjust = 0.5, face = "italic", size = base_size *
@@ -286,8 +286,8 @@ METHOD_ORDER <- c("diversity", "jackknife", "rrm_interaction", "divergence", "ra
 #'
 
 #' @noRd
-.font_sizes <- list(title = 19, subtitle = 15, axis_title = 15, axis_text = 13, legend_title = 13,
-    legend_text = 12, heatmap_main = 13, heatmap_labels = 11)
+.font_sizes <- list(title = 21, subtitle = 17, axis_title = 17, axis_text = 14, legend_title = 14,
+    legend_text = 13, heatmap_main = 14, heatmap_labels = 12)
 
 # ============================================================================
 # THEME VARIANTS - Specialized themes for different plot types
@@ -309,12 +309,12 @@ METHOD_ORDER <- c("diversity", "jackknife", "rrm_interaction", "divergence", "ra
 #' - Optional major gridlines for q-value axis
 #' - Wider plot margins for axis labels
 #'
-#' Used by: plot_diversity_spectrum(), .plot_rrm(),
+#' Used by: plot_diversity_spectrum(), .plot_sait(),
 #' and similar spectrum/profile plots.
 #'
 
 #' @noRd
-.theme_spectrum <- function(base_size = 11) {
+.theme_spectrum <- function(base_size = 12) {
     .theme_base(base_size = base_size) + ggplot2::theme(legend.position = "right",
         panel.grid.major.y = ggplot2::element_line(color = "gray90", linewidth = 0.25),
         plot.margin = ggplot2::margin(t = 5, r = 8, b = 5, l = 5, unit = "mm"))
