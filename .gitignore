@@ -1,5 +1,4 @@
 
-# Local R check directories and temporary package checks
 *.bak
 docs/
 database/
@@ -10,45 +9,27 @@ coverage/
 inst/doc/
 /Meta/
 __pycache__/
-..Rcheck
-..Rcheck/
-.Rcheck
 .Rcheck/
 *.Rhistory
-.TSENAT.Bioccheck
-.TSENAT.Bioccheck/
 .Rhistory
 .Rproj.user
 *.Ruserdata
 .Ruserdata
 *.tar.gz
 tmp/
-TSENAT.Rcheck
 TSENAT.Rcheck/
-vignette/*html
-vignette/*pdf
-vignettes/ts_debug.R
 .vscode/
 Rplots.pdf
-# Coverage analysis files
 *.gcda
 *.gcno
-
-# Compiled C/C++ binaries
 src/*.o
 src/*.so
 src/*.dll
 src/*.dylib
 tools/
-
-# Generated site
-docs/
 _pkgdown.yml
 r_dependencies_s4_interactive.html
 visualize_dependencies.py
-
-# Pkgdown
 inst/pkgdown/
-
-# Citations
 citations.md
+
