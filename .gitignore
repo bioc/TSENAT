@@ -33,20 +33,22 @@ Rplots.pdf
 # Coverage analysis files
 *.gcda
 *.gcno
-# Compiled C/C++ binaries (platform-specific, should be rebuilt locally)
+
+# Compiled C/C++ binaries
 src/*.o
 src/*.so
 src/*.dll
 src/*.dylib
 tools/
+
 # Generated site
 docs/
 _pkgdown.yml
 r_dependencies_s4_interactive.html
 visualize_dependencies.py
 
-# Exclude pkgdown templates and assets from git (will be managed via R build)
+# Pkgdown
 inst/pkgdown/
 
-# Generated citations file (restored from gh-pages when needed)
+# Citations
 citations.md
