@@ -134,7 +134,7 @@ div_all <- results(analysis, type = 'diversity')
 # Get diversity for specific q-value (single SummarizedExperiment table for display)
 div_q1 <- results(analysis, type = 'diversity', q = 1.0)
 
-# Get diversity for specific q-value as SummarizedExperiment for downstream processing (e.g., SplicingFactory)
+# Get diversity as SummarizedExperiment for downstream processing
 div_q1_se <- results(analysis, type = 'diversity', q = 1.0, format = 'se')
 
 # Get results ranked by p-value, top 20 genes
