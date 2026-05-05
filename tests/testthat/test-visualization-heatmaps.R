@@ -779,7 +779,6 @@ describe("Integration: Complete helper workflow", {
 test_that("plot_jis_delta: creates heatmaps from q-values", {
   skip_if_not_installed("SummarizedExperiment")
   skip_if_not_installed("ggplot2")
-  skip_if_not_installed("ComplexHeatmap")
   
   set.seed(777)
   

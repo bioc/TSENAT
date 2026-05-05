@@ -185,7 +185,6 @@ analysis <- build_analysis(
 analysis
 print(dim(analysis))
 
-\donttest{
 # Method 2: From Salmon quantification folder
 # Requires directory structure like:
 #   salmon_output/
@@ -223,7 +222,6 @@ print(dim(analysis))
 #   config = cfg
 #   # Note: metadata argument omitted - will be read from config$metadata
 # )
-}
 
 # Advanced: Assigning metadata to assays after object creation
 # When adding metadata to SummarizedExperiment assays, always use the

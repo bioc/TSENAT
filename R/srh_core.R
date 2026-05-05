@@ -465,7 +465,7 @@
     analysis_results <- parallel::mclapply(X = seq_len(n_genes), FUN = function(g_idx) {
         gene_data <- data[data$gene == all_genes[g_idx], ]
         return(.detect_q_analyze_gene(gene_data, paired, subject_col, has_condition))
-    }, mc.cores = min(nthreads, parallel::detectCores()), mc.preschedule = TRUE,
+    }, mc.cores = .get_effective_nthreads(nthreads), mc.preschedule = TRUE,
         mc.set.seed = TRUE, mc.allow.recursive = FALSE)
 
     # Collect results from parallel computation

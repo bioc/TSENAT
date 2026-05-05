@@ -1,6 +1,10 @@
 # Makevars for Windows (use LTO optimization on Windows)
 # Coverage-aware configuration (portable with BSD make)
 
+# Filter out non-portable compiler flags that may come from the environment
+# -Werror=format-security is system-specific and non-portable
+PKG_CXXFLAGS = $(filter-out -Werror=format-security,$(PKG_CXXFLAGS))
+
 # Check if running coverage analysis
 COVERAGE_FLAGS = $(if $(R_COVERAGE),-O0 -fprofile-arcs -ftest-coverage,-O3 -flto)
 COVERAGE_LIBS = $(if $(R_COVERAGE),-fprofile-arcs -ftest-coverage,)

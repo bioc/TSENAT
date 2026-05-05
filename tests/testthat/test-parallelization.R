@@ -1090,14 +1090,15 @@ test_that("nthreads parameter is properly validated", {
   expect_is(result, "TSENATAnalysis")
   expect_is(result@divergence_results$divergence_se, "SummarizedExperiment")
   
-  # Test with huge number (should be clamped by OS/BiocParallel)
+  # Test with huge number (should be clamped by .get_effective_nthreads())
+  # When _R_CHECK_LIMIT_CORES_ is set, requesting 999 threads is silently clamped
+  # to the core limit, so the function should succeed without error
   analysis <- create_test_analysis()
-  result <- expect_warning(
-    silent_calculate_divergence(
-      analysis,
-      nthreads = 999
-    ),
-    "worker number limited"  # BiocParallel warns when limiting workers
+  
+  # This should always succeed - either with clamping (when core limit set)
+  # or with system cores (when no core limit)
+  result <- suppressWarnings(
+    silent_calculate_divergence(analysis, nthreads = 999)
   )
   expect_is(result, "TSENATAnalysis")
   expect_is(result@divergence_results$divergence_se, "SummarizedExperiment")

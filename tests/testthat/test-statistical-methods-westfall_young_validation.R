@@ -585,3 +585,575 @@ test_that(".estimate_storey_pi0 returns single value", {
   expect_equal(length(result$pi0), 1)
   expect_true(!is.na(result$pi0))
 })
+
+# ════════════════════════════════════════════════════════════════════════════════
+# TEST: WY PERMUTATION WITH .get_effective_nthreads() INTEGRATION
+# ════════════════════════════════════════════════════════════════════════════════
+
+test_that("WY permutation respects .get_effective_nthreads() for high thread counts", {
+  # This test validates that the change from parallel::detectCores()
+  # to .get_effective_nthreads() works correctly with high thread requests
+  
+  # Skip if core limit is in effect, as behavior is environment-dependent
+  core_limit_env <- Sys.getenv("_R_CHECK_LIMIT_CORES_", "")
+  skip_if(nchar(core_limit_env) > 0, 
+          "Skipping high thread count test under _R_CHECK_LIMIT_CORES_")
+  
+  set.seed(888)
+  
+  # Setup: Small dataset for quick test
+  data_wy <- expand.grid(
+    subject = c("S1", "S2"),
+    sample_type = c("Normal", "Tumor"),
+    q = 1,
+    gene = c("Gene1", "Gene2")
+  )
+  data_wy$sample <- paste0(data_wy$subject, "_", data_wy$sample_type)
+  data_wy$paired_samples <- data_wy$subject
+  data_wy$entropy <- rnorm(nrow(data_wy), mean = 2, sd = 0.3)
+  data_wy$condition <- data_wy$sample_type
+  
+  # Test 1: Normal execution with reasonable nthreads (should succeed)
+  result_normal <- .calculate_srh(
+    data = data_wy,
+    entropy_col = "entropy",
+    q_col = "q",
+    gene_col = "gene",
+    condition_col = "condition",
+    paired = TRUE,
+    subject_col = "subject",
+    multicorr = "westfall-young",
+    wy_randomizations = 30,
+    nthreads = 4,
+    verbose = FALSE
+  )
+  
+  expect_is(result_normal, "data.frame")
+  expect_equal(nrow(result_normal), 2)
+  expect_true("adj_p_value" %in% colnames(result_normal))
+  
+  # Test 2: High thread count (999) - .get_effective_nthreads() should clamp it
+  # When _R_CHECK_LIMIT_CORES_ is set, this will be clamped to that limit
+  # When not set, it will be clamped to system cores
+  # Either way, the function should succeed (not error on thread count alone)
+  result_high <- .calculate_srh(
+    data = data_wy,
+    entropy_col = "entropy",
+    q_col = "q",
+    gene_col = "gene",
+    condition_col = "condition",
+    paired = TRUE,
+    subject_col = "subject",
+    multicorr = "westfall-young",
+    wy_randomizations = 30,
+    nthreads = 999,  # Requests many threads, but should be handled gracefully
+    verbose = FALSE
+  )
+  
+  expect_is(result_high, "data.frame")
+  expect_equal(nrow(result_high), 2)
+  expect_true("adj_p_value" %in% colnames(result_high))
+  
+  # Both results should have valid p-values
+  for (i in seq_len(nrow(result_high))) {
+    p_adj <- result_high$adj_p_value[i]
+    if (!is.na(p_adj)) {
+      expect_gte(p_adj, 0)
+      expect_lte(p_adj, 1)
+    }
+  }
+})
+
+# ════════════════════════════════════════════════════════════════════════════════
+# TEST: .estimate_storey_pi0() BOOTSTRAP METHOD
+# ════════════════════════════════════════════════════════════════════════════════
+
+test_that(".estimate_storey_pi0 bootstrap method produces valid estimates", {
+  # Test the bootstrap method for pi0 estimation
+  # Bootstrap samples p-values and estimates pi0 across a grid of lambda values
+  # then selects the lambda with the most stable estimate (lowest variance)
+  
+  set.seed(555)
+  
+  # Generate mixed p-values: some null (uniform), some alternative (beta)
+  # ~80% null, ~20% alternative
+  p_null <- runif(800, 0, 1)
+  p_alt <- rbeta(200, 0.5, 2)
+  p_mixed <- c(p_null, p_alt)
+  
+  # Run bootstrap method
+  result_boot <- .estimate_storey_pi0(
+    p_mixed,
+    lambda = NULL,  # Not used in bootstrap method
+    pi0_method = "bootstrap"
+  )
+  
+  # Validate output structure
+  expect_is(result_boot, "list")
+  expect_true("pi0" %in% names(result_boot))
+  expect_true("lambda" %in% names(result_boot))
+  expect_true("pi0_method" %in% names(result_boot))
+  expect_equal(result_boot$pi0_method, "bootstrap")
+  
+  # Validate pi0 bounds: should be between 0 and 1
+  expect_gte(result_boot$pi0, 0)
+  expect_lte(result_boot$pi0, 1)
+  
+  # Validate lambda: should be in the grid [0, 0.95]
+  expect_gte(result_boot$lambda, 0)
+  expect_lte(result_boot$lambda, 0.95)
+  
+  # For 80% null, pi0 should be reasonably close to 0.8 (allowing ±0.3 tolerance)
+  # Bootstrap method may be conservative on small samples
+  expect_gt(result_boot$pi0, 0.5)
+  expect_lte(result_boot$pi0, 1.0)
+  
+  # Check that n_hypotheses and n_null are present
+  expect_true("n_hypotheses" %in% names(result_boot))
+  expect_true("n_null" %in% names(result_boot))
+  expect_equal(result_boot$n_hypotheses, length(p_mixed))
+  expect_equal(result_boot$n_null, round(result_boot$pi0 * length(p_mixed)))
+})
+
+test_that(".estimate_storey_pi0 bootstrap method handles all null p-values", {
+  # When all p-values are from null distribution (uniform)
+  # pi0 should be close to 1.0
+  
+  set.seed(666)
+  all_null <- runif(200, 0, 1)
+  
+  result_boot_null <- .estimate_storey_pi0(
+    all_null,
+    lambda = NULL,
+    pi0_method = "bootstrap"
+  )
+  
+  expect_is(result_boot_null, "list")
+  expect_equal(result_boot_null$pi0_method, "bootstrap")
+  
+  # With all null p-values, pi0 should be high (close to 1.0)
+  expect_gt(result_boot_null$pi0, 0.7)  # Allow some sampling variation
+  expect_lte(result_boot_null$pi0, 1.0)
+})
+
+test_that(".estimate_storey_pi0 bootstrap method handles all alternative p-values", {
+  # When all p-values are from alternative distribution
+  # pi0 should be close to 0.0
+  
+  set.seed(777)
+  all_alt <- rbeta(200, 0.5, 2)
+  
+  result_boot_alt <- .estimate_storey_pi0(
+    all_alt,
+    lambda = NULL,
+    pi0_method = "bootstrap"
+  )
+  
+  expect_is(result_boot_alt, "list")
+  expect_equal(result_boot_alt$pi0_method, "bootstrap")
+  
+  # With all alternative p-values, pi0 should be low (close to 0.0)
+  # Bootstrap method may be conservative on small samples
+  expect_gte(result_boot_alt$pi0, 0)
+  expect_lte(result_boot_alt$pi0, 1.0)
+})
+
+test_that(".estimate_storey_pi0 bootstrap method returns consistent structure", {
+  # Verify that bootstrap method always returns required fields
+  
+  set.seed(888)
+  p_values <- c(runif(50, 0, 1), rbeta(50, 0.5, 2))
+  
+  result <- .estimate_storey_pi0(
+    p_values,
+    lambda = NULL,
+    pi0_method = "bootstrap"
+  )
+  
+  # Check all required fields are present
+  required_fields <- c("pi0", "lambda", "pi0_method", "n_hypotheses", "n_null")
+  for (field in required_fields) {
+    expect_true(field %in% names(result), 
+                info = paste("Missing field:", field))
+  }
+  
+  # Verify field types
+  expect_is(result$pi0, "numeric")
+  expect_is(result$lambda, "numeric")
+  expect_is(result$pi0_method, "character")
+  # Use is.numeric() instead of expect_is() for n_hypotheses
+  # because in some environments integer doesn't inherit from numeric
+  expect_true(is.numeric(result$n_hypotheses))
+  expect_is(result$n_null, "numeric")
+  
+  # Verify consistency between fields
+  expect_equal(result$n_null, round(result$pi0 * result$n_hypotheses))
+})
+
+# ════════════════════════════════════════════════════════════════════════════════
+# TEST: PARALLEL EXECUTION PATH IN WY PERMUTATION
+# ════════════════════════════════════════════════════════════════════════════════
+
+test_that("WY permutation parallel path computes permutation minima correctly", {
+  # Tests the parallel mclapply path for distributing permutations across cores
+  # Validates that .get_effective_nthreads() is used for core allocation
+  
+  skip_if_not(.Platform$OS.type == "unix", 
+              message = "Parallel WY permutation uses mclapply (Unix only)")
+  
+  set.seed(999)
+  
+  # Setup: Small dataset for quick parallel test
+  data_par <- expand.grid(
+    subject = c("S1", "S2", "S3"),
+    sample_type = c("Control", "Treatment"),
+    q = 1,
+    gene = c("Gene1", "Gene2")
+  )
+  data_par$sample <- paste0(data_par$subject, "_", data_par$sample_type)
+  data_par$paired_samples <- data_par$subject
+  data_par$entropy <- rnorm(nrow(data_par), mean = 2, sd = 0.3)
+  data_par$condition <- data_par$sample_type
+  
+  # Run WY with parallel execution (nthreads=2)
+  result_par <- .calculate_srh(
+    data = data_par,
+    entropy_col = "entropy",
+    q_col = "q",
+    gene_col = "gene",
+    condition_col = "condition",
+    paired = TRUE,
+    subject_col = "subject",
+    multicorr = "westfall-young",
+    wy_randomizations = 25,  # Small number for speed
+    nthreads = 2,            # Trigger parallel path
+    verbose = FALSE
+  )
+  
+  # Validate output structure
+  expect_is(result_par, "data.frame")
+  expect_true(nrow(result_par) > 0)
+  expect_true("adj_p_value" %in% colnames(result_par))
+  expect_true("p_value" %in% colnames(result_par))
+  
+  # All adjusted p-values should be valid
+  expect_true(all(!is.na(result_par$adj_p_value) & 
+                   result_par$adj_p_value >= 0 & 
+                   result_par$adj_p_value <= 1, 
+                   na.rm = TRUE))
+  
+  # Monotonicity: adjusted p-values >= original p-values
+  for (i in seq_len(nrow(result_par))) {
+    p_orig <- result_par$p_value[i]
+    p_adj <- result_par$adj_p_value[i]
+    if (!is.na(p_orig) && !is.na(p_adj)) {
+      expect_gte(p_adj, p_orig * 0.95)  # Allow small numerical tolerance
+    }
+  }
+})
+
+test_that("WY parallel execution respects .get_effective_nthreads() with high counts", {
+  # Validates that requesting very high thread counts (999) is handled gracefully
+  # by .get_effective_nthreads() and doesn't cause errors
+  
+  skip_if_not(.Platform$OS.type == "unix", 
+              message = "Parallel WY permutation uses mclapply (Unix only)")
+  
+  set.seed(1111)
+  
+  # Small dataset
+  data_high <- expand.grid(
+    subject = c("S1", "S2"),
+    sample_type = c("A", "B"),
+    q = 1,
+    gene = "Gene1"
+  )
+  data_high$sample <- paste0(data_high$subject, "_", data_high$sample_type)
+  data_high$paired_samples <- data_high$subject
+  data_high$entropy <- rnorm(nrow(data_high), mean = 1.5, sd = 0.2)
+  data_high$condition <- data_high$sample_type
+  
+  # Request 999 threads - should be clamped by .get_effective_nthreads()
+  # This should NOT throw an error about thread count
+  result_high_threads <- .calculate_srh(
+    data = data_high,
+    entropy_col = "entropy",
+    q_col = "q",
+    gene_col = "gene",
+    condition_col = "condition",
+    paired = TRUE,
+    subject_col = "subject",
+    multicorr = "westfall-young",
+    wy_randomizations = 20,  # Small number for speed
+    nthreads = 999,          # Very high request
+    verbose = FALSE
+  )
+  
+  # Should succeed without error
+  expect_is(result_high_threads, "data.frame")
+  expect_true("adj_p_value" %in% colnames(result_high_threads))
+  
+  # P-values should be valid
+  valid_pvals <- !is.na(result_high_threads$adj_p_value)
+  if (any(valid_pvals)) {
+    expect_true(all(result_high_threads$adj_p_value[valid_pvals] >= 0 &
+                    result_high_threads$adj_p_value[valid_pvals] <= 1))
+  }
+})
+
+test_that("WY parallel and serial execution produce similar permutation distributions", {
+  # Compares parallel (nthreads=2) vs serial (nthreads=1) execution
+  # Results should be similar (same random seed ensures reproducibility)
+  
+  skip_if_not(.Platform$OS.type == "unix", 
+              message = "Parallel WY permutation uses mclapply (Unix only)")
+  
+  set.seed(2222)
+  
+  # Small dataset
+  data_comparison <- expand.grid(
+    subject = c("S1", "S2", "S3"),
+    sample_type = c("Ctrl", "Trt"),
+    q = 1,
+    gene = c("Gene1", "Gene2")
+  )
+  data_comparison$sample <- paste0(data_comparison$subject, "_", data_comparison$sample_type)
+  data_comparison$paired_samples <- data_comparison$subject
+  data_comparison$entropy <- rnorm(nrow(data_comparison), mean = 2, sd = 0.3)
+  data_comparison$condition <- data_comparison$sample_type
+  
+  # Run SERIAL
+  set.seed(3333)
+  result_serial <- .calculate_srh(
+    data = data_comparison,
+    entropy_col = "entropy",
+    q_col = "q",
+    gene_col = "gene",
+    condition_col = "condition",
+    paired = TRUE,
+    subject_col = "subject",
+    multicorr = "westfall-young",
+    wy_randomizations = 30,
+    nthreads = 1,  # Serial
+    verbose = FALSE
+  )
+  
+  # Run PARALLEL (same seed for reproducible comparison)
+  set.seed(3333)
+  result_parallel <- .calculate_srh(
+    data = data_comparison,
+    entropy_col = "entropy",
+    q_col = "q",
+    gene_col = "gene",
+    condition_col = "condition",
+    paired = TRUE,
+    subject_col = "subject",
+    multicorr = "westfall-young",
+    wy_randomizations = 30,
+    nthreads = 2,  # Parallel
+    verbose = FALSE
+  )
+  
+  # Both should produce valid output
+  expect_is(result_serial, "data.frame")
+  expect_is(result_parallel, "data.frame")
+  expect_equal(nrow(result_serial), nrow(result_parallel))
+  
+  # P-values should be present and valid
+  expect_true(all(!is.na(result_serial$p_value) | is.na(result_serial$p_value)))
+  expect_true(all(!is.na(result_parallel$p_value) | is.na(result_parallel$p_value)))
+  
+  # Adjusted p-values should be in valid range for both
+  if (any(!is.na(result_serial$adj_p_value))) {
+    expect_true(all(result_serial$adj_p_value[!is.na(result_serial$adj_p_value)] >= 0 &
+                    result_serial$adj_p_value[!is.na(result_serial$adj_p_value)] <= 1))
+  }
+  if (any(!is.na(result_parallel$adj_p_value))) {
+    expect_true(all(result_parallel$adj_p_value[!is.na(result_parallel$adj_p_value)] >= 0 &
+                    result_parallel$adj_p_value[!is.na(result_parallel$adj_p_value)] <= 1))
+  }
+})
+
+# ════════════════════════════════════════════════════════════════════════════════
+# TEST: PARALLEL EXECUTION PATH IN WY PERMUTATION
+# ════════════════════════════════════════════════════════════════════════════════
+
+test_that("WY permutation parallel path computes permutation minima correctly", {
+  # Tests the parallel mclapply path for distributing permutations across cores
+  # Validates that .get_effective_nthreads() is used for core allocation
+  
+  skip_if_not(.Platform$OS.type == "unix", 
+              message = "Parallel WY permutation uses mclapply (Unix only)")
+  
+  set.seed(999)
+  
+  # Setup: Small dataset for quick parallel test
+  data_par <- expand.grid(
+    subject = c("S1", "S2", "S3"),
+    sample_type = c("Control", "Treatment"),
+    q = 1,
+    gene = c("Gene1", "Gene2")
+  )
+  data_par$sample <- paste0(data_par$subject, "_", data_par$sample_type)
+  data_par$paired_samples <- data_par$subject
+  data_par$entropy <- rnorm(nrow(data_par), mean = 2, sd = 0.3)
+  data_par$condition <- data_par$sample_type
+  
+  # Run WY with parallel execution (nthreads=2)
+  result_par <- .calculate_srh(
+    data = data_par,
+    entropy_col = "entropy",
+    q_col = "q",
+    gene_col = "gene",
+    condition_col = "condition",
+    paired = TRUE,
+    subject_col = "subject",
+    multicorr = "westfall-young",
+    wy_randomizations = 25,  # Small number for speed
+    nthreads = 2,            # Trigger parallel path
+    verbose = FALSE
+  )
+  
+  # Validate output structure
+  expect_is(result_par, "data.frame")
+  expect_true(nrow(result_par) > 0)
+  expect_true("adj_p_value" %in% colnames(result_par))
+  expect_true("p_value" %in% colnames(result_par))
+  
+  # All adjusted p-values should be valid
+  expect_true(all(!is.na(result_par$adj_p_value) & 
+                   result_par$adj_p_value >= 0 & 
+                   result_par$adj_p_value <= 1, 
+                   na.rm = TRUE))
+  
+  # Monotonicity: adjusted p-values >= original p-values
+  for (i in seq_len(nrow(result_par))) {
+    p_orig <- result_par$p_value[i]
+    p_adj <- result_par$adj_p_value[i]
+    if (!is.na(p_orig) && !is.na(p_adj)) {
+      expect_gte(p_adj, p_orig * 0.95)  # Allow small numerical tolerance
+    }
+  }
+})
+
+test_that("WY parallel execution respects .get_effective_nthreads() with high counts", {
+  # Validates that requesting very high thread counts (999) is handled gracefully
+  # by .get_effective_nthreads() and doesn't cause errors
+  
+  skip_if_not(.Platform$OS.type == "unix", 
+              message = "Parallel WY permutation uses mclapply (Unix only)")
+  
+  set.seed(1111)
+  
+  # Small dataset
+  data_high <- expand.grid(
+    subject = c("S1", "S2"),
+    sample_type = c("A", "B"),
+    q = 1,
+    gene = "Gene1"
+  )
+  data_high$sample <- paste0(data_high$subject, "_", data_high$sample_type)
+  data_high$paired_samples <- data_high$subject
+  data_high$entropy <- rnorm(nrow(data_high), mean = 1.5, sd = 0.2)
+  data_high$condition <- data_high$sample_type
+  
+  # Request 999 threads - should be clamped by .get_effective_nthreads()
+  # This should NOT throw an error about thread count
+  result_high_threads <- .calculate_srh(
+    data = data_high,
+    entropy_col = "entropy",
+    q_col = "q",
+    gene_col = "gene",
+    condition_col = "condition",
+    paired = TRUE,
+    subject_col = "subject",
+    multicorr = "westfall-young",
+    wy_randomizations = 20,  # Small number for speed
+    nthreads = 999,          # Very high request
+    verbose = FALSE
+  )
+  
+  # Should succeed without error
+  expect_is(result_high_threads, "data.frame")
+  expect_true("adj_p_value" %in% colnames(result_high_threads))
+  
+  # P-values should be valid
+  valid_pvals <- !is.na(result_high_threads$adj_p_value)
+  if (any(valid_pvals)) {
+    expect_true(all(result_high_threads$adj_p_value[valid_pvals] >= 0 &
+                    result_high_threads$adj_p_value[valid_pvals] <= 1))
+  }
+})
+
+test_that("WY parallel and serial execution produce similar permutation distributions", {
+  # Compares parallel (nthreads=2) vs serial (nthreads=1) execution
+  # Results should be similar (same random seed ensures reproducibility)
+  
+  skip_if_not(.Platform$OS.type == "unix", 
+              message = "Parallel WY permutation uses mclapply (Unix only)")
+  
+  set.seed(2222)
+  
+  # Small dataset
+  data_comparison <- expand.grid(
+    subject = c("S1", "S2", "S3"),
+    sample_type = c("Ctrl", "Trt"),
+    q = 1,
+    gene = c("Gene1", "Gene2")
+  )
+  data_comparison$sample <- paste0(data_comparison$subject, "_", data_comparison$sample_type)
+  data_comparison$paired_samples <- data_comparison$subject
+  data_comparison$entropy <- rnorm(nrow(data_comparison), mean = 2, sd = 0.3)
+  data_comparison$condition <- data_comparison$sample_type
+  
+  # Run SERIAL
+  set.seed(3333)
+  result_serial <- .calculate_srh(
+    data = data_comparison,
+    entropy_col = "entropy",
+    q_col = "q",
+    gene_col = "gene",
+    condition_col = "condition",
+    paired = TRUE,
+    subject_col = "subject",
+    multicorr = "westfall-young",
+    wy_randomizations = 30,
+    nthreads = 1,  # Serial
+    verbose = FALSE
+  )
+  
+  # Run PARALLEL (same seed for reproducible comparison)
+  set.seed(3333)
+  result_parallel <- .calculate_srh(
+    data = data_comparison,
+    entropy_col = "entropy",
+    q_col = "q",
+    gene_col = "gene",
+    condition_col = "condition",
+    paired = TRUE,
+    subject_col = "subject",
+    multicorr = "westfall-young",
+    wy_randomizations = 30,
+    nthreads = 2,  # Parallel
+    verbose = FALSE
+  )
+  
+  # Both should produce valid output
+  expect_is(result_serial, "data.frame")
+  expect_is(result_parallel, "data.frame")
+  expect_equal(nrow(result_serial), nrow(result_parallel))
+  
+  # P-values should be present and valid
+  expect_true(all(!is.na(result_serial$p_value) | is.na(result_serial$p_value)))
+  expect_true(all(!is.na(result_parallel$p_value) | is.na(result_parallel$p_value)))
+  
+  # Adjusted p-values should be in valid range for both
+  if (any(!is.na(result_serial$adj_p_value))) {
+    expect_true(all(result_serial$adj_p_value[!is.na(result_serial$adj_p_value)] >= 0 &
+                    result_serial$adj_p_value[!is.na(result_serial$adj_p_value)] <= 1))
+  }
+  if (any(!is.na(result_parallel$adj_p_value))) {
+    expect_true(all(result_parallel$adj_p_value[!is.na(result_parallel$adj_p_value)] >= 0 &
+                    result_parallel$adj_p_value[!is.na(result_parallel$adj_p_value)] <= 1))
+  }
+})

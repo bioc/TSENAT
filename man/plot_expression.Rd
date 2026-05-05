@@ -144,16 +144,16 @@ analysis <- build_analysis(
 analysis <- filter_analysis(analysis, stringency = 'severe')
 analysis <- calculate_diversity(
   analysis,
-  q = c(0.5, 1.0, 1.5, 2.0, 2.5),
+  q = seq(0.2, 2, by = 0.4),
   verbose = FALSE
 )
 analysis <- suppressWarnings(calculate_sait(
   analysis,
-  method = 'gam',
+  method = 'lmm',
   verbose = FALSE
 ))
-plot_file <- plot_expression(analysis, top_n = 3)
-# print(plot_file) 
+plot_file <- plot_expression(analysis, top_n = 2)
+# print(plot_file)
 
 }
 \seealso{

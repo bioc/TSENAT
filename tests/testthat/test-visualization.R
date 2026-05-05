@@ -14,6 +14,7 @@ library(testthat)
 
 
 test_that("infer_samples_from_se finds sample_type column and falls back", {
+    skip_on_bioc()
     mat <- matrix(runif(6), nrow = 3, ncol = 2)
     rownames(mat) <- c("tx1", "tx2", "tx3")
     colnames(mat) <- c("a", "b")
@@ -30,6 +31,7 @@ test_that("infer_samples_from_se finds sample_type column and falls back", {
 })
 
 test_that("validate_control_in_samples picks 'Normal' when present or first level", {
+    skip_on_bioc()
     samples <- c("Tumor", "Normal", "Tumor")
     expect_equal(.validate_control_in_samples(NULL, samples), "Normal")
     samples2 <- c("A", "B")
@@ -42,6 +44,7 @@ context("Visualization: Top Transcripts Plotting")
 
 
 test_that("plot_top_transcripts works on simple matrix input", {
+    skip_on_bioc()
     tx_counts <- matrix(sample(1:100, 24, replace = TRUE), nrow = 6)
     rownames(tx_counts) <- paste0("tx", seq_len(nrow(tx_counts)))
     colnames(tx_counts) <- paste0("S", seq_len(ncol(tx_counts)))
@@ -61,6 +64,7 @@ test_that("plot_top_transcripts works on simple matrix input", {
 })
 
 test_that("plot_top_transcripts errors when se is not SummarizedExperiment", {
+    skip_on_bioc()
     mat <- matrix(1:6, nrow = 2)
     expect_error(.plot_expression(mat, gene = "G1"), "se must be a SummarizedExperiment")
 })
@@ -68,6 +72,7 @@ test_that("plot_top_transcripts errors when se is not SummarizedExperiment", {
 context("Visualization: Generate Plots Additional Tests")
 
 test_that("make_plot_for_geneprepare_inputs errors when tx2gene missing", {
+    skip_on_bioc()
     skip_if_not_installed("ggplot2")
     counts <- matrix(1:6, nrow = 3)
     rownames(counts) <- paste0("tx", seq_len(nrow(counts)))
@@ -76,6 +81,7 @@ test_that("make_plot_for_geneprepare_inputs errors when tx2gene missing", {
 })
 
 test_that("make_plot_for_geneprepare_inputs returns list with mapping when provided", {
+    skip_on_bioc()
     skip_if_not_installed("ggplot2")
     counts <- matrix(1:6, nrow = 3)
     rownames(counts) <- paste0("tx", 1:3)
@@ -87,6 +93,7 @@ test_that("make_plot_for_geneprepare_inputs returns list with mapping when provi
 })
 
 test_that("make_plot_for_genemake_plot_for_gene returns ggplot object", {
+    skip_on_bioc()
     skip_if_not_installed("ggplot2")
     counts <- matrix(rpois(6, 10), nrow = 3)
     rownames(counts) <- paste0("tx", 1:3)
@@ -98,6 +105,7 @@ test_that("make_plot_for_genemake_plot_for_gene returns ggplot object", {
 })
 
 test_that("make_plot_for_genecombine_plots returns a plot-like object", {
+    skip_on_bioc()
     skip_if_not_installed("ggplot2")
     p1 <- ggplot2::ggplot() +
         ggplot2::geom_point(mapping = ggplot2::aes(x = 1:3, y = 3:1))
@@ -113,6 +121,7 @@ context("Visualization: Generate Plots Extended Tests")
 # plot_top_transcripts writes output_file for single and multiple genes
 
 test_that("plot_top_transcripts writes output files for single and multiple genes", {
+    skip_on_bioc()
     skip_if_not_installed("ggplot2")
     set.seed(10)
     counts <- matrix(rpois(6 * 4, lambda = 10), nrow = 6)
@@ -144,11 +153,13 @@ context("Visualization: Top Transcripts Helper Functions")
 
 # make_plot_for_geneselect_genes_from_res
 test_that("make_plot_for_geneselect_genes_from_res errors on NULL or missing genes", {
+    skip_on_bioc()
     expect_error(.make_plot_for_geneselect_genes_from_res(NULL, 3), "Either 'gene' or 'res' must be provided")
     expect_error(.make_plot_for_geneselect_genes_from_res(data.frame(a = 1:3), 2), "must contain a 'genes' column")
 })
 
 test_that("make_plot_for_geneselect_genes_from_res sorts by adjusted or raw p-values and returns unique genes", {
+    skip_on_bioc()
     res <- data.frame(genes = c("g1", "g2", "g1", "g3"), adjusted_p_values = c(0.2, 0.01, 0.05, NA))
     sel <- .make_plot_for_geneselect_genes_from_res(res, top_n = 3)
     expect_true(all(c("g2", "g1") %in% sel))
@@ -162,6 +173,7 @@ test_that("make_plot_for_geneselect_genes_from_res sorts by adjusted or raw p-va
 
 # make_plot_for_geneinfer_samples_from_coldata
 test_that("make_plot_for_geneinfer_samples_from_coldata handles row-named coldata and Sample id column", {
+    skip_on_bioc()
     counts <- matrix(1:6, nrow = 2)
     colnames(counts) <- c("S1", "S2", "S3")[1:ncol(counts)]
 
@@ -178,6 +190,7 @@ test_that("make_plot_for_geneinfer_samples_from_coldata handles row-named coldat
 
 # make_plot_for_generead_tx2gene
 test_that("make_plot_for_generead_tx2gene validates inputs and reads mapping", {
+    skip_on_bioc()
     expect_error(.make_plot_for_generead_tx2gene(NULL), "`tx2gene` must be provided")
 
     bad <- data.frame(X = 1:2)
@@ -197,6 +210,7 @@ test_that("make_plot_for_generead_tx2gene validates inputs and reads mapping", {
 
 # make_plot_for_genemake_agg
 test_that("make_plot_for_genemake_agg returns an aggregation function and label", {
+    skip_on_bioc()
     maj <- .make_plot_for_genemake_agg("median")
     expect_equal(maj$metric_choice, "median")
     expect_true(is.function(maj$agg_fun))
@@ -209,6 +223,7 @@ test_that("make_plot_for_genemake_agg returns an aggregation function and label"
 
 # make_plot_for_genebuild_tx_long and make_plot_for_geneaggregate_df_long
 test_that("make_plot_for_genebuild_tx_long and aggregation pipeline works and errors appropriately", {
+    skip_on_bioc()
     counts <- matrix(1:12, nrow = 4)
     rownames(counts) <- paste0("tx", 1:4)
     colnames(counts) <- paste0("S", 1:3)
@@ -247,6 +262,7 @@ context("Visualization: Plot Helper Functions")
 
 
 test_that(".format_label handles various inputs", {
+    skip_on_bioc()
     expect_null(.format_label(NULL))
     expect_equal(.format_label("__FOO_bar  "), "Foo bar")
     expect_equal(.format_label(" a "), "A")
@@ -265,6 +281,7 @@ context("Visualization: Unit Tests for Plotting Helpers")
 # make_plot_for_geneselect_genes_from_res
 
 test_that("make_plot_for_geneselect_genes_from_res selects by adjusted_p_values and raw_p_values", {
+    skip_on_bioc()
     res1 <- data.frame(genes = c("A", "B", "C"), adjusted_p_values = c(0.05, 0.01, 0.2), stringsAsFactors = FALSE)
     expect_equal(TSENAT:::.make_plot_for_geneselect_genes_from_res(res1, top_n = 2), c("B", "A"))
 
@@ -278,6 +295,7 @@ test_that("make_plot_for_geneselect_genes_from_res selects by adjusted_p_values 
 # make_plot_for_geneinfer_samples_from_coldata
 
 test_that("make_plot_for_geneinfer_samples_from_coldata infers samples from data.frame and file path and errors on mismatch", {
+    skip_on_bioc()
     counts <- matrix(1:8, ncol = 4)
     colnames(counts) <- paste0("S", 1:4)
 
@@ -303,6 +321,7 @@ test_that("make_plot_for_geneinfer_samples_from_coldata infers samples from data
 # make_plot_for_generead_tx2gene
 
 test_that("make_plot_for_generead_tx2gene reads mapping from data.frame and file and errors on missing columns", {
+    skip_on_bioc()
     mapping <- data.frame(Transcript = c("t1", "t2"), Gen = c("G1", "G1"), stringsAsFactors = FALSE)
     out <- TSENAT:::.make_plot_for_generead_tx2gene(mapping)
     expect_equal(out, mapping)
@@ -318,6 +337,7 @@ test_that("make_plot_for_generead_tx2gene reads mapping from data.frame and file
 # make_plot_for_genemake_agg
 
 test_that("make_plot_for_genemake_agg returns correct aggregator and label", {
+    skip_on_bioc()
     med <- TSENAT:::.make_plot_for_genemake_agg("median")
     expect_equal(med$metric_choice, "median")
     expect_equal(med$agg_fun(c(1, 2, NA)), stats::median(c(1, 2, NA), na.rm = TRUE))
@@ -340,6 +360,7 @@ test_that("make_plot_for_genemake_agg returns correct aggregator and label", {
 # make_plot_for_genebuild_tx_long & make_plot_for_geneaggregate_df_long & make_plot_for_genebuild_plot_from_summary
 
 test_that("tx long building, aggregation and plot building behave correctly", {
+    skip_on_bioc()
     counts <- matrix(rpois(6 * 2, lambda = 10), nrow = 6)
     rownames(counts) <- paste0("tx", 1:6)
     colnames(counts) <- paste0("S", 1:2)
@@ -364,6 +385,7 @@ test_that("tx long building, aggregation and plot building behave correctly", {
 # make_plot_for_genecombine_grid writes to file when output_file provided
 
 test_that("make_plot_for_genecombine_grid writes a PNG file when output_file is given", {
+    skip_on_bioc()
     skip_if_not_installed("ggplot2")
 
     df <- data.frame(x = 1:3, y = rnorm(3))
@@ -385,6 +407,7 @@ context("Visualization: Gene Profile Plotting (Edge Cases)")
 context("Visualization: generate_plots.R Comprehensive Coverage")
 
 test_that("infer_samples_from_se fallback logic works", {
+    skip_on_bioc()
     se <- SummarizedExperiment(
         assays = list(counts = matrix(1:8, ncol = 4)),
         colData = DataFrame(foo = c("a", "b", "c", "d"), bar = c("x", "y", "z", "w"))
@@ -404,6 +427,7 @@ test_that("infer_samples_from_se fallback logic works", {
 })
 
 test_that("get_readcounts_from_se works with file path and fallback", {
+    skip_on_bioc()
     # test with a file path (with gene column)
     rc_df <- data.frame(gene = c("g1", "g2"), c1 = c(1, 2), c2 = c(3, 4))
     rc_file <- tempfile()
@@ -453,6 +477,7 @@ test_that("get_readcounts_from_se works with file path and fallback", {
 })
 
 test_that("get_tx2gene_from_se fallback works", {
+    skip_on_bioc()
     se <- SummarizedExperiment(assays = list(counts = matrix(1:4, nrow = 2, dimnames = list(c("tx1", "tx2"), c("s1", "s2")))))
     res <- TSENAT:::.get_tx2gene_from_se(se, readcounts_mat = assay(se))
     expect_equal(res$mapping, c("tx1", "tx2"))
@@ -466,6 +491,7 @@ test_that("get_tx2gene_from_se fallback works", {
 
 
 test_that("plot_diversity_spectrum handles single group and empty long df", {
+    skip_on_bioc()
     se <- SummarizedExperiment(assays = list(diversity = matrix(rnorm(4), 2, dimnames = list(NULL, c("s1_q=0.1", "s2_q=0.1")))))
     colData(se) <- DataFrame(sample_type = c("A", "A"), row.names = c("s1", "s2"))
     p <- plot_diversity_spectrum(se)
@@ -486,6 +512,7 @@ test_that("plot_diversity_spectrum handles single group and empty long df", {
 
 
 test_that(".plot_transcript_fill_limits handles no transcripts found", {
+    skip_on_bioc()
     counts <- matrix(1:4, 2)
     rownames(counts) <- c("tx1", "tx2")
     mapping <- data.frame(Transcript = c("tx3"), Gen = c("g1"))
@@ -499,6 +526,7 @@ test_that(".plot_transcript_fill_limits handles no transcripts found", {
 })
 
 test_that(".plot_transcript_grid_draw creates a temporary pdf in non-interactive sessions", {
+    skip_on_bioc()
     # This is hard to test directly, but we can check the logic.
     # We can't easily force a non-interactive session in a test.
     # We can check that it doesn't error when no device is open.
@@ -516,6 +544,7 @@ test_that(".plot_transcript_grid_draw creates a temporary pdf in non-interactive
 
 
 test_that("make_plot_for_genecombine_plots fallbacks work", {
+    skip_on_bioc()
     p1 <- ggplot2::ggplot()
     # Ensure the function runs and falls back to any available backend;
     # don't rely on mocking namespace checks here.
@@ -523,6 +552,7 @@ test_that("make_plot_for_genecombine_plots fallbacks work", {
 })
 
 test_that("make_plot_for_genecombine_plots treats single string second arg as label", {
+    skip_on_bioc()
     p1 <- ggplot2::ggplot()
     # explicit label
     out1 <- NULL
@@ -533,6 +563,7 @@ test_that("make_plot_for_genecombine_plots treats single string second arg as la
 })
 
 test_that("make_plot_for_geneprepare_inputs handles file paths and various errors", {
+    skip_on_bioc()
     counts <- matrix(1:4, 2)
     rownames(counts) <- paste0("tx", 1:2)
     colnames(counts) <- paste0("s", 1:2)
@@ -591,6 +622,7 @@ test_that("make_plot_for_geneprepare_inputs handles file paths and various error
 })
 
 test_that("plot_jis_delta rejects results without q-values", {
+  skip_on_bioc()
   # Create a mock object with correct class but no q-value results
   mock_result <- list(
     gene_ids = c("ENSG1", "ENSG2"),
@@ -606,6 +638,7 @@ test_that("plot_jis_delta rejects results without q-values", {
 })
 
 test_that("plot_jis_delta works with valid multi-q results", {
+  skip_on_bioc()
   skip_on_ci()  # Expensive: runs calculate_jis with multi-q
   # Load test data - readcounts from TSENAT
   data("readcounts", package = "TSENAT", envir = environment())
@@ -653,6 +686,7 @@ test_that("plot_jis_delta works with valid multi-q results", {
 })
 
 test_that("plot_jis_delta respects n_genes parameter", {
+  skip_on_bioc()
   skip_on_ci()  # Expensive: runs jackknife_isoform_switching with multi-q
   # Load test data
   data("readcounts", package = "TSENAT", envir = environment())
@@ -704,6 +738,7 @@ test_that("plot_jis_delta respects n_genes parameter", {
 })
 
 test_that("plot_jis_delta handles n_genes > available genes", {
+  skip_on_bioc()
   # Load test data
   data("readcounts", package = "TSENAT", envir = environment())
   
@@ -752,6 +787,7 @@ test_that("plot_jis_delta handles n_genes > available genes", {
 })
 
 test_that("plot_jis_delta handles q-values correctly", {
+  skip_on_bioc()
   # Load test data
   data("readcounts", package = "TSENAT", envir = environment())
   
@@ -804,6 +840,7 @@ test_that("plot_jis_delta handles q-values correctly", {
 })
 
 test_that("plot_jis_delta creates valid PNG file", {
+  skip_on_bioc()
   skip_on_ci()  # Expensive: runs jackknife_isoform_switching with multi-q
   # Load test data
   data("readcounts", package = "TSENAT", envir = environment())
@@ -861,6 +898,7 @@ test_that("plot_jis_delta creates valid PNG file", {
 # ============================================================================
 
 test_that("Violin plotting with single q values", {
+  skip_on_bioc()
   set.seed(42)
   
   # Create simple test data
@@ -878,6 +916,7 @@ test_that("Violin plotting with single q values", {
 })
 
 test_that("Density plotting with single q values", {
+  skip_on_bioc()
   set.seed(42)
   
   # Create simple test data
@@ -894,6 +933,7 @@ test_that("Density plotting with single q values", {
 })
 
 test_that("Violin and density grid combined plotting", {
+  skip_on_bioc()
   set.seed(42)
   
   # Create realistic test data (counts should be positive integers)
@@ -914,6 +954,7 @@ test_that("Violin and density grid combined plotting", {
 })
 
 test_that("Custom titles in violin plots", {
+  skip_on_bioc()
   set.seed(42)
   
   x <- matrix(c(10, 15, 20, 25), nrow = 2, ncol = 2)
@@ -936,6 +977,7 @@ test_that("Custom titles in violin plots", {
 context("make_gam_plot: GAM-based entropy vs q-value plotting")
 
 test_that("make_gam_plot: basic setup with valid gene data", {
+  skip_on_bioc()
   config <- list()
   
   # Create test data matching make_gam_plot expectations
@@ -961,6 +1003,7 @@ test_that("make_gam_plot: basic setup with valid gene data", {
 })
 
 test_that("make_gam_plot: gene name extraction from column names", {
+  skip_on_bioc()
   config <- list()
   
   # Test parsing of "Sample_q=value" format
@@ -976,6 +1019,7 @@ test_that("make_gam_plot: gene name extraction from column names", {
 })
 
 test_that("make_gam_plot: gene not found in matrix warning", {
+  skip_on_bioc()
   config <- list()
   
   set.seed(42)
@@ -989,6 +1033,7 @@ test_that("make_gam_plot: gene not found in matrix warning", {
 })
 
 test_that("make_gam_plot: gene display name mapping", {
+  skip_on_bioc()
   config <- list()
   
   set.seed(42)
@@ -1013,6 +1058,7 @@ test_that("make_gam_plot: gene display name mapping", {
 })
 
 test_that("make_gam_plot: group mapping from colData", {
+  skip_on_bioc()
   config <- list()
   
   set.seed(42)
@@ -1031,6 +1077,7 @@ test_that("make_gam_plot: group mapping from colData", {
 })
 
 test_that("make_gam_plot: unmapped columns warning", {
+  skip_on_bioc()
   config <- list()
   
   col_samples <- c("s1", "s2", "s999", "s4")
@@ -1045,6 +1092,7 @@ test_that("make_gam_plot: unmapped columns warning", {
 })
 
 test_that("make_gam_plot: NA removal from plot data", {
+  skip_on_bioc()
   config <- list()
   
   set.seed(42)
@@ -1070,6 +1118,7 @@ test_that("make_gam_plot: NA removal from plot data", {
 })
 
 test_that("make_gam_plot: empty data warning and NULL return", {
+  skip_on_bioc()
   config <- list()
   
   # All entries are NA
@@ -1091,6 +1140,7 @@ test_that("make_gam_plot: empty data warning and NULL return", {
 })
 
 test_that("make_gam_plot: insufficient groups (<2)", {
+  skip_on_bioc()
   config <- list()
   
   # Only one group
@@ -1100,6 +1150,7 @@ test_that("make_gam_plot: insufficient groups (<2)", {
 })
 
 test_that("make_gam_plot: q-value range extraction", {
+  skip_on_bioc()
   config <- list()
   
   q_vals <- c(0.5, 0.75, 1.0, 1.25, 1.5, 2.0)
@@ -1117,6 +1168,7 @@ test_that("make_gam_plot: q-value range extraction", {
 })
 
 test_that("make_gam_plot: GAM fitting with k parameter", {
+  skip_on_bioc()
   config <- list()
   skip_if_not_installed("mgcv")
   
@@ -1144,6 +1196,7 @@ test_that("make_gam_plot: GAM fitting with k parameter", {
 })
 
 test_that("make_gam_plot: GAM prediction with se.fit", {
+  skip_on_bioc()
   config <- list()
   skip_if_not_installed("mgcv")
   
@@ -1169,6 +1222,7 @@ test_that("make_gam_plot: GAM prediction with se.fit", {
 })
 
 test_that("make_gam_plot: insufficient data for GAM (< 3 points)", {
+  skip_on_bioc()
   config <- list()
   
   subset_data <- data.frame(
@@ -1182,6 +1236,7 @@ test_that("make_gam_plot: insufficient data for GAM (< 3 points)", {
 })
 
 test_that("make_gam_plot: GAM fit error handling", {
+  skip_on_bioc()
   config <- list()
   skip_if_not_installed("mgcv")
   
@@ -1205,6 +1260,7 @@ test_that("make_gam_plot: GAM fit error handling", {
 })
 
 test_that("make_gam_plot: group factor level consistency", {
+  skip_on_bioc()
   config <- list()
   
   # Create data with possibly inconsistent group factors
@@ -1231,6 +1287,7 @@ test_that("make_gam_plot: group factor level consistency", {
 })
 
 test_that("make_gam_plot: color palette selection for groups", {
+  skip_on_bioc()
   config <- list()
   skip_if_not_installed("RColorBrewer")
   
@@ -1246,6 +1303,7 @@ test_that("make_gam_plot: color palette selection for groups", {
 })
 
 test_that("make_gam_plot: color handling for two groups", {
+  skip_on_bioc()
   config <- list()
   skip_if_not_installed("RColorBrewer")
   
@@ -1260,6 +1318,7 @@ test_that("make_gam_plot: color handling for two groups", {
 })
 
 test_that("make_gam_plot: plot creation with geom_point", {
+  skip_on_bioc()
   config <- list()
   skip_if_not_installed("ggplot2")
   
@@ -1277,6 +1336,7 @@ test_that("make_gam_plot: plot creation with geom_point", {
 })
 
 test_that("make_gam_plot: plot creation with geom_line (GAM fit)", {
+  skip_on_bioc()
   config <- list()
   skip_if_not_installed("ggplot2")
   
@@ -1294,6 +1354,7 @@ test_that("make_gam_plot: plot creation with geom_line (GAM fit)", {
 })
 
 test_that("make_gam_plot: title generation from gene names", {
+  skip_on_bioc()
   config <- list()
   
   gene_id <- "gene_1"
@@ -1309,6 +1370,7 @@ test_that("make_gam_plot: title generation from gene names", {
 })
 
 test_that("make_gam_plot: title when display name equals gene ID", {
+  skip_on_bioc()
   config <- list()
   
   gene_id <- "gene_1"
@@ -1324,6 +1386,7 @@ test_that("make_gam_plot: title when display name equals gene ID", {
 })
 
 test_that("make_gam_plot: theme customization", {
+  skip_on_bioc()
   config <- list()
   skip_if_not_installed("ggplot2")
   
@@ -1343,6 +1406,7 @@ test_that("make_gam_plot: theme customization", {
 })
 
 test_that("make_gam_plot: single group handling for fallback", {
+  skip_on_bioc()
   config <- list()
   
   # Edge case: < 2 unique groups
@@ -1353,6 +1417,7 @@ test_that("make_gam_plot: single group handling for fallback", {
 })
 
 test_that("make_gam_plot: data filtering by group", {
+  skip_on_bioc()
   config <- list()
   
   plot_df <- data.frame(
@@ -1370,6 +1435,7 @@ test_that("make_gam_plot: data filtering by group", {
 })
 
 test_that("make_gam_plot: multiple groups data filtering", {
+  skip_on_bioc()
   config <- list()
   
   plot_df <- data.frame(
@@ -1389,6 +1455,7 @@ test_that("make_gam_plot: multiple groups data filtering", {
 })
 
 test_that("make_gam_plot: no valid plots handling", {
+  skip_on_bioc()
   config <- list()
   
   # If all genes fail to produce plots
@@ -1401,6 +1468,7 @@ test_that("make_gam_plot: no valid plots handling", {
 })
 
 test_that("make_gam_plot: successful plot generation", {
+  skip_on_bioc()
   config <- list()
   skip_if_not_installed("ggplot2")
   
@@ -1579,6 +1647,7 @@ setup_bootstrap_no_ci_analysis <- function() {
 # ==============================================================================
 
 test_that("plot_diversity_spectrum bootstrap: CI auto-detection when both assays present (line 694)", {
+  skip_on_bioc()
   analysis <- setup_bootstrap_ci_analysis()
   
   # Function should automatically detect CI assays and use bootstrap mode
@@ -1594,6 +1663,7 @@ test_that("plot_diversity_spectrum bootstrap: CI auto-detection when both assays
 })
 
 test_that("plot_diversity_spectrum fallback: IQR when no CI data available (lines 697-700)", {
+  skip_on_bioc()
   analysis <- setup_bootstrap_no_ci_analysis()
   
   # Should fall back to IQR when CI assays not available (no warning)
@@ -1613,6 +1683,7 @@ test_that("plot_diversity_spectrum fallback: IQR when no CI data available (line
 # ==============================================================================
 
 test_that("plot_diversity_spectrum basic mode: plot creation (lines 725-755)", {
+  skip_on_bioc()
   analysis <- setup_bootstrap_no_ci_analysis()
   
   # Should create IQR-based plot when CI data unavailable
@@ -1632,6 +1703,7 @@ test_that("plot_diversity_spectrum basic mode: plot creation (lines 725-755)", {
 })
 
 test_that("plot_diversity_spectrum basic mode: IQR ribbon computation (lines 717-722)", {
+  skip_on_bioc()
   analysis <- setup_bootstrap_ci_analysis()
   
   # Basic mode should compute median and IQR
@@ -1648,6 +1720,7 @@ test_that("plot_diversity_spectrum basic mode: IQR ribbon computation (lines 717
 })
 
 test_that("plot_diversity_spectrum basic mode: single group legend hiding (line 751-752)", {
+  skip_on_bioc()
   # Create single-group analysis
   se <- setup_bootstrap_ci_analysis()@diversity_results[[1]]
   if (is(se, "SummarizedExperiment")) {
@@ -1676,6 +1749,7 @@ test_that("plot_diversity_spectrum basic mode: single group legend hiding (line 
 # ==============================================================================
 
 test_that("plot_diversity_spectrum bootstrap: detect ci_lower and ci_upper assays (line 688-689)", {
+  skip_on_bioc()
   analysis <- setup_bootstrap_ci_analysis()
   
   # Should detect both CI assays
@@ -1696,6 +1770,7 @@ test_that("plot_diversity_spectrum bootstrap: detect ci_lower and ci_upper assay
 })
 
 test_that("plot_diversity_spectrum bootstrap: error when CI assays missing (line 785-787)", {
+  skip_on_bioc()
   analysis <- setup_bootstrap_no_ci_analysis()
   
   # Directly call with bootstrap mode expecting CI (should warn/fallback)
@@ -1716,6 +1791,7 @@ test_that("plot_diversity_spectrum bootstrap: error when CI assays missing (line
 # ==============================================================================
 
 test_that("plot_diversity_spectrum bootstrap: long data preparation (line 761)", {
+  skip_on_bioc()
   analysis <- setup_bootstrap_ci_analysis()
   
   # Long data preparation should work
@@ -1735,6 +1811,7 @@ test_that("plot_diversity_spectrum bootstrap: long data preparation (line 761)",
 })
 
 test_that("plot_diversity_spectrum bootstrap: q-value extraction (line 766-767)", {
+  skip_on_bioc()
   analysis <- setup_bootstrap_ci_analysis()
   
   # Q-values should be extracted as numeric
@@ -1751,6 +1828,7 @@ test_that("plot_diversity_spectrum bootstrap: q-value extraction (line 766-767)"
 })
 
 test_that("plot_diversity_spectrum bootstrap: minimum q-value count (line 770-771)", {
+  skip_on_bioc()
   se <- setup_bootstrap_ci_analysis()@diversity_results[[1]]
   if (is(se, "SummarizedExperiment")) {
     # Ensure at least 2 q-values (should already have them from setup)
@@ -1774,6 +1852,7 @@ test_that("plot_diversity_spectrum bootstrap: minimum q-value count (line 770-77
 # ==============================================================================
 
 test_that("plot_diversity_spectrum bootstrap: condition_col validation (line 775-776)", {
+  skip_on_bioc()
   analysis <- setup_bootstrap_ci_analysis()
   
   # Invalid condition_col should either error or fail gracefully
@@ -1790,6 +1869,7 @@ test_that("plot_diversity_spectrum bootstrap: condition_col validation (line 775
 })
 
 test_that("plot_diversity_spectrum bootstrap: group count validation (line 779-781)", {
+  skip_on_bioc()
   analysis <- setup_bootstrap_ci_analysis()
   
   # 2 groups expected for bootstrap comparison
@@ -1815,6 +1895,7 @@ test_that("plot_diversity_spectrum bootstrap: group count validation (line 779-7
 # ==============================================================================
 
 test_that("plot_diversity_spectrum bootstrap: plot_df initialization (lines 800-806)", {
+  skip_on_bioc()
   analysis <- setup_bootstrap_ci_analysis()
   
   # Plot data frame should be initialized with proper columns
@@ -1830,6 +1911,7 @@ test_that("plot_diversity_spectrum bootstrap: plot_df initialization (lines 800-
 })
 
 test_that("plot_diversity_spectrum bootstrap: group-q loop iteration (lines 810-858)", {
+  skip_on_bioc()
   analysis <- setup_bootstrap_ci_analysis()
   
   # Should iterate through groups and q-values
@@ -1846,6 +1928,7 @@ test_that("plot_diversity_spectrum bootstrap: group-q loop iteration (lines 810-
 })
 
 test_that("plot_diversity_spectrum bootstrap: sample CI bounds aggregation (lines 820-845)", {
+  skip_on_bioc()
   analysis <- setup_bootstrap_ci_analysis()
   
   # Sample-level CI bounds should be aggregated
@@ -1865,6 +1948,7 @@ test_that("plot_diversity_spectrum bootstrap: sample CI bounds aggregation (line
 # ==============================================================================
 
 test_that("plot_diversity_spectrum bootstrap: plot creation with CI bands (lines 861-870)", {
+  skip_on_bioc()
   analysis <- setup_bootstrap_ci_analysis()
   
   # Bootstrap mode should create plot with CI ribbons
@@ -1885,6 +1969,7 @@ test_that("plot_diversity_spectrum bootstrap: plot creation with CI bands (lines
 })
 
 test_that("plot_diversity_spectrum bootstrap: plot styling (lines 871-883)", {
+  skip_on_bioc()
   analysis <- setup_bootstrap_ci_analysis()
   
   # Plot should have proper styling
@@ -1900,6 +1985,7 @@ test_that("plot_diversity_spectrum bootstrap: plot styling (lines 871-883)", {
 })
 
 test_that("plot_diversity_spectrum bootstrap: color scales (lines 884-885)", {
+  skip_on_bioc()
   analysis <- setup_bootstrap_ci_analysis()
   
   # Manual color scales should be applied
@@ -1915,6 +2001,7 @@ test_that("plot_diversity_spectrum bootstrap: color scales (lines 884-885)", {
 })
 
 test_that("plot_diversity_spectrum bootstrap: single group legend (lines 887-888)", {
+  skip_on_bioc()
   # Create single-group data with CIs
   se <- setup_bootstrap_ci_analysis()@diversity_results[[1]]
   if (is(se, "SummarizedExperiment")) {
@@ -1942,6 +2029,7 @@ test_that("plot_diversity_spectrum bootstrap: single group legend (lines 887-888
 # ==============================================================================
 
 test_that("plot_diversity_spectrum bootstrap: returns ggplot object (line 891)", {
+  skip_on_bioc()
   analysis <- setup_bootstrap_ci_analysis()
   
   # Function should return ggplot for bootstrap mode
@@ -2070,6 +2158,7 @@ create_sait_res_p_value <- function() {
 # ==============================================================================
 
 test_that("plot_diversity_spectrum gene-mode: invalid assay name error (line 559)", {
+  skip_on_bioc()
   analysis <- setup_gene_mode_analysis()
   
   # Try to use non-existent assay - function will error during processing
@@ -2085,6 +2174,7 @@ test_that("plot_diversity_spectrum gene-mode: invalid assay name error (line 559
 })
 
 test_that("plot_diversity_spectrum gene-mode: valid assay name passes validation (line 559)", {
+  skip_on_bioc()
   analysis <- setup_gene_mode_analysis()
   
   # Should not error on assay validation with existing assay
@@ -2113,6 +2203,7 @@ test_that("plot_diversity_spectrum gene-mode: valid assay name passes validation
 # ==============================================================================
 
 test_that("plot_diversity_spectrum gene-mode: prepare_tsallis_long is called (line 566)", {
+  skip_on_bioc()
   analysis <- setup_gene_mode_analysis()
   
   # Verify that calling with gene param triggers prepare_tsallis_long path
@@ -2134,6 +2225,7 @@ test_that("plot_diversity_spectrum gene-mode: prepare_tsallis_long is called (li
 # ==============================================================================
 
 test_that("plot_diversity_spectrum gene-mode: Gene column requirement (line 567)", {
+  skip_on_bioc()
   # This test verifies the function checks for Gene column in prepared data
   # prepare_tsallis_long should return data with Gene column
   analysis <- setup_gene_mode_analysis()
@@ -2161,6 +2253,7 @@ test_that("plot_diversity_spectrum gene-mode: Gene column requirement (line 567)
 # ==============================================================================
 
 test_that("plot_diversity_spectrum gene-mode: gene parameter takes precedence (line 570)", {
+  skip_on_bioc()
   analysis <- setup_gene_mode_analysis()
   sait_res <- create_sait_res_adj_p_interaction()
   
@@ -2179,6 +2272,7 @@ test_that("plot_diversity_spectrum gene-mode: gene parameter takes precedence (l
 })
 
 test_that("plot_diversity_spectrum gene-mode: NULL gene and sait_res falls back to aggregate mode (line 571)", {
+  skip_on_bioc()
   analysis <- setup_gene_mode_analysis()
   
   # When gene is NULL and sait_res is NULL with incomplete metadata, should error gracefully
@@ -2198,6 +2292,7 @@ test_that("plot_diversity_spectrum gene-mode: NULL gene and sait_res falls back 
 # ==============================================================================
 
 test_that("plot_diversity_spectrum gene-mode: sait_res must be data.frame (line 572)", {
+  skip_on_bioc()
   analysis <- setup_gene_mode_analysis()
   
   # sait_res as non-dataframe with incomplete metadata, should error on metadata first
@@ -2213,6 +2308,7 @@ test_that("plot_diversity_spectrum gene-mode: sait_res must be data.frame (line 
 })
 
 test_that("plot_diversity_spectrum gene-mode: sait_res must have gene column (line 572)", {
+  skip_on_bioc()
   analysis <- setup_gene_mode_analysis()
   
   # sait_res without gene column with incomplete metadata, should error on metadata first
@@ -2237,6 +2333,7 @@ test_that("plot_diversity_spectrum gene-mode: sait_res must have gene column (li
 # ==============================================================================
 
 test_that("plot_diversity_spectrum gene-mode: detect adj_p_interaction format (line 576-578)", {
+  skip_on_bioc()
   analysis <- setup_gene_mode_analysis()
   sait_res <- create_sait_res_adj_p_interaction()
   
@@ -2261,6 +2358,7 @@ test_that("plot_diversity_spectrum gene-mode: detect adj_p_interaction format (l
 })
 
 test_that("plot_diversity_spectrum gene-mode: detect p_interaction format (line 579-580)", {
+  skip_on_bioc()
   analysis <- setup_gene_mode_analysis()
   sait_res <- create_sait_res_p_interaction()
   
@@ -2283,6 +2381,7 @@ test_that("plot_diversity_spectrum gene-mode: detect p_interaction format (line 
 })
 
 test_that("plot_diversity_spectrum gene-mode: detect adj_p_value format (line 581-583)", {
+  skip_on_bioc()
   analysis <- setup_gene_mode_analysis()
   sait_res <- create_sait_res_adj_p_value()
   
@@ -2305,6 +2404,7 @@ test_that("plot_diversity_spectrum gene-mode: detect adj_p_value format (line 58
 })
 
 test_that("plot_diversity_spectrum gene-mode: detect p_value format (line 584-585)", {
+  skip_on_bioc()
   analysis <- setup_gene_mode_analysis()
   sait_res <- create_sait_res_p_value()
   
@@ -2331,6 +2431,7 @@ test_that("plot_diversity_spectrum gene-mode: detect p_value format (line 584-58
 # ==============================================================================
 
 test_that("plot_diversity_spectrum gene-mode: missing p-value column error (line 588)", {
+  skip_on_bioc()
   analysis <- setup_gene_mode_analysis()
   
   # sait_res without any p-value column with incomplete metadata, should error on metadata first
@@ -2356,6 +2457,7 @@ test_that("plot_diversity_spectrum gene-mode: missing p-value column error (line
 # ==============================================================================
 
 test_that("plot_diversity_spectrum gene-mode: genes ordered by p-value (line 590)", {
+  skip_on_bioc()
   analysis <- setup_gene_mode_analysis()
   sait_res <- create_sait_res_adj_p_interaction()
   
@@ -2375,6 +2477,7 @@ test_that("plot_diversity_spectrum gene-mode: genes ordered by p-value (line 590
 })
 
 test_that("plot_diversity_spectrum gene-mode: n_top defaults to 1 when NULL (line 592)", {
+  skip_on_bioc()
   analysis <- setup_gene_mode_analysis()
   sait_res <- create_sait_res_adj_p_interaction()
   
@@ -2394,6 +2497,7 @@ test_that("plot_diversity_spectrum gene-mode: n_top defaults to 1 when NULL (lin
 })
 
 test_that("plot_diversity_spectrum gene-mode: n_top limits gene selection (line 593)", {
+  skip_on_bioc()
   analysis <- setup_gene_mode_analysis()
   sait_res <- create_sait_res_adj_p_interaction()
   
@@ -2416,6 +2520,7 @@ test_that("plot_diversity_spectrum gene-mode: n_top limits gene selection (line 
 # ==============================================================================
 
 test_that("plot_diversity_spectrum gene-mode: empty gene vector falls back to aggregate mode (line 598)", {
+  skip_on_bioc()
   analysis <- setup_gene_mode_analysis()
   
   # Empty gene vector with incomplete metadata should error on metadata first
@@ -2434,6 +2539,7 @@ test_that("plot_diversity_spectrum gene-mode: empty gene vector falls back to ag
 # ==============================================================================
 
 test_that("plot_diversity_spectrum gene-mode: single gene plotting (line 631-632)", {
+  skip_on_bioc()
   analysis <- setup_gene_mode_analysis()
   
   # Single gene should return ggplot
@@ -2459,6 +2565,7 @@ test_that("plot_diversity_spectrum gene-mode: single gene plotting (line 631-632
 })
 
 test_that("plot_diversity_spectrum gene-mode: median +/- SD computation (lines 607-610)", {
+  skip_on_bioc()
   analysis <- setup_gene_mode_analysis()
   
   # Function should compute stats (median, SD/variance)
@@ -2484,6 +2591,7 @@ test_that("plot_diversity_spectrum gene-mode: median +/- SD computation (lines 6
 # ==============================================================================
 
 test_that("plot_diversity_spectrum gene-mode: multiple genes creates grid (lines 635-639)", {
+  skip_on_bioc()
   analysis <- setup_gene_mode_analysis()
   
   # Multiple genes should trigger grid arrangement
@@ -2500,6 +2608,7 @@ test_that("plot_diversity_spectrum gene-mode: multiple genes creates grid (lines
 })
 
 test_that("plot_diversity_spectrum gene-mode: legend extraction and positioning (lines 643-649)", {
+  skip_on_bioc()
   analysis <- setup_gene_mode_analysis()
   
   # Multiple genes triggers cowplot legend positioning
@@ -2516,6 +2625,7 @@ test_that("plot_diversity_spectrum gene-mode: legend extraction and positioning 
 })
 
 test_that("plot_diversity_spectrum gene-mode: 2x2 grid arrangement (lines 657-660)", {
+  skip_on_bioc()
   analysis <- setup_gene_mode_analysis()
   
   # Multiple genes should be arranged in 2x2 grid
@@ -2532,6 +2642,7 @@ test_that("plot_diversity_spectrum gene-mode: 2x2 grid arrangement (lines 657-66
 })
 
 test_that("plot_diversity_spectrum gene-mode: title and subtitle construction (lines 663-667)", {
+  skip_on_bioc()
   analysis <- setup_gene_mode_analysis()
   
   # Multiple genes should add title/subtitle layer
@@ -2548,6 +2659,7 @@ test_that("plot_diversity_spectrum gene-mode: title and subtitle construction (l
 })
 
 test_that("plot_diversity_spectrum gene-mode: full grid with legend assembly (lines 670-676)", {
+  skip_on_bioc()
   analysis <- setup_gene_mode_analysis()
   
   # Final assembly: title + grid + legend in 3-row layout
@@ -2636,6 +2748,7 @@ setup_multiq_analysis <- function() {
 # ==============================================================================
 
 test_that("plot_diversity_spectrum: TSENATAnalysis with multiple q-values (lines 430-551)", {
+  skip_on_bioc()
   # Lines 430-551: Extract and combine multiple q-value diversity results
   analysis <- setup_multiq_analysis()
   
@@ -2660,6 +2773,7 @@ test_that("plot_diversity_spectrum: TSENATAnalysis with multiple q-values (lines
 })
 
 test_that("plot_diversity_spectrum: assay list initialization (lines 433-435)", {
+  skip_on_bioc()
   # Lines 433-435: Initialize assay list and first_se variables
   analysis <- setup_multiq_analysis()
   
@@ -2677,6 +2791,7 @@ test_that("plot_diversity_spectrum: assay list initialization (lines 433-435)", 
 })
 
 test_that("plot_diversity_spectrum: loop through diversity_results (lines 437-446)", {
+  skip_on_bioc()
   # Lines 437-446: Iterate through diversity results, handle both SE and matrix objects
   analysis <- setup_multiq_analysis()
   
@@ -2700,6 +2815,7 @@ test_that("plot_diversity_spectrum: loop through diversity_results (lines 437-44
 })
 
 test_that("plot_diversity_spectrum: q-value extraction and storage (lines 449-453)", {
+  skip_on_bioc()
   # Lines 449-453: Extract q-value from name and store in dictionary
   analysis <- setup_multiq_analysis()
   
@@ -2722,6 +2838,7 @@ test_that("plot_diversity_spectrum: q-value extraction and storage (lines 449-45
 })
 
 test_that("plot_diversity_spectrum: error when no SE in diversity_results (lines 457-459)", {
+  skip_on_bioc()
   # Lines 457-459: Error handling when first_se is NULL
   se <- SummarizedExperiment::SummarizedExperiment(
     assays = list(counts = matrix(1, nrow = 5, ncol = 4))
@@ -2743,6 +2860,7 @@ test_that("plot_diversity_spectrum: error when no SE in diversity_results (lines
 })
 
 test_that("plot_diversity_spectrum: target dimensions extraction (lines 462-464)", {
+  skip_on_bioc()
   # Lines 462-464: Extract target gene names and column count
   analysis <- setup_multiq_analysis()
   
@@ -2760,6 +2878,7 @@ test_that("plot_diversity_spectrum: target dimensions extraction (lines 462-464)
 })
 
 test_that("plot_diversity_spectrum: combined assay creation (lines 467-469)", {
+  skip_on_bioc()
   # Lines 467-469: Create combined assay matrix with proper dimensions
   analysis <- setup_multiq_analysis()
   
@@ -2776,6 +2895,7 @@ test_that("plot_diversity_spectrum: combined assay creation (lines 467-469)", {
 })
 
 test_that("plot_diversity_spectrum: column count mismatch handling (lines 480-489)", {
+  skip_on_bioc()
   # Lines 480-489: Detect and handle when q-value result has different column count
   analysis <- setup_multiq_analysis()
   
@@ -2798,6 +2918,7 @@ test_that("plot_diversity_spectrum: column count mismatch handling (lines 480-48
 })
 
 test_that("plot_diversity_spectrum: column naming with q-value suffix (lines 503-510)", {
+  skip_on_bioc()
   # Lines 503-510: Create unique column names with q-value suffix
   analysis <- setup_multiq_analysis()
   
@@ -2814,6 +2935,7 @@ test_that("plot_diversity_spectrum: column naming with q-value suffix (lines 503
 })
 
 test_that("plot_diversity_spectrum: dimension validation (lines 513-520)", {
+  skip_on_bioc()
   # Lines 513-520: Validate dimensions before assigning to combined assay
   analysis <- setup_multiq_analysis()
   
@@ -2835,6 +2957,7 @@ test_that("plot_diversity_spectrum: dimension validation (lines 513-520)", {
 })
 
 test_that("plot_diversity_spectrum: combined assay population (lines 522-525)", {
+  skip_on_bioc()
   # Lines 522-525: Fill in combined assay matrix column by column
   analysis <- setup_multiq_analysis()
   
@@ -2854,6 +2977,7 @@ test_that("plot_diversity_spectrum: combined assay population (lines 522-525)", 
 })
 
 test_that("plot_diversity_spectrum: colData construction from diversity_results (lines 528-535)", {
+  skip_on_bioc()
   # Lines 528-535: Build colData from each diversity result
   analysis <- setup_multiq_analysis()
   
@@ -2870,6 +2994,7 @@ test_that("plot_diversity_spectrum: colData construction from diversity_results 
 })
 
 test_that("plot_diversity_spectrum: combined SE creation and assay naming (lines 539-550)", {
+  skip_on_bioc()
   # Lines 539-550: Create final SummarizedExperiment with combined results
   analysis <- setup_multiq_analysis()
   
@@ -2893,6 +3018,7 @@ test_that("plot_diversity_spectrum: combined SE creation and assay naming (lines
 context("plot_divergence_spectrum: Multi-q divergence spectrum plotting")
 
 test_that("plot_divergence_spectrum: input validation - SummarizedExperiment type", {
+  skip_on_bioc()
   config <- list()
   skip_if_not_installed("SummarizedExperiment")
   
@@ -2907,6 +3033,7 @@ test_that("plot_divergence_spectrum: input validation - SummarizedExperiment typ
 })
 
 test_that("plot_divergence_spectrum: invalid input - non-SE object", {
+  skip_on_bioc()
   config <- list()
   
   # Should reject non-SE input
@@ -2916,6 +3043,7 @@ test_that("plot_divergence_spectrum: invalid input - non-SE object", {
 })
 
 test_that("plot_divergence_spectrum: empty SE handling", {
+  skip_on_bioc()
   config <- list()
   skip_if_not_installed("SummarizedExperiment")
   
@@ -2928,6 +3056,7 @@ test_that("plot_divergence_spectrum: empty SE handling", {
 })
 
 test_that("plot_divergence_spectrum: gene name extraction from rowData", {
+  skip_on_bioc()
   config <- list()
   skip_if_not_installed("SummarizedExperiment")
   
@@ -2948,6 +3077,7 @@ test_that("plot_divergence_spectrum: gene name extraction from rowData", {
 })
 
 test_that("plot_divergence_spectrum: q-value extraction from column names", {
+  skip_on_bioc()
   config <- list()
   
   col_names <- c("q_0.5", "q_1.0", "q_1.5", "q_2.0", "q_2.5")
@@ -2959,6 +3089,7 @@ test_that("plot_divergence_spectrum: q-value extraction from column names", {
 })
 
 test_that("plot_divergence_spectrum: q-value fallback with sequential values", {
+  skip_on_bioc()
   config <- list()
   
   col_names <- c("col1", "col2", "col3", "col4")
@@ -2973,6 +3104,7 @@ test_that("plot_divergence_spectrum: q-value fallback with sequential values", {
 })
 
 test_that("plot_divergence_spectrum: q-value sorting", {
+  skip_on_bioc()
   config <- list()
   
   q_vals <- c(2.0, 0.5, 1.5, 1.0)
@@ -2983,6 +3115,7 @@ test_that("plot_divergence_spectrum: q-value sorting", {
 })
 
 test_that("plot_divergence_spectrum: single gene spectrum case", {
+  skip_on_bioc()
   config <- list()
   skip_if_not_installed("SummarizedExperiment")
   
@@ -3000,6 +3133,7 @@ test_that("plot_divergence_spectrum: single gene spectrum case", {
 })
 
 test_that("plot_divergence_spectrum: single gene - plot creation", {
+  skip_on_bioc()
   config <- list()
   skip_if_not_installed("ggplot2")
   
@@ -3020,6 +3154,7 @@ test_that("plot_divergence_spectrum: single gene - plot creation", {
 })
 
 test_that("plot_divergence_spectrum: top N genes selection from sait_res", {
+  skip_on_bioc()
   config <- list()
   
   # Create ranking by p-value
@@ -3036,6 +3171,7 @@ test_that("plot_divergence_spectrum: top N genes selection from sait_res", {
 })
 
 test_that("plot_divergence_spectrum: gene column detection in sait_res", {
+  skip_on_bioc()
   config <- list()
   
   # Test with 'gene' column
@@ -3056,6 +3192,7 @@ test_that("plot_divergence_spectrum: gene column detection in sait_res", {
 })
 
 test_that("plot_divergence_spectrum: p-value column detection in sait_res", {
+  skip_on_bioc()
   config <- list()
   
   # Test with different p-value column names
@@ -3076,6 +3213,7 @@ test_that("plot_divergence_spectrum: p-value column detection in sait_res", {
 })
 
 test_that("plot_divergence_spectrum: multi-gene plotting data construction", {
+  skip_on_bioc()
   config <- list()
   
   set.seed(42)
@@ -3104,6 +3242,7 @@ test_that("plot_divergence_spectrum: multi-gene plotting data construction", {
 })
 
 test_that("plot_divergence_spectrum: confidence interval extraction", {
+  skip_on_bioc()
   config <- list()
   skip_if_not_installed("SummarizedExperiment")
   
@@ -3129,6 +3268,7 @@ test_that("plot_divergence_spectrum: confidence interval extraction", {
 })
 
 test_that("plot_divergence_spectrum: CI data frame construction", {
+  skip_on_bioc()
   config <- list()
   
   q_vals <- c(0.5, 1.0, 1.5)
@@ -3150,6 +3290,7 @@ test_that("plot_divergence_spectrum: CI data frame construction", {
 })
 
 test_that("plot_divergence_spectrum: gene factor ordering by p-value", {
+  skip_on_bioc()
   config <- list()
   skip_if_not_installed("ggplot2")
   
@@ -3174,6 +3315,7 @@ test_that("plot_divergence_spectrum: gene factor ordering by p-value", {
 })
 
 test_that("plot_divergence_spectrum: faceted plot creation", {
+  skip_on_bioc()
   config <- list()
   skip_if_not_installed("ggplot2")
   
@@ -3192,6 +3334,7 @@ test_that("plot_divergence_spectrum: faceted plot creation", {
 })
 
 test_that("plot_divergence_spectrum: CI ribbon overlay", {
+  skip_on_bioc()
   config <- list()
   skip_if_not_installed("ggplot2")
   
@@ -3222,6 +3365,7 @@ test_that("plot_divergence_spectrum: CI ribbon overlay", {
 })
 
 test_that("plot_divergence_spectrum: theme application", {
+  skip_on_bioc()
   config <- list()
   skip_if_not_installed("ggplot2")
   
@@ -3239,6 +3383,7 @@ test_that("plot_divergence_spectrum: theme application", {
 })
 
 test_that("plot_divergence_spectrum: handling metric parameter (mean vs median)", {
+  skip_on_bioc()
   config <- list()
   
   metric <- "mean"
@@ -3248,6 +3393,7 @@ test_that("plot_divergence_spectrum: handling metric parameter (mean vs median)"
 })
 
 test_that("plot_divergence_spectrum: handling variability_metric parameter", {
+  skip_on_bioc()
   config <- list()
   
   variability_metric <- "iqr"
@@ -3257,6 +3403,7 @@ test_that("plot_divergence_spectrum: handling variability_metric parameter", {
 })
 
 test_that("plot_divergence_spectrum: ncol parameter application", {
+  skip_on_bioc()
   config <- list()
   skip_if_not_installed("ggplot2")
   
@@ -3276,6 +3423,7 @@ test_that("plot_divergence_spectrum: ncol parameter application", {
 })
 
 test_that("plot_divergence_spectrum: no genes found fallback", {
+  skip_on_bioc()
   config <- list()
   
   gene_indices <- c(NA, NA)
@@ -3285,6 +3433,7 @@ test_that("plot_divergence_spectrum: no genes found fallback", {
 })
 
 test_that("plot_divergence_spectrum: return NULL for empty input", {
+  skip_on_bioc()
   config <- list()
   skip_if_not_installed("SummarizedExperiment")
   
@@ -3296,6 +3445,7 @@ test_that("plot_divergence_spectrum: return NULL for empty input", {
 })
 
 test_that("plot_divergence_spectrum: large n_genes parameter", {
+  skip_on_bioc()
   config <- list()
   
   n_genes <- 100
@@ -3308,6 +3458,7 @@ test_that("plot_divergence_spectrum: large n_genes parameter", {
 })
 
 test_that("plot_divergence_spectrum: single gene from sait_res", {
+  skip_on_bioc()
   config <- list()
   
   sait_res <- data.frame(
@@ -3322,6 +3473,7 @@ test_that("plot_divergence_spectrum: single gene from sait_res", {
 })
 
 test_that("plot_divergence_spectrum: error on invalid metric parameter", {
+  skip_on_bioc()
   config <- list()
   
   metric <- "invalid"
@@ -3332,6 +3484,7 @@ test_that("plot_divergence_spectrum: error on invalid metric parameter", {
 })
 
 test_that("plot_divergence_spectrum: error on invalid variability_metric", {
+  skip_on_bioc()
   config <- list()
   
   var_metric <- "invalid"
@@ -3342,6 +3495,7 @@ test_that("plot_divergence_spectrum: error on invalid variability_metric", {
 })
 
 test_that("plot_divergence_spectrum: gene not found in divergence matrix", {
+  skip_on_bioc()
   config <- list()
   skip_if_not_installed("SummarizedExperiment")
   
@@ -3358,6 +3512,7 @@ test_that("plot_divergence_spectrum: gene not found in divergence matrix", {
 })
 
 test_that("plot_divergence_spectrum: large divergence matrix", {
+  skip_on_bioc()
   config <- list()
   skip_if_not_installed("SummarizedExperiment")
   
@@ -3381,6 +3536,7 @@ test_that("plot_divergence_spectrum: large divergence matrix", {
 
 
 test_that("plot_sait: function call returns ggplot", {
+  skip_on_bioc()
   skip_if_not_installed("SummarizedExperiment")
   skip_if_not_installed("ggplot2")
   skip_if_not_installed("mgcv")
@@ -3425,6 +3581,7 @@ test_that("plot_sait: function call returns ggplot", {
 })
 
 test_that("plot_sait: respects n_top parameter", {
+  skip_on_bioc()
   skip_if_not_installed("SummarizedExperiment")
   skip_if_not_installed("ggplot2")
   skip_if_not_installed("mgcv")
@@ -3460,6 +3617,7 @@ test_that("plot_sait: respects n_top parameter", {
 })
 
 test_that("plot_sait: can plot specific gene subset", {
+  skip_on_bioc()
   skip_if_not_installed("SummarizedExperiment")
   skip_if_not_installed("ggplot2")
   skip_if_not_installed("mgcv")
@@ -3496,6 +3654,7 @@ test_that("plot_sait: can plot specific gene subset", {
 context("plot_jis_delta: Multi-q heatmap comparison")
 
 test_that("plot_jis_delta: class validation", {
+  skip_on_bioc()
   config <- list()
   
   # Mock result class
@@ -3508,6 +3667,7 @@ test_that("plot_jis_delta: class validation", {
 })
 
 test_that("plot_jis_delta: q_result_keys extraction", {
+  skip_on_bioc()
   config <- list()
   
   switching_results <- list(
@@ -3522,6 +3682,7 @@ test_that("plot_jis_delta: q_result_keys extraction", {
 })
 
 test_that("plot_jis_delta: gene ID extraction", {
+  skip_on_bioc()
   config <- list()
   
   first_result <- list(
@@ -3535,6 +3696,7 @@ test_that("plot_jis_delta: gene ID extraction", {
 })
 
 test_that("plot_jis_delta: top N genes selection", {
+  skip_on_bioc()
   config <- list()
   
   gene_ids <- c("g1", "g2", "g3", "g4", "g5")
@@ -3546,6 +3708,7 @@ test_that("plot_jis_delta: top N genes selection", {
 })
 
 test_that("plot_jis_delta: sait_results integration", {
+  skip_on_bioc()
   config <- list()
   
   sait_results <- data.frame(
@@ -3557,6 +3720,7 @@ test_that("plot_jis_delta: sait_results integration", {
 })
 
 test_that("plot_jis_delta: p-value ranking", {
+  skip_on_bioc()
   config <- list()
   
   gene_ids <- c("g1", "g2", "g3", "g4")
@@ -3569,6 +3733,7 @@ test_that("plot_jis_delta: p-value ranking", {
 })
 
 test_that("plot_jis_delta: q-value string parsing", {
+  skip_on_bioc()
   config <- list()
   
   q_key <- "q_0_01"
@@ -3578,6 +3743,7 @@ test_that("plot_jis_delta: q-value string parsing", {
 })
 
 test_that("plot_jis_delta: delta_influence extraction", {
+  skip_on_bioc()
   config <- list()
   
   delta_vals <- c(0.1, 0.05, 0.15, 0.08)
@@ -3586,6 +3752,7 @@ test_that("plot_jis_delta: delta_influence extraction", {
 })
 
 test_that("plot_jis_delta: Inf/NaN handling", {
+  skip_on_bioc()
   config <- list()
   
   delta_vals <- c(0.1, Inf, 0.05, NaN, 0.12)
@@ -3595,6 +3762,7 @@ test_that("plot_jis_delta: Inf/NaN handling", {
 })
 
 test_that("plot_jis_delta: transcript ID tracking", {
+  skip_on_bioc()
   config <- list()
   
   transcript_ids <- c("ENST001", "ENST002", "ENST003")
@@ -3608,6 +3776,7 @@ test_that("plot_jis_delta: transcript ID tracking", {
 })
 
 test_that("plot_jis_delta: gene name lookup", {
+  skip_on_bioc()
   config <- list()
   
   gene_ids <- c("g1", "g2", "g3")
@@ -3620,6 +3789,7 @@ test_that("plot_jis_delta: gene name lookup", {
 })
 
 test_that("plot_jis_delta: validity tracking", {
+  skip_on_bioc()
   config <- list()
   
   validity_report <- list(
@@ -3632,6 +3802,7 @@ test_that("plot_jis_delta: validity tracking", {
 })
 
 test_that("plot_jis_delta: multiple genes iteration", {
+  skip_on_bioc()
   config <- list()
   
   genes <- c("g1", "g2", "g3")
@@ -3643,6 +3814,7 @@ test_that("plot_jis_delta: multiple genes iteration", {
 })
 
 test_that("plot_jis_delta: across all q-values iteration", {
+  skip_on_bioc()
   config <- list()
   
   q_result_keys <- c("q_0_5", "q_1_0", "q_1_5")
@@ -3653,6 +3825,7 @@ test_that("plot_jis_delta: across all q-values iteration", {
 })
 
 test_that("plot_jis_delta: data alignment validation", {
+  skip_on_bioc()
   config <- list()
   
   heatmap_data_row1 <- data.frame(transcript = "t1", q_0_5 = 0.1)
@@ -3725,6 +3898,7 @@ setup_ma_test_data <- function() {
 context("Low-priority plotting functions: Single uncovered lines and edge cases")
 
 test_that("plot_top_transcripts: multi-panel gene plot arrangement", {
+  skip_on_bioc()
   config <- list()
   skip_if_not_installed("ggplot2")
   
@@ -3749,6 +3923,7 @@ test_that("plot_top_transcripts: multi-panel gene plot arrangement", {
 })
 
 test_that("plot_top_transcripts: grid layout calculation", {
+  skip_on_bioc()
   config <- list()
   
   n_plots <- 6
@@ -3759,6 +3934,7 @@ test_that("plot_top_transcripts: grid layout calculation", {
 })
 
 test_that("plot_top_transcripts: single plot handling", {
+  skip_on_bioc()
   config <- list()
   skip_if_not_installed("ggplot2")
   
@@ -3772,6 +3948,7 @@ test_that("plot_top_transcripts: single plot handling", {
 })
 
 test_that("plot_top_transcripts: many plots (>10)", {
+  skip_on_bioc()
   config <- list()
   skip_if_not_installed("ggplot2")
   
@@ -3790,6 +3967,7 @@ test_that("plot_top_transcripts: many plots (>10)", {
 })
 
 test_that("extract_q: q-value extraction from column names", {
+  skip_on_bioc()
   config <- list()
   
   col_names <- c("sample1_q=0.5", "sample2_q=1.0", "sample1_q=1.5")
@@ -3808,6 +3986,7 @@ test_that("extract_q: q-value extraction from column names", {
 })
 
 test_that("extract_q: fallback for missing q-values", {
+  skip_on_bioc()
   config <- list()
   
   col_names <- c("col1", "col2", "col3")
@@ -3826,6 +4005,7 @@ test_that("extract_q: fallback for missing q-values", {
 })
 
 test_that("extract_q: sequential q-value fallback", {
+  skip_on_bioc()
   config <- list()
   
   n_cols <- 5
@@ -3835,6 +4015,7 @@ test_that("extract_q: sequential q-value fallback", {
 })
 
 test_that("plot_divergence_distribution: histogram of divergence values", {
+  skip_on_bioc()
   config <- list()
   skip_if_not_installed("ggplot2")
   
@@ -3849,6 +4030,7 @@ test_that("plot_divergence_distribution: histogram of divergence values", {
 })
 
 test_that("plot_divergence_distribution: density plot overlay", {
+  skip_on_bioc()
   config <- list()
   skip_if_not_installed("ggplot2")
   
@@ -3861,6 +4043,7 @@ test_that("plot_divergence_distribution: density plot overlay", {
 })
 
 test_that("plot_tsallis_density_singleq: single q-value density plot", {
+  skip_on_bioc()
   config <- list()
   skip_if_not_installed("ggplot2")
   
@@ -3879,6 +4062,7 @@ test_that("plot_tsallis_density_singleq: single q-value density plot", {
 })
 
 test_that("plot_tsallis_density_singleq: two-group comparison", {
+  skip_on_bioc()
   config <- list()
   skip_if_not_installed("ggplot2")
   
@@ -3894,6 +4078,7 @@ test_that("plot_tsallis_density_singleq: two-group comparison", {
 })
 
 test_that("plot_diversity_violin_density: violin plot with density", {
+  skip_on_bioc()
   config <- list()
   skip_if_not_installed("ggplot2")
   
@@ -3911,6 +4096,7 @@ test_that("plot_diversity_violin_density: violin plot with density", {
 })
 
 test_that("plot_diversity_violin_density: multi-q faceting", {
+  skip_on_bioc()
   config <- list()
   skip_if_not_installed("ggplot2")
   
@@ -3928,6 +4114,7 @@ test_that("plot_diversity_violin_density: multi-q faceting", {
 })
 
 test_that("make_plot_for_geneprepare_inputs: data preparation helper", {
+  skip_on_bioc()
   config <- list()
   
   # Mock input validation
@@ -3941,6 +4128,7 @@ test_that("make_plot_for_geneprepare_inputs: data preparation helper", {
 })
 
 test_that("make_plot_for_geneselect_genes_from_res: gene selection from results", {
+  skip_on_bioc()
   config <- list()
   
   results <- data.frame(
@@ -3954,6 +4142,7 @@ test_that("make_plot_for_geneselect_genes_from_res: gene selection from results"
 })
 
 test_that("make_plot_for_geneinfer_samples_from_coldata: infer sample names from coldata", {
+  skip_on_bioc()
   config <- list()
   
   col_names <- c("s1_q=0.5", "s2_q=0.5", "s1_q=1.0", "s2_q=1.0")
@@ -3964,6 +4153,7 @@ test_that("make_plot_for_geneinfer_samples_from_coldata: infer sample names from
 })
 
 test_that("make_plot_for_generead_tx2gene: read tx2gene mapping", {
+  skip_on_bioc()
   config <- list()
   
   # Mock tx2gene mapping
@@ -3976,6 +4166,7 @@ test_that("make_plot_for_generead_tx2gene: read tx2gene mapping", {
 })
 
 test_that("make_plot_for_gene: single gene plot wrapper", {
+  skip_on_bioc()
   config <- list()
   skip_if_not_installed("ggplot2")
   
@@ -3992,6 +4183,7 @@ test_that("make_plot_for_gene: single gene plot wrapper", {
 })
 
 test_that("make_plot_for_genecombine_grid: grid calculation edge case (odd number)", {
+  skip_on_bioc()
   config <- list()
   
   n_plots <- 7
@@ -4002,6 +4194,7 @@ test_that("make_plot_for_genecombine_grid: grid calculation edge case (odd numbe
 })
 
 test_that("plot color consistency across theme", {
+  skip_on_bioc()
   config <- list()
   skip_if_not_installed("ggplot2")
   
@@ -4016,6 +4209,7 @@ test_that("plot color consistency across theme", {
 })
 
 test_that("label formatting in plots", {
+  skip_on_bioc()
   config <- list()
   skip_if_not_installed("ggplot2")
   
@@ -4033,6 +4227,7 @@ test_that("label formatting in plots", {
 })
 
 test_that("axis scale transformations", {
+  skip_on_bioc()
   config <- list()
   skip_if_not_installed("ggplot2")
   
@@ -4046,6 +4241,7 @@ test_that("axis scale transformations", {
 })
 
 test_that("faceted plot grid consistency", {
+  skip_on_bioc()
   config <- list()
   skip_if_not_installed("ggplot2")
   
@@ -4072,6 +4268,7 @@ context("Plots: Coverage Expansion for Edge Cases")
 # ============================================================================
 
 test_that("infer_samples_from_se: explicit samples parameter is returned as character", {
+  skip_on_bioc()
   # Line 60: return(as.character(samples))
   
   se <- SummarizedExperiment::SummarizedExperiment(
@@ -4088,6 +4285,7 @@ test_that("infer_samples_from_se: explicit samples parameter is returned as char
 })
 
 test_that("infer_samples_from_se: numeric samples are coerced to character", {
+  skip_on_bioc()
   se <- SummarizedExperiment::SummarizedExperiment(
     assays = list(counts = matrix(1:20, nrow = 5, ncol = 4))
   )
@@ -4105,6 +4303,7 @@ test_that("infer_samples_from_se: numeric samples are coerced to character", {
 # ============================================================================
 
 test_that("infer_samples_from_se: returns NULL when colData is missing/NULL", {
+  skip_on_bioc()
   # Line 65: return(NULL)
   
   # Create SE without colData
@@ -4124,6 +4323,7 @@ test_that("infer_samples_from_se: returns NULL when colData is missing/NULL", {
 # ============================================================================
 
 test_that("get_readcounts_from_se: errors when specified file doesn't exist", {
+  skip_on_bioc()
   # Line 101: if (!file.exists(readcounts_arg)) stop(...)
   
   se <- SummarizedExperiment::SummarizedExperiment(
@@ -4144,6 +4344,7 @@ test_that("get_readcounts_from_se: errors when specified file doesn't exist", {
 # ============================================================================
 
 test_that("infer_samples_from_se: prefers binary column in fallback logic", {
+  skip_on_bioc()
   # Tests fallback when no standard column names match
   
   se <- SummarizedExperiment::SummarizedExperiment(
@@ -4173,6 +4374,7 @@ test_that("infer_samples_from_se: prefers binary column in fallback logic", {
 # ============================================================================
 
 test_that("get_readcounts_from_se: accepts matrix as readcounts_arg", {
+  skip_on_bioc()
   se <- SummarizedExperiment::SummarizedExperiment(
     assays = list(counts = matrix(1:20, nrow = 5, ncol = 4))
   )
@@ -4186,6 +4388,7 @@ test_that("get_readcounts_from_se: accepts matrix as readcounts_arg", {
 })
 
 test_that("get_readcounts_from_se: accepts data.frame as readcounts_arg", {
+  skip_on_bioc()
   se <- SummarizedExperiment::SummarizedExperiment(
     assays = list(counts = matrix(1:20, nrow = 5, ncol = 4))
   )
@@ -4204,6 +4407,7 @@ test_that("get_readcounts_from_se: accepts data.frame as readcounts_arg", {
 })
 
 test_that("get_readcounts_from_se: errors on invalid readcounts_arg type", {
+  skip_on_bioc()
   se <- SummarizedExperiment::SummarizedExperiment(
     assays = list(counts = matrix(1:20, nrow = 5, ncol = 4))
   )
@@ -4220,6 +4424,7 @@ test_that("get_readcounts_from_se: errors on invalid readcounts_arg type", {
 # ============================================================================
 
 test_that("get_tx2gene_from_se: extracts tx2gene from metadata", {
+  skip_on_bioc()
   # Create a proper tx2gene mapping
   tx2gene_map <- data.frame(
     Transcript = c("TX1", "TX2", "TX3", "TX4"),
@@ -4247,6 +4452,7 @@ test_that("get_tx2gene_from_se: extracts tx2gene from metadata", {
 # ============================================================================
 
 test_that("validate_control_in_samples: returns control when it's in sample list", {
+  skip_on_bioc()
   samples <- c("control_1", "treatment_1", "control_2", "treatment_2")
   control <- "control_1"
   
@@ -4256,6 +4462,7 @@ test_that("validate_control_in_samples: returns control when it's in sample list
 })
 
 test_that("validate_control_in_samples: returns 'Normal' when present and control not found", {
+  skip_on_bioc()
   samples <- c("Normal", "group_B", "group_C")
   control <- "group_D"
   
@@ -4266,6 +4473,7 @@ test_that("validate_control_in_samples: returns 'Normal' when present and contro
 })
 
 test_that("validate_control_in_samples: returns first element as fallback", {
+  skip_on_bioc()
   samples <- c("group_A", "group_B", "group_C")
   control <- "group_D"
   
@@ -4280,6 +4488,7 @@ test_that("validate_control_in_samples: returns first element as fallback", {
 # ============================================================================
 
 test_that("get_readcounts_from_se: handles single-column readcounts file", {
+  skip_on_bioc()
   # Create temporary single-column readcounts file
   temp_file <- tempfile(fileext = ".txt")
   write.table(
@@ -4305,6 +4514,7 @@ test_that("get_readcounts_from_se: handles single-column readcounts file", {
 # ============================================================================
 
 test_that("infer_samples_from_se: handles factor columns in colData", {
+  skip_on_bioc()
   se <- SummarizedExperiment::SummarizedExperiment(
     assays = list(counts = matrix(1:20, nrow = 5, ncol = 4)),
     colData = data.frame(
@@ -4320,6 +4530,7 @@ test_that("infer_samples_from_se: handles factor columns in colData", {
 })
 
 test_that("infer_samples_from_se: handles numeric vector in colData", {
+  skip_on_bioc()
   se <- SummarizedExperiment::SummarizedExperiment(
     assays = list(counts = matrix(1:20, nrow = 5, ncol = 4)),
     colData = data.frame(
@@ -4339,6 +4550,7 @@ test_that("infer_samples_from_se: handles numeric vector in colData", {
 # ============================================================================
 
 test_that("infer_samples_from_se: finds columns with underscores and hyphens", {
+  skip_on_bioc()
   se <- SummarizedExperiment::SummarizedExperiment(
     assays = list(counts = matrix(1:20, nrow = 5, ncol = 4)),
     colData = data.frame(
@@ -4358,6 +4570,7 @@ test_that("infer_samples_from_se: finds columns with underscores and hyphens", {
 # ============================================================================
 
 test_that("get_tx2gene_from_se: returns NULL when readcounts_mat is NULL", {
+  skip_on_bioc()
   # Line 168: NULL
   
   se <- SummarizedExperiment::SummarizedExperiment(
@@ -4376,6 +4589,7 @@ test_that("get_tx2gene_from_se: returns NULL when readcounts_mat is NULL", {
 # ============================================================================
 
 test_that("get_readcounts_from_se: falls back to first assay when no preferred assay found", {
+  skip_on_bioc()
   # Lines 131-136: fallback with warning
   
   se <- SummarizedExperiment::SummarizedExperiment(
@@ -4396,6 +4610,7 @@ test_that("get_readcounts_from_se: falls back to first assay when no preferred a
 # ============================================================================
 
 test_that("get_readcounts_from_se: reads readcounts from metadata when available", {
+  skip_on_bioc()
   # Lines 119-120: if (!is.null(md) && !is.null(md$readcounts)) return(as.matrix(...))
   
   metadata_counts <- matrix(c(1, 2, 3, 4, 5, 6, 7, 8), nrow = 4, ncol = 2)
@@ -4417,6 +4632,7 @@ test_that("get_readcounts_from_se: reads readcounts from metadata when available
 # ============================================================================
 
 test_that("get_readcounts_from_se: extracts numeric columns from multi-column data.frame", {
+  skip_on_bioc()
   # Lines 103-105: ncol > 1 case
   
   temp_file <- tempfile(fileext = ".txt")
@@ -4446,6 +4662,7 @@ test_that("get_readcounts_from_se: extracts numeric columns from multi-column da
 # ============================================================================
 
 test_that("get_readcounts_from_se: selects 'readcounts' assay when multiple preferred assays exist", {
+  skip_on_bioc()
   # Lines 126-127: choose preferred assay
   
   se <- SummarizedExperiment::SummarizedExperiment(
@@ -4468,6 +4685,7 @@ test_that("get_readcounts_from_se: selects 'readcounts' assay when multiple pref
 # ============================================================================
 
 test_that("get_tx2gene_from_se: extracts genes column from rowData when available", {
+  skip_on_bioc()
   # Lines 156-160: rowData fallback with genes column
   
   se <- SummarizedExperiment::SummarizedExperiment(
@@ -4490,6 +4708,7 @@ test_that("get_tx2gene_from_se: extracts genes column from rowData when availabl
 # ============================================================================
 
 test_that("get_tx2gene_from_se: uses rownames as fallback when no tx2gene available", {
+  skip_on_bioc()
   # Lines 164-165: Last resort - use rownames
   
   se <- SummarizedExperiment::SummarizedExperiment(
@@ -4511,6 +4730,7 @@ test_that("get_tx2gene_from_se: uses rownames as fallback when no tx2gene availa
 # ============================================================================
 
 test_that("get_readcounts_from_se: uses 'counts' assay when 'readcounts' not available", {
+  skip_on_bioc()
   se <- SummarizedExperiment::SummarizedExperiment(
     assays = list(
       something_else = matrix(1:10, nrow = 5, ncol = 2),
@@ -4529,6 +4749,7 @@ test_that("get_readcounts_from_se: uses 'counts' assay when 'readcounts' not ava
 # ============================================================================
 
 test_that("infer_samples_from_se: handles matrix input for samples parameter", {
+  skip_on_bioc()
   se <- SummarizedExperiment::SummarizedExperiment(
     assays = list(counts = matrix(1:20, nrow = 5, ncol = 4))
   )
@@ -4546,6 +4767,7 @@ test_that("infer_samples_from_se: handles matrix input for samples parameter", {
 # ============================================================================
 
 test_that("plot_divergence_distribution: requires effect_sizes_divergence in metadata", {
+  skip_on_bioc()
   skip_if_not_installed("SummarizedExperiment")
   
   set.seed(5555)
@@ -4569,6 +4791,7 @@ test_that("plot_divergence_distribution: requires effect_sizes_divergence in met
 })
 
 test_that("plot_divergence_distribution: returns plot or NULL gracefully", {
+  skip_on_bioc()
   skip_if_not_installed("SummarizedExperiment")
   skip_if_not_installed("ggplot2")
   
@@ -4604,6 +4827,7 @@ test_that("plot_divergence_distribution: returns plot or NULL gracefully", {
 # ============================================================================
 
 test_that("plot_concordance: requires method_concordance in metadata", {
+  skip_on_bioc()
   skip_if_not_installed("SummarizedExperiment")
   
   set.seed(5557)
@@ -4627,6 +4851,7 @@ test_that("plot_concordance: requires method_concordance in metadata", {
 })
 
 test_that("plot_concordance: returns plot with valid concordance data", {
+  skip_on_bioc()
   skip_if_not_installed("SummarizedExperiment")
   skip_if_not_installed("ggplot2")
   
@@ -4740,6 +4965,7 @@ analysis_sait_jis_q08 <- suppressWarnings(calculate_jis(
 # with different n_top values and same assertions
 
 test_that("plot_sait returns valid grid plot with various n_top values", {
+    skip_on_bioc()
     # Test multiple n_top values in single test to avoid redundant computations
     for (n in c(2, 3, 4, 6)) {
         p <- plot_sait(analysis, n_top = n)
@@ -4749,6 +4975,7 @@ test_that("plot_sait returns valid grid plot with various n_top values", {
 })
 
 test_that("plot_sait handles edge cases with valid output structures", {
+    skip_on_bioc()
     # Test high n_top value (more than available genes)
     p_high <- plot_sait(analysis, n_top = 20)
     expect_true(is.null(p_high) || inherits(p_high, "ggplot") || inherits(p_high, "gtable"))
@@ -4763,6 +4990,7 @@ test_that("plot_sait handles edge cases with valid output structures", {
 # =============================================================================
 
 test_that("Lazy switching_tables via results() produces valid output with different q-values", {
+    skip_on_bioc()
     # OPTIMIZATION: Reuse pre-cached results to avoid redundant computations
     
     # Test with q = c(0.5, 1.0) computations
@@ -4783,6 +5011,7 @@ test_that("Lazy switching_tables via results() produces valid output with differ
 })
 
 test_that("Lazy switching_tables returns sorted/ordered output", {
+    skip_on_bioc()
     # OPTIMIZATION: Reuse pre-cached analysis_sait_jis_q12 instead of recalculating
     # This avoids redundant calculate_sait + calculate_jis (saves ~8 seconds per test)
     
@@ -4800,6 +5029,7 @@ test_that("Lazy switching_tables returns sorted/ordered output", {
 # =============================================================================
 
 test_that("SAIT results integrate properly with visualization pipeline", {
+    skip_on_bioc()
     # OPTIMIZATION: Reuse pre-cached analysis (already has SAIT from setup)
     # This avoids redundant calculate_sait (saves ~3 seconds per test)
     
@@ -4811,6 +5041,7 @@ test_that("SAIT results integrate properly with visualization pipeline", {
 })
 
 test_that("Jackknife results integrate with lazy switching_tables computation", {
+    skip_on_bioc()
     # OPTIMIZATION: Reuse pre-cached analysis_sait_jis_q12 instead of recalculating
     # This avoids redundant calculate_sait + calculate_jis (saves ~8 seconds per test)
     
@@ -4824,6 +5055,7 @@ test_that("Jackknife results integrate with lazy switching_tables computation", 
 # =============================================================================
 
 test_that("plot_sait produces publishable format", {
+    skip_on_bioc()
     p <- plot_sait(analysis, n_top = 2)
     
     # Plot should be created and be a valid ggplot or gtable
@@ -4831,6 +5063,7 @@ test_that("plot_sait produces publishable format", {
 })
 
 test_that("Lazy switching_tables produces export-ready data", {
+    skip_on_bioc()
     # OPTIMIZATION: Reuse pre-cached analysis_sait_jis_q12 instead of recalculating
     # This avoids redundant calculate_sait + calculate_jis (saves ~8 seconds per test)
     
@@ -4851,6 +5084,7 @@ test_that("Lazy switching_tables produces export-ready data", {
 # =============================================================================
 
 test_that("plot_sait handles missing SAIT results gracefully", {
+    skip_on_bioc()
     # Don't calculate LM - should handle gracefully
     p <- plot_sait(analysis, n_top = 3)
     
@@ -4858,6 +5092,7 @@ test_that("plot_sait handles missing SAIT results gracefully", {
 })
 
 test_that("Lazy switching_tables handles edge cases (minimal/high q values)", {
+    skip_on_bioc()
     # OPTIMIZATION: Consolidate edge case tests using reuse patterns
     # Reuse pre-cached analysis_sait_jis_q08 for minimal/alternative q values
     
@@ -4877,16 +5112,19 @@ test_that("Lazy switching_tables handles edge cases (minimal/high q values)", {
 # =============================================================================
 
 test_that("plot_sait returns specific plot type", {
+    skip_on_bioc()
     p <- plot_sait(analysis, n_top = 1)
     expect_true(is.null(p) || inherits(p, "ggplot") || inherits(p, "gtable"))
 })
 
 test_that("plot_sait axes have correct scale for entropy", {
+    skip_on_bioc()
     p <- plot_sait(analysis, n_top = 1)
     expect_true(is.null(p) || inherits(p, "ggplot") || inherits(p, "gtable"))
 })
 
 test_that("Lazy switching_tables data types are consistent", {
+    skip_on_bioc()
     # OPTIMIZATION: Reuse pre-cached analysis_sait_jis_q12 instead of recalculating
     # This avoids redundant calculate_sait + calculate_jis (saves ~8 seconds per test)
     

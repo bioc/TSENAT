@@ -8,6 +8,10 @@
 # - C++11 standard and beyond
 # - Portable make syntax (no GNU extensions)
 
+# Filter out non-portable compiler flags that may come from the environment
+# -Werror=format-security is system-specific and non-portable
+PKG_CXXFLAGS = $(filter-out -Werror=format-security,$(PKG_CXXFLAGS))
+
 # Handle coverage mode (set by covr::package_coverage)
 # Use portable $(if ...) instead of ifdef/else/endif
 # Note: Use PKG_CXXFLAGS instead of CXXFLAGS to avoid overriding user/site settings

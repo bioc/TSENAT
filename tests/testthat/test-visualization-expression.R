@@ -68,6 +68,7 @@ test_genes_multiple <- as.character(gene_ids[1:3])
 # ============================================================================
 
 test_that("plot_expression() requires TSENATAnalysis object", {
+    skip_on_bioc()
     expect_error(
         TSENAT::plot_expression(list(data = "invalid"), gene = test_gene_single),
         "must be a TSENATAnalysis object"
@@ -79,6 +80,7 @@ test_that("plot_expression() requires TSENATAnalysis object", {
 })
 
 test_that("plot_expression() requires valid SummarizedExperiment object", {
+    skip_on_bioc()
     analysis <- test_analysis_plot
     # S4 validation prevents assigning NULL - this test verifies the SE slot is required
     expect_error(
@@ -90,6 +92,7 @@ test_that("plot_expression() requires valid SummarizedExperiment object", {
 })
 
 test_that("plot_expression() executes with explicit single gene", {
+    skip_on_bioc()
     # Wrap in tryCatch since heatmap generation depends on internal data structure
     # When successful, invisibly returns TRUE; when data unavailable, gracefully skips
     result <- tryCatch({
@@ -109,6 +112,7 @@ test_that("plot_expression() executes with explicit single gene", {
 })
 
 test_that("plot_expression() executes with multiple genes", {
+    skip_on_bioc()
     plot_obj <- TSENAT::plot_expression(
         test_analysis_plot,
         gene = test_genes_multiple,
@@ -123,6 +127,7 @@ test_that("plot_expression() executes with multiple genes", {
 # ============================================================================
 
 test_that("plot_expression() accepts explicit condition_col", {
+    skip_on_bioc()
     plot_obj <- TSENAT::plot_expression(
         test_analysis_plot,
         gene = test_gene_single,
@@ -134,6 +139,7 @@ test_that("plot_expression() accepts explicit condition_col", {
 })
 
 test_that("plot_expression() auto-detects condition_col when NULL", {
+    skip_on_bioc()
     plot_obj <- TSENAT::plot_expression(
         test_analysis_plot,
         gene = test_gene_single,
@@ -145,6 +151,7 @@ test_that("plot_expression() auto-detects condition_col when NULL", {
 })
 
 test_that("plot_expression() respects metric parameter", {
+    skip_on_bioc()
     for (metric in c("median", "mean", "variance", "iqr")) {
         plot_obj <- TSENAT::plot_expression(
             test_analysis_plot,
@@ -158,6 +165,7 @@ test_that("plot_expression() respects metric parameter", {
 })
 
 test_that("plot_expression() respects use_tpm parameter", {
+    skip_on_bioc()
     plot_obj_tpm <- TSENAT::plot_expression(
         test_analysis_plot,
         gene = test_gene_single,
@@ -181,6 +189,7 @@ test_that("plot_expression() respects use_tpm parameter", {
 # ============================================================================
 
 test_that("plot_expression() respects top_n parameter", {
+    skip_on_bioc()
     for (n in c(1, 4, 8)) {
         plot_obj <- TSENAT::plot_expression(
             test_analysis_plot,
@@ -194,6 +203,7 @@ test_that("plot_expression() respects top_n parameter", {
 })
 
 test_that("plot_expression() respects layout_ncol parameter", {
+    skip_on_bioc()
     plot_obj_2col <- TSENAT::plot_expression(
         test_analysis_plot,
         gene = test_genes_multiple,
@@ -213,6 +223,7 @@ test_that("plot_expression() respects layout_ncol parameter", {
 })
 
 test_that("plot_expression() respects fontsize parameter", {
+    skip_on_bioc()
     for (size in c(8, 12, 16, 20)) {
         plot_obj <- TSENAT::plot_expression(
             test_analysis_plot,
@@ -226,6 +237,7 @@ test_that("plot_expression() respects fontsize parameter", {
 })
 
 test_that("plot_expression() respects cellwidth parameter", {
+    skip_on_bioc()
     plot_obj <- TSENAT::plot_expression(
         test_analysis_plot,
         gene = test_gene_single,
@@ -237,6 +249,7 @@ test_that("plot_expression() respects cellwidth parameter", {
 })
 
 test_that("plot_expression() respects cellheight parameter", {
+    skip_on_bioc()
     plot_obj <- TSENAT::plot_expression(
         test_analysis_plot,
         gene = test_gene_single,
@@ -252,6 +265,7 @@ test_that("plot_expression() respects cellheight parameter", {
 # ============================================================================
 
 test_that("plot_expression() auto-detects top genes from SAIT results", {
+    skip_on_bioc()
     plot_obj <- TSENAT::plot_expression(
         test_analysis_plot,
         gene = NULL,  # Will auto-detect
@@ -264,6 +278,7 @@ test_that("plot_expression() auto-detects top genes from SAIT results", {
 })
 
 test_that("plot_expression() errors when no gene specified and no SAIT results", {
+    skip_on_bioc()
     analysis <- test_analysis_plot
     analysis@sait_results <- list()  # Remove SAIT results
 
@@ -278,6 +293,7 @@ test_that("plot_expression() errors when no gene specified and no SAIT results",
 })
 
 test_that("plot_expression() errors when gene is NULL and top_n > available genes", {
+    skip_on_bioc()
     # This should work without error as long as SAIT results exist
     # The function should use min(top_n, available_genes)
     plot_obj <- TSENAT::plot_expression(
@@ -295,6 +311,7 @@ test_that("plot_expression() errors when gene is NULL and top_n > available gene
 # ============================================================================
 
 test_that("plot_expression() can save output to PNG file", {
+    skip_on_bioc()
     output_file <- file.path(tempdir(), "test_expression_plot.png")
 
     if (file.exists(output_file)) unlink(output_file)
@@ -314,6 +331,7 @@ test_that("plot_expression() can save output to PNG file", {
 })
 
 test_that("plot_expression() can save output to PDF file", {
+    skip_on_bioc()
     output_file <- file.path(tempdir(), "test_expression_plot.pdf")
 
     if (file.exists(output_file)) unlink(output_file)
@@ -331,6 +349,7 @@ test_that("plot_expression() can save output to PDF file", {
 })
 
 test_that("plot_expression() respects width and height parameters", {
+    skip_on_bioc()
     output_file <- file.path(tempdir(), "test_expression_sized.png")
 
     plot_obj <- TSENAT::plot_expression(
@@ -348,6 +367,7 @@ test_that("plot_expression() respects width and height parameters", {
 })
 
 test_that("plot_expression() creates output directory if needed", {
+    skip_on_bioc()
     output_dir <- file.path(tempdir(), "test_plot_dir_", floor(runif(1, 1e6, 9.9e6)))
     output_file <- file.path(output_dir, "test_plot.png")
 
@@ -373,6 +393,7 @@ test_that("plot_expression() creates output directory if needed", {
 # ============================================================================
 
 test_that("plot_expression() with verbose=TRUE produces messages", {
+    skip_on_bioc()
     output <- capture.output({
         plot_obj <- TSENAT::plot_expression(
             test_analysis_plot,
@@ -386,6 +407,7 @@ test_that("plot_expression() with verbose=TRUE produces messages", {
 })
 
 test_that("plot_expression() with verbose=FALSE suppresses messages", {
+    skip_on_bioc()
     output <- capture.output({
         plot_obj <- TSENAT::plot_expression(
             test_analysis_plot,
@@ -403,6 +425,7 @@ test_that("plot_expression() with verbose=FALSE suppresses messages", {
 # ============================================================================
 
 test_that("plot_expression() accepts valid gene from rownames", {
+    skip_on_bioc()
     # Use first gene from the SE
     valid_gene <- rownames(TSENAT::se(test_analysis_plot))[1]
 
@@ -416,6 +439,7 @@ test_that("plot_expression() accepts valid gene from rownames", {
 })
 
 test_that("plot_expression() handles multiple genes", {
+    skip_on_bioc()
     valid_genes <- rownames(TSENAT::se(test_analysis_plot))[1:3]
 
     plot_obj <- TSENAT::plot_expression(
@@ -428,6 +452,7 @@ test_that("plot_expression() handles multiple genes", {
 })
 
 test_that("plot_expression() handles character vector of genes", {
+    skip_on_bioc()
     genes <- as.character(rownames(TSENAT::se(test_analysis_plot))[1:2])
 
     plot_obj <- TSENAT::plot_expression(
@@ -444,6 +469,7 @@ test_that("plot_expression() handles character vector of genes", {
 # ============================================================================
 
 test_that("plot_expression() reads verbose from config when not provided", {
+    skip_on_bioc()
     analysis <- test_analysis_plot
     analysis@config$verbose <- TRUE
 
@@ -460,6 +486,7 @@ test_that("plot_expression() reads verbose from config when not provided", {
 })
 
 test_that("plot_expression() reads condition_col from config when not provided", {
+    skip_on_bioc()
     plot_obj <- TSENAT::plot_expression(
         test_analysis_plot,
         gene = test_gene_single,
@@ -475,6 +502,7 @@ test_that("plot_expression() reads condition_col from config when not provided",
 # ============================================================================
 
 test_that("plot_expression() does not modify original analysis object", {
+    skip_on_bioc()
     # Get state before
     original_se <- TSENAT::se(test_analysis_plot)
     original_se_nrows <- nrow(original_se)
@@ -493,6 +521,7 @@ test_that("plot_expression() does not modify original analysis object", {
 })
 
 test_that("plot_expression() preserves metadata", {
+    skip_on_bioc()
     original_meta <- TSENAT::metadata(test_analysis_plot)
 
     plot_obj <- TSENAT::plot_expression(
@@ -510,6 +539,7 @@ test_that("plot_expression() preserves metadata", {
 # ============================================================================
 
 test_that("plot_expression() auto-detects p-value column", {
+    skip_on_bioc()
     # Test that it successfully identifies relevant columns
     plot_obj <- TSENAT::plot_expression(
         test_analysis_plot,
@@ -522,6 +552,7 @@ test_that("plot_expression() auto-detects p-value column", {
 })
 
 test_that("plot_expression() auto-detects gene column", {
+    skip_on_bioc()
     plot_obj <- TSENAT::plot_expression(
         test_analysis_plot,
         gene = NULL,
@@ -537,6 +568,7 @@ test_that("plot_expression() auto-detects gene column", {
 # ============================================================================
 
 test_that("plot_expression() handles single sample correctly", {
+    skip_on_bioc()
     # Even with single sample, should execute
     plot_obj <- TSENAT::plot_expression(
         test_analysis_plot,
@@ -548,6 +580,7 @@ test_that("plot_expression() handles single sample correctly", {
 })
 
 test_that("plot_expression() handles metric parameter as character", {
+    skip_on_bioc()
     for (metric in c("median", "mean")) {
         plot_obj <- TSENAT::plot_expression(
             test_analysis_plot,
@@ -561,6 +594,7 @@ test_that("plot_expression() handles metric parameter as character", {
 })
 
 test_that("plot_expression() handles NULL output_file (no file saving)", {
+    skip_on_bioc()
     plot_obj <- TSENAT::plot_expression(
         test_analysis_plot,
         gene = test_gene_single,

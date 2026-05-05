@@ -400,7 +400,7 @@
         # Use parallel::mclapply for distributed computation mc.cores limits to
         # nthreads; automatically falls back to serial on Windows
         perm_minima <- unlist(parallel::mclapply(X = seq_len(wy_randomizations),
-            FUN = compute_permutation, mc.cores = min(nthreads, parallel::detectCores()),
+            FUN = compute_permutation, mc.cores = .get_effective_nthreads(nthreads),
             mc.preschedule = TRUE, mc.set.seed = TRUE))
 
     } else {
@@ -526,7 +526,7 @@
         # Use parallel::mclapply for distributed computation FIXED: Collect as
         # list of vectors (one per permutation), not just minima
         perm_stats_list <- parallel::mclapply(X = seq_len(wy_randomizations), FUN = compute_permutation,
-            mc.cores = min(nthreads, parallel::detectCores()), mc.preschedule = TRUE,
+            mc.cores = .get_effective_nthreads(nthreads), mc.preschedule = TRUE,
             mc.set.seed = TRUE)
 
         # Convert list of vectors to matrix (genes × permutations)
