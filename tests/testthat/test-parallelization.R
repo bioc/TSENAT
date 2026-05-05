@@ -1090,14 +1090,14 @@ test_that("nthreads parameter is properly validated", {
   expect_is(result, "TSENATAnalysis")
   expect_is(result@divergence_results$divergence_se, "SummarizedExperiment")
   
-  # Test with huge number (should be clamped by OS/BiocParallel)
+  # Test with huge number (should be silently clamped by .get_effective_nthreads())
+  # After the parallelization fix, threads are clamped before BiocParallel, so no warning
   analysis <- create_test_analysis()
-  result <- expect_warning(
+  result <- expect_silent(
     silent_calculate_divergence(
       analysis,
       nthreads = 999
-    ),
-    "worker number limited"  # BiocParallel warns when limiting workers
+    )
   )
   expect_is(result, "TSENATAnalysis")
   expect_is(result@divergence_results$divergence_se, "SummarizedExperiment")

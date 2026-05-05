@@ -39,7 +39,7 @@ test_that(".get_palette_colors handles invalid palette gracefully", {
 
 test_that(".apply_aesthetics_colors preserves plot class", {
     # Pure function test - should not modify plot class
-    skip_if_not_installed("ggplot2")
+    
     
     p <- ggplot2::ggplot(mtcars, ggplot2::aes(x = mpg, y = cyl))
     colors <- c("#FF0000", "#0000FF")
@@ -51,7 +51,7 @@ test_that(".apply_aesthetics_colors preserves plot class", {
 
 test_that(".apply_aesthetics_colors applies color and fill scales", {
     # Verify that both color and fill scales are applied
-    skip_if_not_installed("ggplot2")
+    
     
     p <- ggplot2::ggplot(mtcars, ggplot2::aes(x = mpg, y = cyl, color = factor(cyl)))
     colors <- c("#FF0000", "#0000FF", "#00FF00")  # 3 colors for 3 levels of cyl
@@ -67,7 +67,7 @@ test_that(".apply_aesthetics_colors applies color and fill scales", {
 
 test_that(".apply_aesthetics_colors respects direction parameter", {
     # Test direction reversal
-    skip_if_not_installed("ggplot2")
+    
     
     p <- ggplot2::ggplot(mtcars, ggplot2::aes(x = mpg, y = cyl))
     colors <- c("#FF0000", "#00FF00", "#0000FF")
@@ -82,7 +82,7 @@ test_that(".apply_aesthetics_colors respects direction parameter", {
 
 test_that(".apply_aesthetics_colors sets legend position", {
     # Test legend positioning
-    skip_if_not_installed("ggplot2")
+    
     
     p <- ggplot2::ggplot(mtcars, ggplot2::aes(x = mpg, y = cyl))
     colors <- c("#FF0000", "#0000FF")
@@ -94,7 +94,7 @@ test_that(".apply_aesthetics_colors sets legend position", {
 
 test_that(".apply_aesthetics_colors works with custom legend name", {
     # Test legend naming
-    skip_if_not_installed("ggplot2")
+    
     
     p <- ggplot2::ggplot(mtcars, ggplot2::aes(x = mpg, y = cyl, color = factor(vs)))
     colors <- c("#FF0000", "#0000FF")
@@ -106,7 +106,7 @@ test_that(".apply_aesthetics_colors works with custom legend name", {
 
 test_that(".apply_group_aesthetics integrates palette lookup and application", {
     # Integration test: full pipeline
-    skip_if_not_installed("ggplot2")
+    
     
     p <- ggplot2::ggplot(mtcars, ggplot2::aes(x = mpg, y = cyl, color = factor(vs)))
     
@@ -122,7 +122,7 @@ test_that(".apply_group_aesthetics integrates palette lookup and application", {
 
 test_that(".apply_group_aesthetics works with all calling contexts", {
     # Verify that the 9 callers still work correctly
-    skip_if_not_installed("ggplot2")
+    
     
     p <- ggplot2::ggplot(mtcars, ggplot2::aes(x = mpg, y = cyl))
     
@@ -163,7 +163,7 @@ test_that(".validate_sait_method_dependencies validates FPCA", {
 # =============================================================================
 
 test_that(".validate_sait_data_structure checks condition_col in colData", {
-    skip_if_not_installed("SummarizedExperiment")
+    
     
     # Create minimal SummarizedExperiment
     mat <- matrix(1:20, nrow = 5, ncol = 4)
@@ -177,7 +177,7 @@ test_that(".validate_sait_data_structure checks condition_col in colData", {
 })
 
 test_that(".validate_sait_data_structure checks assay exists", {
-    skip_if_not_installed("SummarizedExperiment")
+    
     
     mat <- matrix(1:20, nrow = 5, ncol = 4)
     coldata <- data.frame(condition = rep(c("A", "B"), 2))
@@ -194,7 +194,7 @@ test_that(".validate_sait_data_structure checks assay exists", {
 })
 
 test_that(".validate_sait_data_structure passes with valid structure", {
-    skip_if_not_installed("SummarizedExperiment")
+    
     
     mat <- matrix(1:20, nrow = 5, ncol = 4)
     coldata <- data.frame(condition = rep(c("A", "B"), 2))
@@ -265,7 +265,7 @@ test_that(".postprocess_sait_results returns data.frame by default", {
 })
 
 test_that(".postprocess_sait_results returns list with model_data when requested", {
-    skip_if_not_installed("SummarizedExperiment")
+    
     
     res <- data.frame(
         gene_id = c("ENSG001", "ENSG002"),
@@ -290,7 +290,7 @@ test_that(".postprocess_sait_results returns list with model_data when requested
 
 test_that("Extracted functions maintain backward compatibility with .calculate_sait", {
     # Verify that the new helper functions work in the actual calling context
-    skip_if_not_installed("SummarizedExperiment")
+    
     
     # Test that validation functions work
     mat <- matrix(1:20, nrow = 5, ncol = 4)
@@ -312,7 +312,7 @@ test_that("Extracted functions maintain backward compatibility with .calculate_s
 test_that(".apply_group_aesthetics is reliable for 9+ calling contexts", {
     # This function has 9 callers across plotting code
     # Test that it handles edge cases robustly
-    skip_if_not_installed("ggplot2")
+    
     
     p <- ggplot2::ggplot(mtcars, ggplot2::aes(x = mpg, y = cyl))
     
@@ -346,7 +346,7 @@ test_that(".get_palette_colors has no side effects", {
 
 test_that(".apply_aesthetics_colors doesn't modify input plot", {
     # Pure functions should not modify arguments
-    skip_if_not_installed("ggplot2")
+    
     
     p <- ggplot2::ggplot(mtcars, ggplot2::aes(x = mpg, y = cyl))
     p_original <- p  # Reference to original
@@ -472,7 +472,7 @@ test_that("auto_detect_column sends verbose messages", {
 
 
 test_that("save_analysis_output saves data.frame to CSV", {
-    skip_on_cran()
+    
     
     # Create temporary file
     temp_file <- tempfile(fileext = ".csv")
@@ -499,7 +499,7 @@ test_that("save_analysis_output saves data.frame to CSV", {
 })
 
 test_that("save_analysis_output saves data.frame to TSV", {
-    skip_on_cran()
+    
     
     temp_file <- tempfile(fileext = ".tsv")
     on.exit(unlink(temp_file), add = TRUE)
@@ -517,7 +517,7 @@ test_that("save_analysis_output saves data.frame to TSV", {
 })
 
 test_that("save_analysis_output saves object to RDS", {
-    skip_on_cran()
+    
     
     temp_file <- tempfile(fileext = ".rds")
     on.exit(unlink(temp_file), add = TRUE)
@@ -539,7 +539,7 @@ test_that("save_analysis_output saves object to RDS", {
 })
 
 test_that("save_analysis_output creates directory if create_dir=TRUE", {
-    skip_on_cran()
+    
     
     temp_dir <- file.path(tempdir(), "test_output_dir_new", "subdir")
     on.exit(unlink(file.path(tempdir(), "test_output_dir_new"), recursive = TRUE), add = TRUE)
@@ -573,7 +573,7 @@ test_that("save_analysis_output returns FALSE for NULL output_file", {
 })
 
 test_that("save_analysis_output converts matrix to data.frame and saves", {
-    skip_on_cran()
+    
     
     temp_file <- tempfile(fileext = ".tsv")
     on.exit(unlink(temp_file), add = TRUE)
@@ -591,7 +591,7 @@ test_that("save_analysis_output converts matrix to data.frame and saves", {
 })
 
 test_that("save_analysis_output handles unknown format with RDS fallback", {
-    skip_on_cran()
+    
     
     temp_file <- tempfile(fileext = ".unknown")
     on.exit(unlink(temp_file), add = TRUE)

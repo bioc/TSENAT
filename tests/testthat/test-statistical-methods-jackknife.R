@@ -836,8 +836,12 @@ test_that(".get_nthreads_auto_detect respects explicit nthreads=1", {
 })
 
 test_that(".get_nthreads_auto_detect respects explicit nthreads > 1", {
+  # Respect environment variable limits (e.g., _R_CHECK_LIMIT_CORES_)
+  core_limit <- suppressWarnings(as.integer(Sys.getenv("_R_CHECK_LIMIT_CORES_", NA)))
+  expected <- if (is.na(core_limit)) 4 else min(4, core_limit)
+  
   result <- TSENAT:::.get_nthreads_auto_detect(nthreads = 4)
-  expect_equal(result, 4)
+  expect_equal(result, expected)
 })
 
 test_that(".get_nthreads_auto_detect auto-detects cores when NULL", {
