@@ -90,7 +90,7 @@ config <- TSENAT_config(
   subject_col = 'paired_samples',
   paired = TRUE,
   control = 'normal',
-  q = seq(0, 2, by = 0.5)  # Multiple q-values for SAIT interaction analysis (5 unique: 0, 0.5, 1, 1.5, 2)
+  q = seq(0, 2, by = 0.5)  # Multiple q-values for SAIT (5 unique values)
 )
 analysis <- build_analysis(readcounts = readcounts, tx2gene =
 gff3_dataset, metadata = metadata_df, config = config,
