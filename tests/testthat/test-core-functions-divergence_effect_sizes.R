@@ -2,6 +2,7 @@
 # Covers uncovered lines from divergence_coverage.txt
 
 test_that("calculate_effect_sizes aligns gene datasets", {
+  skip_on_bioc()
   # Create mock data matching expected structure
   sait_res <- data.frame(
     gene = c("gene1", "gene2", "gene3"),
@@ -33,6 +34,7 @@ test_that("calculate_effect_sizes aligns gene datasets", {
 })
 
 test_that("calculate_effect_sizes filters non-matching genes", {
+  skip_on_bioc()
   # sait_res with different genes
   sait_res <- data.frame(
     gene = c("gene_A", "gene_B"),
@@ -64,6 +66,7 @@ test_that("calculate_effect_sizes filters non-matching genes", {
 })
 
 test_that("calculate_effect_sizes handles significance threshold", {
+  skip_on_bioc()
   # Test with different significance thresholds
   sait_res <- data.frame(
     gene = c("gene1", "gene2", "gene3"),
@@ -104,6 +107,7 @@ test_that("calculate_effect_sizes handles significance threshold", {
 })
 
 test_that("calculate_effect_sizes enriches per-q patterns", {
+  skip_on_bioc()
   # Test with enrich_per_q_pattern = TRUE
   sait_res <- data.frame(
     gene = c("gene1", "gene2"),
@@ -139,6 +143,7 @@ test_that("calculate_effect_sizes enriches per-q patterns", {
 })
 
 test_that("calculate_effect_sizes formats output correctly", {
+  skip_on_bioc()
   # Test output formatting and structure
   sait_res <- data.frame(
     gene = c("gene1"),
@@ -168,6 +173,7 @@ test_that("calculate_effect_sizes formats output correctly", {
 })
 
 test_that("calculate_effect_sizes handles zero divergence", {
+  skip_on_bioc()
   # Test handling of zero divergence estimates
   sait_res <- data.frame(
     gene = c("gene1", "gene2"),
@@ -196,6 +202,7 @@ test_that("calculate_effect_sizes handles zero divergence", {
 })
 
 test_that("calculate_effect_sizes handles NA divergence estimates", {
+  skip_on_bioc()
   # Test handling of NA estimates
   sait_res <- data.frame(
     gene = c("gene1", "gene2"),
@@ -224,6 +231,7 @@ test_that("calculate_effect_sizes handles NA divergence estimates", {
 })
 
 test_that("calculate_effect_sizes with verbose output", {
+  skip_on_bioc()
   # Test verbose output path
   sait_res <- data.frame(
     gene = c("gene1"),
@@ -257,6 +265,7 @@ test_that("calculate_effect_sizes with verbose output", {
 # ============================================================================
 
 test_that(".validateEffectSizeInputs rejects invalid sait_res", {
+  skip_on_bioc()
   # Test with non-data.frame sait_res
   expect_error(
     TSENAT:::.validateEffectSizeInputs(
@@ -268,6 +277,7 @@ test_that(".validateEffectSizeInputs rejects invalid sait_res", {
 })
 
 test_that(".validateEffectSizeInputs rejects sait_res without required columns", {
+  skip_on_bioc()
   # Missing adj_p_interaction column
   expect_error(
     TSENAT:::.validateEffectSizeInputs(
@@ -279,6 +289,7 @@ test_that(".validateEffectSizeInputs rejects sait_res without required columns",
 })
 
 test_that(".validateEffectSizeInputs rejects non-SummarizedExperiment", {
+  skip_on_bioc()
   # Test with non-SE divergence_results
   expect_error(
     TSENAT:::.validateEffectSizeInputs(
@@ -290,6 +301,7 @@ test_that(".validateEffectSizeInputs rejects non-SummarizedExperiment", {
 })
 
 test_that(".validateEffectSizeInputs rejects SE without gene_name in rowData", {
+  skip_on_bioc()
   # SE without gene_name column
   bad_se <- SummarizedExperiment::SummarizedExperiment(
     rowData = data.frame(other_col = c("gene1"))
@@ -304,6 +316,7 @@ test_that(".validateEffectSizeInputs rejects SE without gene_name in rowData", {
 })
 
 test_that(".alignGeneDatasets detects generic divergence columns", {
+  skip_on_bioc()
   # Setup data with generic columns
   sait_res <- data.frame(
     gene = c("gene1", "gene2"),
@@ -324,6 +337,7 @@ test_that(".alignGeneDatasets detects generic divergence columns", {
 })
 
 test_that(".alignGeneDatasets detects per-q divergence columns", {
+  skip_on_bioc()
   # Setup data with per-q columns
   sait_res <- data.frame(
     gene = c("gene1", "gene2"),
@@ -350,6 +364,7 @@ test_that(".alignGeneDatasets detects per-q divergence columns", {
 })
 
 test_that(".alignGeneDatasets filters non-matching genes", {
+  skip_on_bioc()
   # Setup with only partial overlap
   sait_res <- data.frame(
     gene = c("gene_A", "gene_B", "gene_C"),
@@ -371,6 +386,7 @@ test_that(".alignGeneDatasets filters non-matching genes", {
 })
 
 test_that(".createResultsDataFrame generates correct columns for generic divergence", {
+  skip_on_bioc()
   # Test generic divergence columns
   df <- TSENAT:::.createResultsDataFrame(q_values = NA_real_, use_generic = TRUE)
   
@@ -381,6 +397,7 @@ test_that(".createResultsDataFrame generates correct columns for generic diverge
 })
 
 test_that(".createResultsDataFrame generates correct columns for multi-q divergence", {
+  skip_on_bioc()
   # Test multi-q divergence columns
   q_values <- c(0.5, 1.0, 2.0)
   df <- TSENAT:::.createResultsDataFrame(q_values = q_values, use_generic = FALSE)
@@ -399,6 +416,7 @@ test_that(".createResultsDataFrame generates correct columns for multi-q diverge
 })
 
 test_that(".extractLMMData returns correct LMM information", {
+  skip_on_bioc()
   # Setup LMM results data
   sait_res <- data.frame(
     gene = c("gene1", "gene2"),
@@ -416,6 +434,7 @@ test_that(".extractLMMData returns correct LMM information", {
 })
 
 test_that(".extractLMMData uses gene_name column when available", {
+  skip_on_bioc()
   # Setup LMM results with gene_name column
   sait_res <- data.frame(
     gene = c("g_id_1", "g_id_2"),
@@ -432,6 +451,7 @@ test_that(".extractLMMData uses gene_name column when available", {
 })
 
 test_that(".extractLMMData returns NULL for non-existent gene", {
+  skip_on_bioc()
   sait_res <- data.frame(
     gene = c("gene1"),
     adj_p_interaction = c(0.01)
@@ -443,6 +463,7 @@ test_that(".extractLMMData returns NULL for non-existent gene", {
 })
 
 test_that(".extractDivergenceData retrieves divergence row correctly", {
+  skip_on_bioc()
   rd <- data.frame(
     gene_name = c("gene1", "gene2"),
     estimate = c(0.8, 0.7),

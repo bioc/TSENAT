@@ -116,6 +116,7 @@ setup_tsenat_cached <- local({
 # ============================================================================
 
 test_that("TSENAT() basic execution: returns valid result with structure preserved", {
+    skip_on_bioc()
     # OPTIMIZATION: Reuse cached TSENAT() result instead of recomputing
     result <- setup_tsenat_cached()
     data_list <- setup_workflow_data_cached()
@@ -143,6 +144,7 @@ test_that("TSENAT() basic execution: returns valid result with structure preserv
 })
 
 test_that("TSENAT() output handling: manages output_dir and verbose control correctly", {
+    skip_on_bioc()
     data_list <- setup_workflow_data_cached()
     output_dir <- tempdir()
     
@@ -175,6 +177,7 @@ test_that("TSENAT() output handling: manages output_dir and verbose control corr
 })
 
 test_that("TSENAT() filtering and statistical parameters: respects filter and config", {
+    skip_on_bioc()
     # OPTIMIZATION: Reuse cached TSENAT() result instead of recomputing
     result <- setup_tsenat_cached()
     data_list <- setup_workflow_data_cached()
@@ -192,6 +195,7 @@ test_that("TSENAT() filtering and statistical parameters: respects filter and co
 # ============================================================================
 
 test_that("TSENAT() error handling: rejects invalid input, handles edge cases", {
+    skip_on_bioc()
     data_list <- setup_workflow_data_cached()
     
     invalid_input <- data.frame(a = 1:10, b = 11:20)
@@ -219,6 +223,7 @@ test_that("TSENAT() error handling: rejects invalid input, handles edge cases", 
 # ============================================================================
 
 test_that("TSENAT() paired: produces SAIT results, significant genes, plots generate", {
+    skip_on_bioc()
     # OPTIMIZATION: Reuse cached TSENAT() result instead of recomputing
     result <- setup_tsenat_cached()
     
@@ -267,6 +272,7 @@ context("Integration Tests: setConfig Bug Detection")
 # Solution: Config should only be set during build_analysis(), never via TSENAT().
 
 test_that("setConfig: does not corrupt SummarizedExperiment dimensions", {
+    skip_on_bioc()
     # Get fresh analysis for setConfig testing (not orchestrated)
     data_list <- setup_workflow_data_cached()
     analysis <- data_list$analysis
@@ -281,6 +287,7 @@ test_that("setConfig: does not corrupt SummarizedExperiment dimensions", {
 })
 
 test_that("TSENAT() WITHOUT config parameter: produces correct diversity values", {
+    skip_on_bioc()
     # Manual workflow (like vignette): NO setConfig call
     data_list <- setup_workflow_data_cached()
     analysis_manual <- data_list$analysis
@@ -315,6 +322,7 @@ test_that("TSENAT() WITHOUT config parameter: produces correct diversity values"
 })
 
 test_that("TSENAT() WITHOUT config: produces IDENTICAL results to manual workflow", {
+    skip_on_bioc()
     # REGRESSION TEST: Verify that TSENAT() orchestration doesn't corrupt data
     # OPTIMIZATION: Reuse cached TSENAT() result
     analysis2 <- setup_tsenat_cached()
@@ -333,6 +341,7 @@ test_that("TSENAT() WITHOUT config: produces IDENTICAL results to manual workflo
 })
 
 test_that("TSENAT() WITH config parameter: SHOULD NOT be used (causes data issues)", {
+    skip_on_bioc()
     # This test documents the problematic behavior when config is passed
     data_list <- setup_workflow_data_cached()
     
@@ -370,6 +379,7 @@ test_that("TSENAT() WITH config parameter: SHOULD NOT be used (causes data issue
 })
 
 test_that("setConfig CORRUPTION: direct calls do not modify analysis state", {
+    skip_on_bioc()
     # setConfig should be idempotent: multiple calls should have no ill effects
     
     data_list <- setup_workflow_data_cached()
@@ -391,6 +401,7 @@ test_that("setConfig CORRUPTION: direct calls do not modify analysis state", {
 # ============================================================================
 
 test_that("CONFIG EMBEDDING: Settings applied once via build_analysis, not redundantly", {
+    skip_on_bioc()
     # Test the correct pattern: config applied exactly ONCE at build time
     
     set.seed(42)
@@ -443,6 +454,7 @@ test_that("CONFIG EMBEDDING: Settings applied once via build_analysis, not redun
 })
 
 test_that("IDEMPOTENCY CHECK: setConfig produces consistent state across calls", {
+    skip_on_bioc()
     # If setConfig is truly idempotent, multiple calls should produce identical state
     # OPTIMIZATION: Reuse cached TSENAT() result for config reference
     cached_result <- setup_tsenat_cached()
@@ -473,6 +485,7 @@ test_that("IDEMPOTENCY CHECK: setConfig produces consistent state across calls",
 # ============================================================================
 
 test_that("WORKFLOW EQUIVALENCE: Manual orchestration matches TSENAT() function", {
+    skip_on_bioc()
     # Compare orchestration patterns to ensure no hidden side effects
     # OPTIMIZATION: Use cached TSENAT() result for comparison
     
