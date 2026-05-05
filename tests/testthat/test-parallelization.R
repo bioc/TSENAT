@@ -1091,16 +1091,26 @@ test_that("nthreads parameter is properly validated", {
   expect_is(result@divergence_results$divergence_se, "SummarizedExperiment")
   
   # Test with huge number (should be clamped by .get_effective_nthreads())
-  # BiocParallel may issue warnings for very large worker counts
+  # When _R_CHECK_LIMIT_CORES_ is set, requesting 999 threads will throw an error
+  # This is expected behavior - the code validates nthreads against environment limits
   analysis <- create_test_analysis()
-  result <- suppressWarnings(
-    silent_calculate_divergence(
-      analysis,
-      nthreads = 999
+  
+  # Check if core limit is in effect
+  core_limit <- Sys.getenv("_R_CHECK_LIMIT_CORES_", "")
+  if (nchar(core_limit) > 0 && as.integer(core_limit) < 999) {
+    # Core limit is in effect, expect the error
+    expect_error(
+      silent_calculate_divergence(analysis, nthreads = 999),
+      "must be <="
     )
-  )
-  expect_is(result, "TSENATAnalysis")
-  expect_is(result@divergence_results$divergence_se, "SummarizedExperiment")
+  } else {
+    # No core limit, the function should succeed
+    result <- suppressWarnings(
+      silent_calculate_divergence(analysis, nthreads = 999)
+    )
+    expect_is(result, "TSENATAnalysis")
+    expect_is(result@divergence_results$divergence_se, "SummarizedExperiment")
+  }
 })
 
 test_that("Computation mode is correctly reported in colData", {
