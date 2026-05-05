@@ -1,6 +1,5 @@
 ^docs/
 ^dist/
-^build/
 ^_pkgdown.yml$
 ^\.codecov.yml$
 ^\.covrignore$

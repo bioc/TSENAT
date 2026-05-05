@@ -591,6 +591,11 @@ test_that(".estimate_storey_pi0 returns single value", {
 # ════════════════════════════════════════════════════════════════════════════════
 
 test_that("WY permutation respects .get_effective_nthreads() for high thread counts", {
+  # Skip on Bioconductor: tests parallelization in unconstrained environments
+  # In constrained Bioconductor builds, even reduced thread counts can trigger
+  # parallel::mclapply() validation errors
+  skip_on_bioc()
+  
   # This test validates that the change from parallel::detectCores()
   # to .get_effective_nthreads() works correctly with high thread requests.
   # Test is compatible with _R_CHECK_LIMIT_CORES_ since .get_effective_nthreads()
@@ -796,6 +801,7 @@ test_that("WY permutation parallel path computes permutation minima correctly", 
   # Validates that .get_effective_nthreads() is used for core allocation
   
   skip_if_not(.Platform$OS.type == "unix", 
+  skip_on_bioc()
               message = "Parallel WY permutation uses mclapply (Unix only)")
   
   set.seed(999)
@@ -854,6 +860,7 @@ test_that("WY parallel execution respects .get_effective_nthreads() with high co
   # by .get_effective_nthreads() and doesn't cause errors
   
   skip_if_not(.Platform$OS.type == "unix", 
+  skip_on_bioc()
               message = "Parallel WY permutation uses mclapply (Unix only)")
   
   set.seed(1111)
@@ -903,6 +910,7 @@ test_that("WY parallel and serial execution produce similar permutation distribu
   # Results should be similar (same random seed ensures reproducibility)
   
   skip_if_not(.Platform$OS.type == "unix", 
+  skip_on_bioc()
               message = "Parallel WY permutation uses mclapply (Unix only)")
   
   set.seed(2222)
@@ -980,6 +988,7 @@ test_that("WY permutation parallel path computes permutation minima correctly", 
   # Validates that .get_effective_nthreads() is used for core allocation
   
   skip_if_not(.Platform$OS.type == "unix", 
+  skip_on_bioc()
               message = "Parallel WY permutation uses mclapply (Unix only)")
   
   set.seed(999)
@@ -1038,6 +1047,7 @@ test_that("WY parallel execution respects .get_effective_nthreads() with high co
   # by .get_effective_nthreads() and doesn't cause errors
   
   skip_if_not(.Platform$OS.type == "unix", 
+  skip_on_bioc()
               message = "Parallel WY permutation uses mclapply (Unix only)")
   
   set.seed(1111)
@@ -1087,6 +1097,7 @@ test_that("WY parallel and serial execution produce similar permutation distribu
   # Results should be similar (same random seed ensures reproducibility)
   
   skip_if_not(.Platform$OS.type == "unix", 
+  skip_on_bioc()
               message = "Parallel WY permutation uses mclapply (Unix only)")
   
   set.seed(2222)
