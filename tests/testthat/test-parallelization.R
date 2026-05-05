@@ -1091,26 +1091,17 @@ test_that("nthreads parameter is properly validated", {
   expect_is(result@divergence_results$divergence_se, "SummarizedExperiment")
   
   # Test with huge number (should be clamped by .get_effective_nthreads())
-  # When _R_CHECK_LIMIT_CORES_ is set, requesting 999 threads will throw an error
-  # This is expected behavior - the code validates nthreads against environment limits
+  # When _R_CHECK_LIMIT_CORES_ is set, requesting 999 threads is silently clamped
+  # to the core limit, so the function should succeed without error
   analysis <- create_test_analysis()
   
-  # Check if core limit is in effect
-  core_limit <- Sys.getenv("_R_CHECK_LIMIT_CORES_", "")
-  if (nchar(core_limit) > 0 && as.integer(core_limit) < 999) {
-    # Core limit is in effect, expect the error
-    expect_error(
-      silent_calculate_divergence(analysis, nthreads = 999),
-      "must be <="
-    )
-  } else {
-    # No core limit, the function should succeed
-    result <- suppressWarnings(
-      silent_calculate_divergence(analysis, nthreads = 999)
-    )
-    expect_is(result, "TSENATAnalysis")
-    expect_is(result@divergence_results$divergence_se, "SummarizedExperiment")
-  }
+  # This should always succeed - either with clamping (when core limit set)
+  # or with system cores (when no core limit)
+  result <- suppressWarnings(
+    silent_calculate_divergence(analysis, nthreads = 999)
+  )
+  expect_is(result, "TSENATAnalysis")
+  expect_is(result@divergence_results$divergence_se, "SummarizedExperiment")
 })
 
 test_that("Computation mode is correctly reported in colData", {

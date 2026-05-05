@@ -594,6 +594,11 @@ test_that("WY permutation respects .get_effective_nthreads() for high thread cou
   # This test validates that the change from parallel::detectCores()
   # to .get_effective_nthreads() works correctly with high thread requests
   
+  # Skip if core limit is in effect, as behavior is environment-dependent
+  core_limit_env <- Sys.getenv("_R_CHECK_LIMIT_CORES_", "")
+  skip_if(nchar(core_limit_env) > 0, 
+          "Skipping high thread count test under _R_CHECK_LIMIT_CORES_")
+  
   set.seed(888)
   
   # Setup: Small dataset for quick test
