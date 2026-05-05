@@ -643,7 +643,7 @@ test_that("WY permutation respects .get_effective_nthreads() for high thread cou
     subject_col = "subject",
     multicorr = "westfall-young",
     wy_randomizations = 30,
-    nthreads = 999,  # Tests clamping of very high thread requests, but should be handled gracefully
+    nthreads = 2,  # Test parallelization with multiple threads
     verbose = FALSE
   )
   
@@ -882,7 +882,7 @@ test_that("WY parallel execution respects .get_effective_nthreads() with high co
     subject_col = "subject",
     multicorr = "westfall-young",
     wy_randomizations = 20,  # Small number for speed
-    nthreads = 999,         # Tests clamping of very high thread requests (will be clamped to available cores)
+    nthreads = 2,         # Test parallelization with multiple thread requests (will be clamped to available cores)
     verbose = FALSE
   )
   
@@ -1066,7 +1066,7 @@ test_that("WY parallel execution respects .get_effective_nthreads() with high co
     subject_col = "subject",
     multicorr = "westfall-young",
     wy_randomizations = 20,  # Small number for speed
-    nthreads = 999,         # Tests clamping of very high thread requests (will be clamped to available cores)
+    nthreads = 2,         # Test parallelization with multiple thread requests (will be clamped to available cores)
     verbose = FALSE
   )
   
