@@ -1,5 +1,8 @@
 context("C++ Bootstrap Implementation (Rcpp)")
 
+# Skip entire test file on Bioconductor due to long runtime (14.33s)
+skip_on_bioc()
+
 # Test data preparation
 test_counts <- c(100, 50, 25, 10)
 large_counts <- c(1000, 500, 250, 100, 50, 25)

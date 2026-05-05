@@ -1,5 +1,8 @@
 context("Parallelization: Method Calculation with Multiple Threads")
 
+# Skip entire test file on Bioconductor due to long runtime (26.71s)
+skip_on_bioc()
+
 # Internal helper access for calculate_method
 calculate_method <- TSENAT:::.calculate_method
 

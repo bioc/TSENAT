@@ -1,8 +1,10 @@
 # Tests for calculate_effect_sizes and results integration
 # Covers uncovered lines from divergence_coverage.txt
 
+# Skip entire test file on Bioconductor due to long runtime (14.85s)
+skip_on_bioc()
+
 test_that("calculate_effect_sizes aligns gene datasets", {
-  skip_on_bioc()
   # Create mock data matching expected structure
   sait_res <- data.frame(
     gene = c("gene1", "gene2", "gene3"),

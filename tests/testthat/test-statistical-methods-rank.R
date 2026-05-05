@@ -1,8 +1,10 @@
 
 context("rank_based_methods: Rank-Based Nonparametric Methods")
+
+# Skip entire test file on Bioconductor due to long runtime (12.96s)
+skip_on_bioc()
+
 library(TSENAT)
-
-
 
 test_that("test_rankbased_assumptions validates assumptions", {
   # Create synthetic expression data
