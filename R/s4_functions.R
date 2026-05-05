@@ -986,15 +986,15 @@ setMethod("plot_concordance", "TSENATAnalysis", function(analysis, verbose = FAL
 #' analysis <- filter_analysis(analysis, stringency = 'severe')
 #' analysis <- calculate_diversity(
 #'   analysis,
-#'   q = c(0.5, 1.0, 1.5, 2.0, 2.5),
+#'   q = seq(0.2, 2, by = 0.4),
 #'   verbose = FALSE
 #' )
 #' analysis <- suppressWarnings(calculate_sait(
 #'   analysis,
-#'   method = 'gam',
+#'   method = 'lmm',
 #'   verbose = FALSE
 #' ))
-#' plot_file <- plot_expression(analysis, top_n = 3)
+#' plot_file <- plot_expression(analysis, top_n = 2)
 #' # print(plot_file)
 #'
 #' @seealso
@@ -1186,15 +1186,15 @@ plot_expression <- function(analysis, gene = NULL, condition_col = NULL, top_n =
 #' analysis <- filter_analysis(analysis, stringency = 'severe')
 #' analysis <- calculate_diversity(
 #'   analysis,
-#'   q = c(0.5, 1.0, 1.5, 2.0, 2.5),
+#'   q = seq(0.2, 2, by = 0.4),
 #'   verbose = FALSE
 #' )
 #' analysis <- calculate_divergence(
 #'   analysis,
-#'   q = c(0.5, 1.0, 1.5, 2.0, 2.5),
+#'   q = seq(0.2, 2, by = 0.4),
 #'   verbose = FALSE
 #' )
-#' analysis <- suppressWarnings(calculate_sait(analysis, method = 'gam'))
+#' analysis <- suppressWarnings(calculate_sait(analysis, method = 'lmm'))
 #' analysis <- calculate_effect_sizes(analysis)
 #' p_dist <- plot_divergence_distribution(analysis)
 #' # print(p_dist)
@@ -1344,21 +1344,20 @@ plot_divergence_distribution <- function(analysis, threshold = 0.1, output_file 
 #' analysis <- filter_analysis(analysis, stringency = 'severe')
 #' analysis <- calculate_diversity(
 #'   analysis,
-#'   q = c(0.5, 1.0, 1.5, 2.0, 2.5),
+#'   q = seq(0.2, 2, by = 0.4),
 #'   verbose = FALSE
 #' )
 #' analysis <- calculate_divergence(
 #'   analysis,
-#'   q = c(0.5, 1.0, 1.5, 2.0, 2.5)
+#'   q = seq(0.2, 2, by = 0.4)
 #' )
-#' analysis <- suppressWarnings(calculate_sait(analysis, method = 'gam'))
+#' analysis <- suppressWarnings(calculate_sait(analysis, method = 'lmm'))
 #' analysis <- calculate_jis(
 #'   analysis,
-#'   q = c(0.5, 1, 1.5),
-#'   n_bootstrap = 50
+#'   q = seq(0.2, 2, by = 0.4),
+#'   n_bootstrap = 20
 #' )
-#' heatmap_file <- plot_jis_delta(analysis, n_genes
-#' = 2)
+#' heatmap_file <- plot_jis_delta(analysis, n_genes = 2)
 #'
 #' @seealso
 #' \code{\link{calculate_jis}} for computing switching results
