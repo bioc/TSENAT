@@ -372,6 +372,9 @@
     if (nthreads < 1)
         nthreads <- 1
 
+    # Clamp nthreads to respect environment constraints (e.g., _R_CHECK_LIMIT_CORES_)
+    nthreads <- .get_effective_nthreads(nthreads)
+
     # Determine if parallel execution is possible and beneficial
     use_parallel <- (nthreads > 1) && (wy_randomizations > 1)
 
@@ -487,6 +490,9 @@
     nthreads <- as.integer(nthreads)
     if (nthreads < 1)
         nthreads <- 1
+
+    # Clamp nthreads to respect environment constraints (e.g., _R_CHECK_LIMIT_CORES_)
+    nthreads <- .get_effective_nthreads(nthreads)
 
     # Determine if parallel execution is possible and beneficial
     use_parallel <- (nthreads > 1) && (wy_randomizations > 1)

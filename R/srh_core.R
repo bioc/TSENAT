@@ -408,6 +408,9 @@
 
     multicorr <- match.arg(multicorr)
 
+    # Clamp nthreads early to handle high thread requests gracefully and safely
+    nthreads <- .get_effective_nthreads(nthreads)
+
     # PHASE 1: VALIDATE PARAMETERS
     params <- .detect_q_validate_params(paired, subject_col, wy_randomizations, nperm_mode,
         verbose)
