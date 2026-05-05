@@ -3,13 +3,12 @@
 
 # Filter out non-portable compiler flags that may come from the environment
 # -Werror=format-security is system-specific and non-portable
-PKG_CFLAGS = $(filter-out -Werror=format-security,$(PKG_CFLAGS))
-PKG_CXXFLAGS := $(filter-out -Werror=format-security,$(PKG_CXXFLAGS))
+PKG_CXXFLAGS = $(filter-out -Werror=format-security,$(PKG_CXXFLAGS))
 
 # Check if running coverage analysis
 COVERAGE_FLAGS = $(if $(R_COVERAGE),-O0 -fprofile-arcs -ftest-coverage,-O3 -flto)
 COVERAGE_LIBS = $(if $(R_COVERAGE),-fprofile-arcs -ftest-coverage,)
 
 # Release build: use LTO optimization; coverage: no optimization, no LTO
-PKG_CXXFLAGS += $(COVERAGE_FLAGS) $(if $(R_COVERAGE),,$(SHLIB_OPENMP_CXXFLAGS))
+PKG_CXXFLAGS = $(COVERAGE_FLAGS) $(if $(R_COVERAGE),,$(SHLIB_OPENMP_CXXFLAGS))
 PKG_LIBS = $(if $(R_COVERAGE),,$(SHLIB_OPENMP_CXXFLAGS)) $(LAPACK_LIBS) $(BLAS_LIBS) $(COVERAGE_LIBS)

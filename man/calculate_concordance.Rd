@@ -57,7 +57,7 @@ Identifies:
 - Spearman correlation of p-values (overall agreement trends)
 }
 \examples{
-\\dontrun{
+\dontrun{
 # Load example data (matching TSENAT.Rmd workflow)
 data(readcounts)
 readcounts <- as.matrix(readcounts)

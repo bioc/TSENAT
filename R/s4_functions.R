@@ -308,7 +308,7 @@ setMethod("calculate_assumptions", signature(analysis = "TSENATAnalysis"), funct
 #' )
 #'
 #' @examples
-#' \\dontrun{
+#' \dontrun{
 #' # Load example data (matching TSENAT.Rmd workflow)
 #' data(readcounts)
 #' readcounts <- as.matrix(readcounts)
