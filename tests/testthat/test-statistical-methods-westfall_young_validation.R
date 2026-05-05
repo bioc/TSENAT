@@ -592,12 +592,9 @@ test_that(".estimate_storey_pi0 returns single value", {
 
 test_that("WY permutation respects .get_effective_nthreads() for high thread counts", {
   # This test validates that the change from parallel::detectCores()
-  # to .get_effective_nthreads() works correctly with high thread requests
-  
-  # Skip if core limit is in effect, as behavior is environment-dependent
-  core_limit_env <- Sys.getenv("_R_CHECK_LIMIT_CORES_", "")
-  skip_if(nchar(core_limit_env) > 0, 
-          "Skipping high thread count test under _R_CHECK_LIMIT_CORES_")
+  # to .get_effective_nthreads() works correctly with high thread requests.
+  # Test is compatible with _R_CHECK_LIMIT_CORES_ since .get_effective_nthreads()
+  # clamps high thread requests to available cores.
   
   set.seed(888)
   
@@ -646,7 +643,7 @@ test_that("WY permutation respects .get_effective_nthreads() for high thread cou
     subject_col = "subject",
     multicorr = "westfall-young",
     wy_randomizations = 30,
-    nthreads = 999,  # Requests many threads, but should be handled gracefully
+    nthreads = 999,  # Tests clamping of very high thread requests, but should be handled gracefully
     verbose = FALSE
   )
   
@@ -873,8 +870,9 @@ test_that("WY parallel execution respects .get_effective_nthreads() with high co
   data_high$entropy <- rnorm(nrow(data_high), mean = 1.5, sd = 0.2)
   data_high$condition <- data_high$sample_type
   
-  # Request 999 threads - should be clamped by .get_effective_nthreads()
-  # This should NOT throw an error about thread count
+  # Request 999 threads - tests that source code clamps very high thread requests
+  # via .get_effective_nthreads() before passing to parallel backend
+
   result_high_threads <- .calculate_srh(
     data = data_high,
     entropy_col = "entropy",
@@ -885,7 +883,7 @@ test_that("WY parallel execution respects .get_effective_nthreads() with high co
     subject_col = "subject",
     multicorr = "westfall-young",
     wy_randomizations = 20,  # Small number for speed
-    nthreads = 999,          # Very high request
+    nthreads = 999,         # Tests clamping of very high thread requests (will be clamped to available cores)
     verbose = FALSE
   )
   
@@ -1057,8 +1055,9 @@ test_that("WY parallel execution respects .get_effective_nthreads() with high co
   data_high$entropy <- rnorm(nrow(data_high), mean = 1.5, sd = 0.2)
   data_high$condition <- data_high$sample_type
   
-  # Request 999 threads - should be clamped by .get_effective_nthreads()
-  # This should NOT throw an error about thread count
+  # Request 999 threads - tests that source code clamps very high thread requests
+  # via .get_effective_nthreads() before passing to parallel backend
+  
   result_high_threads <- .calculate_srh(
     data = data_high,
     entropy_col = "entropy",
@@ -1069,7 +1068,7 @@ test_that("WY parallel execution respects .get_effective_nthreads() with high co
     subject_col = "subject",
     multicorr = "westfall-young",
     wy_randomizations = 20,  # Small number for speed
-    nthreads = 999,          # Very high request
+    nthreads = 999,         # Tests clamping of very high thread requests (will be clamped to available cores)
     verbose = FALSE
   )
   

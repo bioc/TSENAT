@@ -1,4 +1,8 @@
 context("S4 Wrapper: plot_expression() - Gene Expression Visualization")
+
+# Skip entire test file on Bioconductor due to long runtime (12.88s)
+skip_on_bioc()
+
 library(TSENAT)
 
 # ============================================================================

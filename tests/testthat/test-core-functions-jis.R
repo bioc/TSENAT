@@ -1,4 +1,8 @@
 context("Core Internal Functions: Jackknife Isoform Switching")
+
+# Skip entire test file on Bioconductor due to long runtime (10.47s)
+skip_on_bioc()
+
 library(SummarizedExperiment)
 library(parallel)
 library(testthat)

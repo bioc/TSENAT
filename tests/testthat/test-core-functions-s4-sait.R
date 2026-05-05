@@ -1,5 +1,8 @@
 # Tests for calculate_sait S4 wrapper function
 
+# Skip entire test file on Bioconductor due to long runtime (10.37s)
+skip_on_bioc()
+
 # Setup: Local helper to create test analysis with optional diversity results
 .create_test_analysis <- function(
     precompute_diversity = TRUE, 

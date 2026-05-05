@@ -8,6 +8,9 @@ library(testthat)
 
 context("GAM Interaction Helper Functions - Setup and Data Validation")
 
+# Skip entire test file on Bioconductor due to long runtime (12.89s)
+skip_on_bioc()
+
 # =============================================================================
 # Helper data generation for tests
 # =============================================================================
