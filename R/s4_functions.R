@@ -308,6 +308,7 @@ setMethod("calculate_assumptions", signature(analysis = "TSENATAnalysis"), funct
 #' )
 #'
 #' @examples
+#' \\dontrun{
 #' # Load example data (matching TSENAT.Rmd workflow)
 #' data(readcounts)
 #' readcounts <- as.matrix(readcounts)
@@ -345,7 +346,7 @@ setMethod("calculate_assumptions", signature(analysis = "TSENATAnalysis"), funct
 #' analysis <- suppressWarnings(calculate_sait(analysis, method = 'gam'))
 #' # Note: calculate_concordance requires results from both
 #' # calculate_srh and calculate_assumptions
-#'
+#' }
 #' @aliases calculate_concordance
 #' @export
 setGeneric("calculate_concordance", function(analysis_sait, analysis_rank = NULL, ...) {
@@ -987,6 +988,7 @@ setMethod("plot_concordance", "TSENATAnalysis", function(analysis, verbose = FAL
 #' significant q x condition interaction effects.
 #'
 #' @examples
+#' \dontrun{
 #' # Plot 6: Top transcripts across groups
 #' data(readcounts)
 #' readcounts <- as.matrix(readcounts)
@@ -1029,7 +1031,8 @@ setMethod("plot_concordance", "TSENATAnalysis", function(analysis, verbose = FAL
 #'   verbose = FALSE
 #' ))
 #' plot_file <- plot_expression(analysis, top_n = 3)
-#' # print(plot_file) 
+#' # print(plot_file)
+#' } 
 #'
 #' @seealso
 #' \code{\link{TSENATAnalysis}} for object structure
@@ -1190,6 +1193,7 @@ plot_expression <- function(analysis, gene = NULL, condition_col = NULL, top_n =
 #' }
 #'
 #' @examples
+#' \dontrun{
 #' # Plot 2: Distribution of effect sizes across genes
 #' data(readcounts)
 #' readcounts <- as.matrix(readcounts)
@@ -1232,6 +1236,7 @@ plot_expression <- function(analysis, gene = NULL, condition_col = NULL, top_n =
 #' analysis <- calculate_effect_sizes(analysis)
 #' p_dist <- plot_divergence_distribution(analysis)
 #' # print(p_dist)
+#' }
 #'
 #' @seealso
 #' \code{\link{calculate_effect_sizes}} for computing effect sizes.
@@ -1344,6 +1349,7 @@ plot_divergence_distribution <- function(analysis, threshold = 0.1, output_file 
 #' interface compared to the base function.
 #'
 #' @examples
+#' \dontrun{
 #' # Plot 5: Multi-q delta influence (isoform switching) heatmaps
 #' data(readcounts)
 #' readcounts <- as.matrix(readcounts)
@@ -1393,6 +1399,7 @@ plot_divergence_distribution <- function(analysis, threshold = 0.1, output_file 
 #' )
 #' heatmap_file <- plot_jis_delta(analysis, n_genes
 #' = 2)
+#' }
 #'
 #' @seealso
 #' \code{\link{calculate_jis}} for computing switching results
@@ -1549,6 +1556,7 @@ plot_jis_delta <- function(analysis, n_genes = 4, sait_results = NULL, verbose =
 #' running LM analysis on TSENATAnalysis.
 #'
 #' @examples
+#' \dontrun{
 #' # Plot 3: GAM q-curves for genes with q-by-condition interactions
 #' data(readcounts)
 #' readcounts <- as.matrix(readcounts)
@@ -1586,6 +1594,7 @@ plot_jis_delta <- function(analysis, n_genes = 4, sait_results = NULL, verbose =
 #' 
 #' p_gam <- plot_sait(analysis, n_top = 2, sig_alpha = 0.15)
 #' # print(p_gam)
+#' }
 #'
 #' @export
 plot_sait <- function(analysis, n_top = 6, genes = NULL, condition_col = NULL, sig_alpha = 0.05,

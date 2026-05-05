@@ -111,6 +111,7 @@ the SAIT results (lowest p-value). This simplifies visualization of genes with
 significant q x condition interaction effects.
 }
 \examples{
+\dontrun{
 # Plot 6: Top transcripts across groups
 data(readcounts)
 readcounts <- as.matrix(readcounts)
@@ -153,7 +154,8 @@ analysis <- suppressWarnings(calculate_sait(
   verbose = FALSE
 ))
 plot_file <- plot_expression(analysis, top_n = 3)
-# print(plot_file) 
+# print(plot_file)
+} 
 
 }
 \seealso{

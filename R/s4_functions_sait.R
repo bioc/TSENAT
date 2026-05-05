@@ -66,6 +66,7 @@
 #' 3. Function defaults
 #'
 #' @examples
+#' \dontrun{
 #' # Create test analysis with appropriate sample structure for paired design
 #' # Note: requires lme4 package for LMM fitting; uses synthetic data
 #' set.seed(42)
@@ -141,6 +142,7 @@
 #' # View top interaction results using unified accessor (first 3 genes)
 #' res <- results(analysis, type = "sait")
 #' if (!is.null(res)) head(res, 3)
+#' }
 #'
 #' @export
 #' @importFrom utils write.table

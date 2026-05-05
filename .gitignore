@@ -10,8 +10,6 @@ coverage/
 inst/doc/
 /Meta/
 __pycache__/
-..Rcheck
-..Rcheck/
 .Rcheck
 .Rcheck/
 *.Rhistory
@@ -25,28 +23,25 @@ __pycache__/
 tmp/
 TSENAT.Rcheck
 TSENAT.Rcheck/
-vignette/*html
-vignette/*pdf
+vignette/*.html
+vignette/*.pdf
 vignettes/ts_debug.R
 .vscode/
 Rplots.pdf
 # Coverage analysis files
 *.gcda
 *.gcno
-# Compiled C/C++ binaries (platform-specific, should be rebuilt locally)
+# Compiled binaries - platform-specific
 src/*.o
 src/*.so
 src/*.dll
 src/*.dylib
 tools/
 # Generated site
-docs/
 _pkgdown.yml
 r_dependencies_s4_interactive.html
 visualize_dependencies.py
-
-# Exclude pkgdown templates and assets from git (will be managed via R build)
+# Exclude pkgdown templates
 inst/pkgdown/
-
-# Generated citations file (restored from gh-pages when needed)
+# Generated citations file
 citations.md

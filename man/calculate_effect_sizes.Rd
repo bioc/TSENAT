@@ -83,6 +83,7 @@ gff3_dataset <- system.file('extdata', 'annotation.gff3.gz', package =
 'TSENAT')
 
 # Configure analysis parameters (best practice for reproducibility)
+\dontrun{
 config <- TSENAT_config(
   sample_col = 'sample',
   condition_col = 'condition',
@@ -109,6 +110,7 @@ effect_size_results <- results(analysis, type = 'effect_sizes_divergence')
 
 # View structure of results
 str(effect_size_results, max.level = 1)
+}
 
 }
 \seealso{

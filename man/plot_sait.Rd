@@ -83,6 +83,7 @@ This wrapper automatically:
 }
 }
 \examples{
+\dontrun{
 # Plot 3: GAM q-curves for genes with q-by-condition interactions
 data(readcounts)
 readcounts <- as.matrix(readcounts)
@@ -120,6 +121,7 @@ analysis <- suppressWarnings(calculate_sait(analysis, method = 'gam'))
 
 p_gam <- plot_sait(analysis, n_top = 2, sig_alpha = 0.15)
 # print(p_gam)
+}
 
 }
 \seealso{

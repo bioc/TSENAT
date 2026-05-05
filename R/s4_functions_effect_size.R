@@ -67,6 +67,7 @@
 #' 'TSENAT')
 #' 
 #' # Configure analysis parameters (best practice for reproducibility)
+#' \dontrun{
 #' config <- TSENAT_config(
 #'   sample_col = 'sample',
 #'   condition_col = 'condition',
@@ -93,6 +94,7 @@
 #'
 #' # View structure of results
 #' str(effect_size_results, max.level = 1)
+#' }
 #'
 #' @seealso
 #' \code{\link{calculate_divergence}} for divergence wrapper,

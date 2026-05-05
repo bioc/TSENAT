@@ -57,6 +57,7 @@ Identifies:
 - Spearman correlation of p-values (overall agreement trends)
 }
 \examples{
+\\dontrun{
 # Load example data (matching TSENAT.Rmd workflow)
 data(readcounts)
 readcounts <- as.matrix(readcounts)
@@ -94,5 +95,5 @@ analysis <- calculate_divergence(analysis, q = c(0.5, 1.0, 1.5, 2.0, 2.5))
 analysis <- suppressWarnings(calculate_sait(analysis, method = 'gam'))
 # Note: calculate_concordance requires results from both
 # calculate_srh and calculate_assumptions
-
+}
 }

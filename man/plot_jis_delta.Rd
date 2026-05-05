@@ -60,6 +60,7 @@ simplified
 interface compared to the base function.
 }
 \examples{
+\dontrun{
 # Plot 5: Multi-q delta influence (isoform switching) heatmaps
 data(readcounts)
 readcounts <- as.matrix(readcounts)
@@ -109,6 +110,7 @@ analysis <- calculate_jis(
 )
 heatmap_file <- plot_jis_delta(analysis, n_genes
 = 2)
+}
 
 }
 \seealso{

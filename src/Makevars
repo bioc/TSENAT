@@ -8,6 +8,11 @@
 # - C++11 standard and beyond
 # - Portable make syntax (no GNU extensions)
 
+# Filter out non-portable compiler flags that may come from the environment
+# -Werror=format-security is system-specific and non-portable
+PKG_CFLAGS = $(filter-out -Werror=format-security,$(PKG_CFLAGS))
+PKG_CXXFLAGS := $(filter-out -Werror=format-security,$(PKG_CXXFLAGS))
+
 # Handle coverage mode (set by covr::package_coverage)
 # Use portable $(if ...) instead of ifdef/else/endif
 # Note: Use PKG_CXXFLAGS instead of CXXFLAGS to avoid overriding user/site settings
@@ -17,5 +22,5 @@ COVERAGE_LIBS = $(if $(R_COVERAGE),-fprofile-arcs -ftest-coverage -lgcov,)
 COVERAGE_FLAGS = $(if $(R_COVERAGE),-O0 -fprofile-arcs -ftest-coverage,)
 
 # Release mode: enable OpenMP for parallelization (unless in coverage mode)
-PKG_CXXFLAGS = $(COVERAGE_FLAGS) $(if $(R_COVERAGE),,$(SHLIB_OPENMP_CXXFLAGS))
+PKG_CXXFLAGS += $(COVERAGE_FLAGS) $(if $(R_COVERAGE),,$(SHLIB_OPENMP_CXXFLAGS))
 PKG_LIBS = $(if $(R_COVERAGE),,$(SHLIB_OPENMP_CXXFLAGS)) $(LAPACK_LIBS) $(BLAS_LIBS) $(FLIBS) $(COVERAGE_LIBS)
