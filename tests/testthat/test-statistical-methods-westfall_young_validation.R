@@ -800,9 +800,9 @@ test_that("WY permutation parallel path computes permutation minima correctly", 
   # Tests the parallel mclapply path for distributing permutations across cores
   # Validates that .get_effective_nthreads() is used for core allocation
   
-  skip_if_not(.Platform$OS.type == "unix", 
-  skip_on_bioc()
+  skip_if_not(.Platform$OS.type == "unix",
               message = "Parallel WY permutation uses mclapply (Unix only)")
+  skip_on_bioc()
   
   set.seed(999)
   
@@ -859,9 +859,9 @@ test_that("WY parallel execution respects .get_effective_nthreads() with high co
   # Validates that requesting very high thread counts (999) is handled gracefully
   # by .get_effective_nthreads() and doesn't cause errors
   
-  skip_if_not(.Platform$OS.type == "unix", 
-  skip_on_bioc()
+  skip_if_not(.Platform$OS.type == "unix",
               message = "Parallel WY permutation uses mclapply (Unix only)")
+  skip_on_bioc()
   
   set.seed(1111)
   
@@ -909,9 +909,9 @@ test_that("WY parallel and serial execution produce similar permutation distribu
   # Compares parallel (nthreads=2) vs serial (nthreads=1) execution
   # Results should be similar (same random seed ensures reproducibility)
   
-  skip_if_not(.Platform$OS.type == "unix", 
-  skip_on_bioc()
+  skip_if_not(.Platform$OS.type == "unix",
               message = "Parallel WY permutation uses mclapply (Unix only)")
+  skip_on_bioc()
   
   set.seed(2222)
   
@@ -987,9 +987,9 @@ test_that("WY permutation parallel path computes permutation minima correctly", 
   # Tests the parallel mclapply path for distributing permutations across cores
   # Validates that .get_effective_nthreads() is used for core allocation
   
-  skip_if_not(.Platform$OS.type == "unix", 
-  skip_on_bioc()
+  skip_if_not(.Platform$OS.type == "unix",
               message = "Parallel WY permutation uses mclapply (Unix only)")
+  skip_on_bioc()
   
   set.seed(999)
   
@@ -1046,9 +1046,9 @@ test_that("WY parallel execution respects .get_effective_nthreads() with high co
   # Validates that requesting very high thread counts (999) is handled gracefully
   # by .get_effective_nthreads() and doesn't cause errors
   
-  skip_if_not(.Platform$OS.type == "unix", 
-  skip_on_bioc()
+  skip_if_not(.Platform$OS.type == "unix",
               message = "Parallel WY permutation uses mclapply (Unix only)")
+  skip_on_bioc()
   
   set.seed(1111)
   
@@ -1096,9 +1096,9 @@ test_that("WY parallel and serial execution produce similar permutation distribu
   # Compares parallel (nthreads=2) vs serial (nthreads=1) execution
   # Results should be similar (same random seed ensures reproducibility)
   
-  skip_if_not(.Platform$OS.type == "unix", 
-  skip_on_bioc()
+  skip_if_not(.Platform$OS.type == "unix",
               message = "Parallel WY permutation uses mclapply (Unix only)")
+  skip_on_bioc()
   
   set.seed(2222)
   
