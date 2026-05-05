@@ -866,7 +866,7 @@ test_that("WY parallel execution respects .get_effective_nthreads() with high co
     subject = c("S1", "S2"),
     sample_type = c("A", "B"),
     q = 1,
-    gene = c("Gene1")
+    gene = "Gene1"
   )
   data_high$sample <- paste0(data_high$subject, "_", data_high$sample_type)
   data_high$paired_samples <- data_high$subject
@@ -1050,7 +1050,7 @@ test_that("WY parallel execution respects .get_effective_nthreads() with high co
     subject = c("S1", "S2"),
     sample_type = c("A", "B"),
     q = 1,
-    gene = c("Gene1")
+    gene = "Gene1"
   )
   data_high$sample <- paste0(data_high$subject, "_", data_high$sample_type)
   data_high$paired_samples <- data_high$subject
