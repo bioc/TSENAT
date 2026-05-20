@@ -1854,3 +1854,60 @@ test_that(".mest_irls_location uses specified scale parameter", {
 
 
 
+
+# ============================================================================
+# TEST SUITE: Bioconductor c2e8214 - M-Estimation Parameter Validation
+# ============================================================================
+# Tests for match.arg() parameter validation in m-estimation functions
+
+test_that(".calculate_m_estimator accepts valid loss_type parameter", {
+    x <- matrix(rnorm(40), nrow = 5, ncol = 8)
+    samples <- c(rep("A", 4), rep("B", 4))
+    
+    # Test with "lsq"
+    result_lsq <- .calculate_m_estimator(x, samples, loss_type = "lsq")
+    expect_is(result_lsq, "data.frame")
+    
+    # Test with "huber"
+    result_huber <- .calculate_m_estimator(x, samples, loss_type = "huber")
+    expect_is(result_huber, "data.frame")
+    
+    # Test with "tukey"
+    result_tukey <- .calculate_m_estimator(x, samples, loss_type = "tukey")
+    expect_is(result_tukey, "data.frame")
+})
+
+test_that(".calculate_m_estimator accepts valid scale_method parameter", {
+    x <- matrix(rnorm(40), nrow = 5, ncol = 8)
+    samples <- c(rep("A", 4), rep("B", 4))
+    
+    # Test with "mad"
+    result_mad <- .calculate_m_estimator(x, samples, scale_method = "mad")
+    expect_is(result_mad, "data.frame")
+    
+    # Test with "proposal2"
+    result_proposal2 <- .calculate_m_estimator(x, samples, scale_method = "proposal2")
+    expect_is(result_proposal2, "data.frame")
+})
+
+test_that(".calculate_m_estimator rejects invalid loss_type", {
+    x <- matrix(rnorm(40), nrow = 5, ncol = 8)
+    samples <- c(rep("A", 4), rep("B", 4))
+    
+    # Invalid loss_type should error with match.arg message
+    expect_error(
+        .calculate_m_estimator(x, samples, loss_type = "invalid_loss"),
+        regexp = "should be one of"
+    )
+})
+
+test_that(".calculate_m_estimator rejects invalid scale_method", {
+    x <- matrix(rnorm(40), nrow = 5, ncol = 8)
+    samples <- c(rep("A", 4), rep("B", 4))
+    
+    # Invalid scale_method should error with match.arg message
+    expect_error(
+        .calculate_m_estimator(x, samples, scale_method = "invalid_scale"),
+        regexp = "should be one of"
+    )
+})

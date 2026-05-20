@@ -7456,3 +7456,69 @@ test_that(".bootstrap_aggregate_ci preserves CI pairing", {
         expect_true(all(result$ci_lower <= result$ci_upper, na.rm = TRUE))
     }
 })
+
+# ============================================================================
+# TEST SUITE: Bioconductor c2e8214 - Bootstrap Parameter Validation (match.arg)
+# ============================================================================
+# Tests for match.arg() parameter validation in bootstrap functions
+
+test_that(".detect_multimodality accepts valid method parameter", {
+    # Create a bimodal distribution
+    boot_dist <- c(rnorm(50, mean = 0, sd = 1), rnorm(50, mean = 5, sd = 1))
+    
+    # Test with "kde" method (default)
+    result_kde <- .detect_multimodality(boot_dist, method = "kde")
+    expect_is(result_kde, "list")
+    expect_true("n_modes" %in% names(result_kde))
+    
+    # Test with "histogram" method
+    result_hist <- .detect_multimodality(boot_dist, method = "histogram")
+    expect_is(result_hist, "list")
+    expect_true("n_modes" %in% names(result_hist))
+    
+    # Test with "gaps" method
+    result_gaps <- .detect_multimodality(boot_dist, method = "gaps")
+    expect_is(result_gaps, "list")
+    expect_true("n_modes" %in% names(result_gaps))
+})
+
+test_that(".detect_multimodality rejects invalid method parameter", {
+    boot_dist <- rnorm(100)
+    
+    # Invalid method should error with match.arg message
+    expect_error(
+        .detect_multimodality(boot_dist, method = "invalid_method"),
+        regexp = "should be one of"
+    )
+})
+
+test_that(".detect_multimodality uses default method", {
+    # If we call without specifying method, should use "kde" by default
+    boot_dist <- rnorm(100)
+    
+    # This will use default
+    result <- .detect_multimodality(boot_dist)
+    expect_is(result, "list")
+    expect_true("n_modes" %in% names(result))
+})
+
+test_that(".detect_multimodality handles small distributions", {
+    boot_dist <- c(1.0, 1.5, 2.0)  # Very small
+    
+    # Should return a list with interpretation
+    result <- .detect_multimodality(boot_dist, method = "kde")
+    expect_is(result, "list")
+})
+
+test_that(".detect_multimodality partial matching for method parameter", {
+    # match.arg allows partial matching by default
+    boot_dist <- rnorm(100)
+    
+    # "kde" should be accepted
+    result1 <- .detect_multimodality(boot_dist, method = "kde")
+    expect_is(result1, "list")
+    
+    # "k" should also work (partial match to "kde")
+    result2 <- .detect_multimodality(boot_dist, method = "k")
+    expect_is(result2, "list")
+})

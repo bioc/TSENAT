@@ -939,3 +939,525 @@ test_that(".plot_tsallis_gene_specific returns invisibly or displays", {
   # Should either return plot invisibly or print summary
   expect_true(ggplot2::is_ggplot(result) || is.list(result) || length(output) >= 0)
 })
+
+context("Tsallis q-Spectrum Plotting: Coverage Enhancement Tests")
+
+library(ggplot2)
+library(SummarizedExperiment)
+library(testthat)
+
+# ============================================================================
+# Helper: Create test SummarizedExperiment with diversity results
+# ============================================================================
+
+make_test_se_diversity <- function(n_genes = 8, n_samples = 8, q_values = c(0.5, 1.0, 1.5, 2.0)) {
+    skip_if_not_installed("SummarizedExperiment")
+    
+    set.seed(42)
+    n_q <- length(q_values)
+    n_replicates <- 3  # 3 replicates per condition-q combination
+    
+    # Create diversity assay with replicates:
+    # columns = condition × q-value × replicate combinations
+    # This provides enough data for IQR/SD calculations (statistics need multiple samples)
+    
+    unique_conds <- c("control", "treatment")
+    
+    # Create column names with replicates: e.g., "control_rep1_q0.5", "control_rep2_q0.5", etc.
+    # Must match pattern: sample_q[numeric] for the parser
+    col_names <- c()
+    condition_list <- c()
+    q_list <- c()
+    
+    for (cond in unique_conds) {
+        for (q in q_values) {
+            for (rep in 1:n_replicates) {
+                col_names <- c(col_names, paste0(cond, "_rep", rep, "_q", q))
+                condition_list <- c(condition_list, cond)
+                q_list <- c(q_list, q)
+            }
+        }
+    }
+    
+    # Create diversity assay: genes × (condition × q × replicate) combinations
+    # Replicates create realistic variance for statistics calculation
+    n_cols <- length(col_names)
+    diversity_matrix <- matrix(0, nrow = n_genes, ncol = n_cols)
+    
+    for (i in seq_len(n_genes)) {
+        for (j in seq_len(n_cols)) {
+            # Base entropy increases with q
+            q_effect <- 2 - (q_list[j] / 2)  # Higher q → lower entropy (0.5→1.75, 2→1)
+            cond_effect <- ifelse(condition_list[j] == "treatment", 0.3, 0)  # Treatment effect
+            # Replicate variance: smaller noise per replicate, will see IQR/SD across replicates
+            noise <- rnorm(1, mean = 0, sd = 0.1)
+            diversity_matrix[i, j] <- max(0.1, 1.5 + q_effect + cond_effect + noise)
+        }
+    }
+    
+    colnames(diversity_matrix) <- col_names
+    rownames(diversity_matrix) <- paste0("GENE_", 1:n_genes)
+    
+    # Create colData matching the assay columns
+    colData_df <- data.frame(
+        sample_id = col_names,
+        condition = condition_list,
+        q_value = q_list,
+        row.names = col_names
+    )
+    
+    se <- SummarizedExperiment::SummarizedExperiment(
+        assays = list(diversity = diversity_matrix),
+        colData = colData_df,
+        rowData = data.frame(
+            gene_id = paste0("GENE_", 1:n_genes),
+            row.names = paste0("GENE_", 1:n_genes)
+        )
+    )
+    
+    # Add metadata with q-values and condition names
+    S4Vectors::metadata(se)$q_values <- q_values
+    S4Vectors::metadata(se)$condition_col <- "condition"
+    
+    se
+}
+
+# ============================================================================
+# TEST SUITE 1: plot_diversity_spectrum() - Main public function
+# ============================================================================
+
+test_that("plot_diversity_spectrum with metric='iqr' works", {
+    skip_if_not_installed("ggplot2")
+    
+    se <- make_test_se_diversity()
+    
+    # Aggregate mode (default)
+    p <- plot_diversity_spectrum(se, metric = "iqr")
+    
+    expect_is(p, "ggplot")
+    expect_true(inherits(p, "gg"))
+})
+
+test_that("plot_diversity_spectrum with metric='sd' works", {
+    skip_if_not_installed("ggplot2")
+    
+    se <- make_test_se_diversity()
+    
+    # Test SD metric variant
+    p <- plot_diversity_spectrum(se, metric = "sd")
+    
+    expect_is(p, "ggplot")
+    expect_true(inherits(p, "gg"))
+})
+
+test_that("plot_diversity_spectrum with lowercase metric works", {
+    skip_if_not_installed("ggplot2")
+    
+    se <- make_test_se_diversity()
+    
+    # Test case insensitivity
+    p <- plot_diversity_spectrum(se, metric = "IQR")
+    
+    expect_is(p, "ggplot")
+})
+
+test_that("plot_diversity_spectrum with invalid metric errors", {
+    skip_if_not_installed("ggplot2")
+    
+    se <- make_test_se_diversity()
+    
+    # Invalid metric should error - match.arg provides the error message
+    expect_error(
+        plot_diversity_spectrum(se, metric = "invalid_metric"),
+        "should be one of"
+    )
+})
+
+test_that("plot_diversity_spectrum with condition_col parameter", {
+    skip_if_not_installed("ggplot2")
+    
+    se <- make_test_se_diversity()
+    
+    # Specify condition column explicitly
+    p <- plot_diversity_spectrum(se, condition_col = "condition")
+    
+    expect_is(p, "ggplot")
+})
+
+test_that("plot_diversity_spectrum with custom assay_name", {
+    skip_if_not_installed("ggplot2")
+    
+    se <- make_test_se_diversity()
+    
+    # Should work with 'diversity' (default assay name)
+    p <- plot_diversity_spectrum(se, assay_name = "diversity")
+    
+    expect_is(p, "ggplot")
+})
+
+# ============================================================================
+# TEST SUITE 2: .plot_tsallis_gene_specific() - Gene-specific plotting
+# ============================================================================
+
+test_that(".plot_tsallis_gene_specific with single gene", {
+    skip_if_not_installed("ggplot2")
+    
+    se <- make_test_se_diversity()
+    
+    # Single gene should return ggplot
+    p <- TSENAT:::.plot_tsallis_gene_specific(
+        se = se,
+        assay_name = "diversity",
+        condition_col = "condition",
+        gene = "GENE_1",
+        sait_res = NULL,
+        n_top = NULL,
+        metric = "iqr",
+        output_file = NULL
+    )
+    
+    expect_is(p, "ggplot")
+})
+
+test_that(".plot_tsallis_gene_specific with multiple genes", {
+    skip_if_not_installed("ggplot2")
+    
+    se <- make_test_se_diversity()
+    
+    # Multiple genes should return grid plot
+    p <- TSENAT:::.plot_tsallis_gene_specific(
+        se = se,
+        assay_name = "diversity",
+        condition_col = "condition",
+        gene = c("GENE_1", "GENE_2", "GENE_3"),
+        sait_res = NULL,
+        n_top = NULL,
+        metric = "iqr",
+        output_file = NULL
+    )
+    
+    # Grid plot should be gtable or similar, not NULL
+    expect_is(p, c("ggplot", "gtable", "grob"))
+})
+
+test_that(".plot_tsallis_gene_specific with sait_res (adj_p_interaction)", {
+    skip_if_not_installed("ggplot2")
+    
+    se <- make_test_se_diversity()
+    
+    # Create mock SAIT results with adj_p_interaction column
+    sait_res <- data.frame(
+        gene = paste0("GENE_", 1:8),
+        adj_p_interaction = c(0.001, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6),
+        stringsAsFactors = FALSE
+    )
+    
+    # Should select top gene by p-value
+    p <- TSENAT:::.plot_tsallis_gene_specific(
+        se = se,
+        assay_name = "diversity",
+        condition_col = "condition",
+        gene = NULL,
+        sait_res = sait_res,
+        n_top = 1,
+        metric = "iqr",
+        output_file = NULL
+    )
+    
+    expect_is(p, "ggplot")
+})
+
+test_that(".plot_tsallis_gene_specific with sait_res (p_interaction)", {
+    skip_if_not_installed("ggplot2")
+    
+    se <- make_test_se_diversity()
+    
+    # Test with p_interaction column
+    sait_res <- data.frame(
+        gene = paste0("GENE_", 1:8),
+        p_interaction = c(0.001, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6),
+        stringsAsFactors = FALSE
+    )
+    
+    p <- TSENAT:::.plot_tsallis_gene_specific(
+        se = se,
+        assay_name = "diversity",
+        condition_col = "condition",
+        gene = NULL,
+        sait_res = sait_res,
+        n_top = 2,
+        metric = "sd",
+        output_file = NULL
+    )
+    
+    expect_is(p, c("ggplot", "gtable", "grob"))
+})
+
+test_that(".plot_tsallis_gene_specific with sait_res (adj_p_value - SRH)", {
+    skip_if_not_installed("ggplot2")
+    
+    se <- make_test_se_diversity()
+    
+    # Test with adj_p_value column (from SRH)
+    sait_res <- data.frame(
+        gene = paste0("GENE_", 1:8),
+        adj_p_value = c(0.001, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6),
+        stringsAsFactors = FALSE
+    )
+    
+    p <- TSENAT:::.plot_tsallis_gene_specific(
+        se = se,
+        assay_name = "diversity",
+        condition_col = "condition",
+        gene = NULL,
+        sait_res = sait_res,
+        n_top = 1,
+        metric = "iqr",
+        output_file = NULL
+    )
+    
+    expect_is(p, "ggplot")
+})
+
+test_that(".plot_tsallis_gene_specific errors when neither gene nor sait_res provided", {
+    skip_if_not_installed("ggplot2")
+    
+    se <- make_test_se_diversity()
+    
+    # Should error without gene or sait_res
+    expect_error(
+        TSENAT:::.plot_tsallis_gene_specific(
+            se = se,
+            assay_name = "diversity",
+            condition_col = "condition",
+            gene = NULL,
+            sait_res = NULL,
+            n_top = NULL,
+            metric = "iqr",
+            output_file = NULL
+        ),
+        "Either 'gene' or 'sait_res'"
+    )
+})
+
+test_that(".plot_tsallis_gene_specific errors on invalid sait_res (not data.frame)", {
+    skip_if_not_installed("ggplot2")
+    
+    se <- make_test_se_diversity()
+    
+    # sait_res must be data.frame
+    expect_error(
+        TSENAT:::.plot_tsallis_gene_specific(
+            se = se,
+            assay_name = "diversity",
+            condition_col = "condition",
+            gene = NULL,
+            sait_res = list(some = "thing"),
+            n_top = NULL,
+            metric = "iqr",
+            output_file = NULL
+        ),
+        "must be a data.frame"
+    )
+})
+
+test_that(".plot_tsallis_gene_specific errors on missing 'gene' column in sait_res", {
+    skip_if_not_installed("ggplot2")
+    
+    se <- make_test_se_diversity()
+    
+    # sait_res must have 'gene' column
+    invalid_sait <- data.frame(
+        transcript = paste0("TX_", 1:8),
+        p_value = runif(8),
+        stringsAsFactors = FALSE
+    )
+    
+    expect_error(
+        TSENAT:::.plot_tsallis_gene_specific(
+            se = se,
+            assay_name = "diversity",
+            condition_col = "condition",
+            gene = NULL,
+            sait_res = invalid_sait,
+            n_top = NULL,
+            metric = "iqr",
+            output_file = NULL
+        ),
+        "must contain a 'gene' column"
+    )
+})
+
+test_that(".plot_tsallis_gene_specific errors when sait_res missing p-value column", {
+    skip_if_not_installed("ggplot2")
+    
+    se <- make_test_se_diversity()
+    
+    # sait_res must have a p-value column
+    invalid_sait <- data.frame(
+        gene = paste0("GENE_", 1:8),
+        effect_size = rnorm(8),
+        stringsAsFactors = FALSE
+    )
+    
+    expect_error(
+        TSENAT:::.plot_tsallis_gene_specific(
+            se = se,
+            assay_name = "diversity",
+            condition_col = "condition",
+            gene = NULL,
+            sait_res = invalid_sait,
+            n_top = NULL,
+            metric = "iqr",
+            output_file = NULL
+        ),
+        "must contain one of.*adj_p_interaction.*p_interaction.*adj_p_value.*p_value"
+    )
+})
+
+test_that(".plot_tsallis_gene_specific errors on non-existent gene", {
+    skip_if_not_installed("ggplot2")
+    
+    se <- make_test_se_diversity()
+    
+    # Gene name that doesn't exist
+    expect_error(
+        TSENAT:::.plot_tsallis_gene_specific(
+            se = se,
+            assay_name = "diversity",
+            condition_col = "condition",
+            gene = "NONEXISTENT_GENE",
+            sait_res = NULL,
+            n_top = NULL,
+            metric = "iqr",
+            output_file = NULL
+        ),
+        "not found in assay"
+    )
+})
+
+# ============================================================================
+# TEST SUITE 3: Gene column reconstruction
+# ============================================================================
+
+test_that(".plot_tsallis_gene_specific reconstructs Gene column from rownames", {
+    skip_if_not_installed("ggplot2")
+    
+    se <- make_test_se_diversity()
+    
+    # Should work with proper rownames
+    p <- TSENAT:::.plot_tsallis_gene_specific(
+        se = se,
+        assay_name = "diversity",
+        condition_col = "condition",
+        gene = "GENE_1",
+        sait_res = NULL,
+        n_top = NULL,
+        metric = "iqr",
+        output_file = NULL
+    )
+    
+    expect_is(p, "ggplot")
+})
+
+# ============================================================================
+# TEST SUITE 4: Metric parameter handling
+# ============================================================================
+
+test_that(".plot_tsallis_gene_specific uses metric='sd' correctly", {
+    skip_if_not_installed("ggplot2")
+    
+    se <- make_test_se_diversity()
+    
+    # SD metric should work
+    p <- TSENAT:::.plot_tsallis_gene_specific(
+        se = se,
+        assay_name = "diversity",
+        condition_col = "condition",
+        gene = "GENE_1",
+        sait_res = NULL,
+        n_top = NULL,
+        metric = "sd",
+        output_file = NULL
+    )
+    
+    expect_is(p, "ggplot")
+})
+
+# ============================================================================
+# TEST SUITE 5: n_top parameter handling
+# ============================================================================
+
+test_that(".plot_tsallis_gene_specific with n_top=NULL defaults to 1", {
+    skip_if_not_installed("ggplot2")
+    
+    se <- make_test_se_diversity()
+    
+    sait_res <- data.frame(
+        gene = paste0("GENE_", 1:8),
+        adj_p_interaction = c(0.001, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6),
+        stringsAsFactors = FALSE
+    )
+    
+    # n_top=NULL should default to 1 (most significant)
+    p <- TSENAT:::.plot_tsallis_gene_specific(
+        se = se,
+        assay_name = "diversity",
+        condition_col = "condition",
+        gene = NULL,
+        sait_res = sait_res,
+        n_top = NULL,
+        metric = "iqr",
+        output_file = NULL
+    )
+    
+    expect_is(p, "ggplot")
+})
+
+test_that(".plot_tsallis_gene_specific with n_top=3", {
+    skip_if_not_installed("ggplot2")
+    
+    se <- make_test_se_diversity()
+    
+    sait_res <- data.frame(
+        gene = paste0("GENE_", 1:8),
+        adj_p_interaction = c(0.001, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6),
+        stringsAsFactors = FALSE
+    )
+    
+    # Request top 3 genes
+    p <- TSENAT:::.plot_tsallis_gene_specific(
+        se = se,
+        assay_name = "diversity",
+        condition_col = "condition",
+        gene = NULL,
+        sait_res = sait_res,
+        n_top = 3,
+        metric = "iqr",
+        output_file = NULL
+    )
+    
+    # Should return grid plot (multiple genes)
+    expect_is(p, c("ggplot", "gtable", "grob"))
+})
+
+test_that(".plot_tsallis_gene_specific with empty gene vector errors", {
+    skip_if_not_installed("ggplot2")
+    
+    se <- make_test_se_diversity()
+    
+    # Empty gene vector is treated as NULL/FALSE, so triggers the 'neither gene nor sait_res' error
+    expect_error(
+        TSENAT:::.plot_tsallis_gene_specific(
+            se = se,
+            assay_name = "diversity",
+            condition_col = "condition",
+            gene = c(),
+            sait_res = NULL,
+            n_top = NULL,
+            metric = "iqr",
+            output_file = NULL
+        ),
+        "Either 'gene' or 'sait_res'"
+    )
+})

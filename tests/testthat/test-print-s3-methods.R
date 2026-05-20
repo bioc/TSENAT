@@ -281,3 +281,167 @@ test_that("S3 methods dispatch correctly", {
     output <- capture.output(print(conc_text))
     expect_true(any(grepl("Concordance", output)))
 })
+
+# ============================================================================
+# TEST SUITE: Bioconductor c2e8214 S3 Print Method Exports
+# ============================================================================
+# Tests for S3 methods marked with @exportS3Method in commit c2e8214
+
+test_that("print.rank_assumptions exported and works correctly", {
+    # Create a rank_assumptions object
+    rank_results <- list(
+        sphericity = list(statistic = 0.95, pvalue = 0.32),
+        exchangeability = list(statistic = 0.82, pvalue = 0.15)
+    )
+    class(rank_results) <- "rank_assumptions"
+    
+    # Print should work without error
+    output <- capture.output(result <- print(rank_results))
+    
+    # Should return invisibly
+    expect_identical(result, rank_results)
+})
+
+test_that("print.rank_correlation_ci exported and works correctly", {
+    # Create a rank_correlation_ci object with proper structure
+    ci_results <- list(
+        correlation = 0.75,
+        ci_lower = 0.60,
+        ci_upper = 0.85,
+        method = "kendall",
+        correlation_matrix = matrix(c(1, 0.75, 0.75, 1), nrow = 2),
+        ci_level = 0.95,
+        interpretation = "Strong positive correlation"
+    )
+    class(ci_results) <- "rank_correlation_ci"
+    
+    # Print should work without error
+    output <- capture.output(result <- print(ci_results))
+    
+    # Should return invisibly
+    expect_identical(result, ci_results)
+})
+
+test_that("print.tsenat_bootstrap_ci exported and works correctly", {
+    # Create a tsenat_bootstrap_ci object
+    boot_ci <- list(
+        estimate = 0.45,
+        ci_lower = 0.40,
+        ci_upper = 0.50,
+        method = "bca"
+    )
+    class(boot_ci) <- "tsenat_bootstrap_ci"
+    
+    # Print should work without error
+    output <- capture.output(result <- print(boot_ci))
+    
+    # Should return invisibly
+    expect_identical(result, boot_ci)
+})
+
+test_that("print.tsenat_bootstrap_ci_list exported and works correctly", {
+    # Create a tsenat_bootstrap_ci_list object
+    boot_ci_list <- list(
+        list(estimate = 0.45, ci_lower = 0.40, ci_upper = 0.50),
+        list(estimate = 0.52, ci_lower = 0.45, ci_upper = 0.58),
+        list(estimate = 0.61, ci_lower = 0.55, ci_upper = 0.67)
+    )
+    class(boot_ci_list) <- "tsenat_bootstrap_ci_list"
+    
+    # Print should work without error
+    output <- capture.output(result <- print(boot_ci_list))
+    
+    # Should return invisibly
+    expect_identical(result, boot_ci_list)
+})
+
+test_that("print.tsenat_divergence_bootstrap_ci exported and works correctly", {
+    # Create a tsenat_divergence_bootstrap_ci object
+    div_boot_ci <- list(
+        estimate = 0.35,
+        ci_lower = 0.30,
+        ci_upper = 0.40,
+        method = "percentile"
+    )
+    class(div_boot_ci) <- "tsenat_divergence_bootstrap_ci"
+    
+    # Print should work without error
+    output <- capture.output(result <- print(div_boot_ci))
+    
+    # Should return invisibly (silently for this class)
+    expect_identical(result, div_boot_ci)
+})
+
+test_that("print.tsenat_jackknife exported and works correctly", {
+    # Create a tsenat_jackknife object
+    jk_result <- list(
+        estimate = 0.42,
+        bias = 0.01,
+        se = 0.03,
+        ci_lower = 0.37,
+        ci_upper = 0.47
+    )
+    class(jk_result) <- "tsenat_jackknife"
+    
+    # Print should work without error
+    output <- capture.output(result <- print(jk_result))
+    
+    # Should return invisibly
+    expect_identical(result, jk_result)
+})
+
+test_that("print.tsenat_jackknife_list exported and works correctly", {
+    # Create a tsenat_jackknife_list object
+    jk_list <- list(
+        list(estimate = 0.42, bias = 0.01, se = 0.03),
+        list(estimate = 0.51, bias = 0.02, se = 0.04),
+        list(estimate = 0.63, bias = 0.01, se = 0.05)
+    )
+    class(jk_list) <- "tsenat_jackknife_list"
+    
+    # Print should work without error
+    output <- capture.output(result <- print(jk_list))
+    
+    # Should return invisibly
+    expect_identical(result, jk_list)
+})
+
+test_that("S3 method registration enables proper dispatch", {
+    # Verify that proper objects with matching class dispatch correctly
+    # Using realistic objects that match the actual class structure
+    
+    # Test rank_assumptions with proper structure
+    rank_obj <- list(
+        sphericity = list(stat = 0.5, pval = 0.2),
+        exchangeability = list(stat = 0.6, pval = 0.1)
+    )
+    class(rank_obj) <- "rank_assumptions"
+    expect_is(rank_obj, "rank_assumptions")
+    # Print methods produce messages, so suppress them
+    suppressMessages(capture.output(print(rank_obj)))
+    expect_true(TRUE)  # Verify it ran without error
+    
+    # Test tsenat_bootstrap_ci with proper structure
+    boot_obj <- list(
+        estimate = 0.5,
+        ci_lower = 0.4,
+        ci_upper = 0.6
+    )
+    class(boot_obj) <- "tsenat_bootstrap_ci"
+    expect_is(boot_obj, "tsenat_bootstrap_ci")
+    # Print methods produce messages, so suppress them
+    suppressMessages(capture.output(print(boot_obj)))
+    expect_true(TRUE)  # Verify it ran without error
+    
+    # Test tsenat_jackknife with proper structure
+    jk_obj <- list(
+        estimate = 0.5,
+        bias = 0.01,
+        se = 0.02
+    )
+    class(jk_obj) <- "tsenat_jackknife"
+    expect_is(jk_obj, "tsenat_jackknife")
+    # Print methods produce messages, so suppress them
+    suppressMessages(capture.output(print(jk_obj)))
+    expect_true(TRUE)  # Verify it ran without error
+})

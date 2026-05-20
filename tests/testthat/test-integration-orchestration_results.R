@@ -1317,3 +1317,652 @@ test_that(".extract_analysis_statistics handles NAs in p-values", {
   # Should count 2 significant (not counting NAs): 0.001 and 0.04 are < 0.05
   expect_equal(stats$n_sait_significant, 2)
 })
+
+context("Orchestration Results: Coverage Enhancement Tests")
+
+# ============================================================================
+# HELPER: Create test SummarizedExperiment with proper metadata for calculate_diversity()
+# ============================================================================
+make_test_se_with_metadata <- function(n_genes = 20, n_samples = 12) {
+    skip_if_not_installed("SummarizedExperiment")
+    
+    data(readcounts, package = "TSENAT", envir = environment())
+    readcounts_mat <- as.matrix(readcounts)[1:n_genes, 1:n_samples]
+    
+    # Create tx2gene mapping from readcounts rownames
+    tx_ids <- rownames(readcounts_mat)
+    # Map each transcript to a gene (e.g., every 2-3 transcripts = 1 gene)
+    tx_per_gene <- ceiling(n_genes / 4)  # Create ~4 genes
+    gene_ids <- paste0("GENE_", rep(1:4, length.out = n_genes))
+    
+    tx2gene <- data.frame(
+        Transcript = tx_ids,
+        Gene = gene_ids,
+        stringsAsFactors = FALSE
+    )
+    
+    se <- SummarizedExperiment::SummarizedExperiment(
+        assays = list(counts = readcounts_mat),
+        colData = data.frame(
+            sample_id = paste0("S", 1:n_samples),
+            condition = rep(c("A", "B"), length.out = n_samples),
+            row.names = colnames(readcounts_mat)
+        ),
+        rowData = data.frame(
+            gene_id = gene_ids,
+            transcript_id = tx_ids,
+            row.names = tx_ids
+        )
+    )
+    
+    # Add tx2gene and readcounts to metadata (required by .prepare_diversity_input)
+    S4Vectors::metadata(se)$tx2gene <- tx2gene
+    S4Vectors::metadata(se)$readcounts <- readcounts_mat
+    
+    se
+}
+
+# ============================================================================
+# TEST SUITE 1: results() Function - Plot Extraction and Error Handling
+# ============================================================================
+# Tests for uncovered lines in results() function (lines 167, 172-176, 198-201)
+
+test_that("results() extracts plot when plot=TRUE and type maps to cached plot", {
+    skip_if_not_installed("SummarizedExperiment")
+    
+    # Create analysis object with proper metadata for calculate_diversity()
+    se <- make_test_se_with_metadata(n_genes = 20, n_samples = 12)
+    
+    config <- TSENAT_config(condition_col = "condition", q = 1.0)
+    analysis <- TSENATAnalysis(se = se, config = config)
+    analysis <- calculate_diversity(analysis, q = 1.0)
+    
+    # Add a test plot to the analysis
+    test_plot <- ggplot2::ggplot() + ggplot2::theme_minimal()
+    analysis@plots[["q_curve"]] <- test_plot
+    
+    # Extract plot using results()
+    extracted_plot <- results(analysis, type = "diversity", plot = TRUE)
+    
+    # Should return the cached plot
+    expect_is(extracted_plot, "ggplot")
+})
+
+test_that("results() falls back to type-direct plot mapping when type not in map", {
+    skip_if_not_installed("SummarizedExperiment")
+    
+    # Create analysis with proper metadata
+    se <- make_test_se_with_metadata(n_genes = 20, n_samples = 12)
+    
+    config <- TSENAT_config(condition_col = "condition", q = 1.0)
+    analysis <- TSENATAnalysis(se = se, config = config)
+    
+    # Add custom plot with direct type name
+    test_plot <- ggplot2::ggplot() + ggplot2::theme_minimal()
+    analysis@plots[["custom_type"]] <- test_plot
+    
+    # Should fall back to direct type matching
+    extracted_plot <- results(analysis, type = "custom_type", plot = TRUE)
+    expect_is(extracted_plot, "ggplot")
+})
+
+test_that("results() returns NULL and warns when plot not found", {
+    skip_if_not_installed("SummarizedExperiment")
+    
+    # Create minimal analysis with no plots
+    data(readcounts, package = "TSENAT")
+    se <- SummarizedExperiment::SummarizedExperiment(
+        assays = list(counts = readcounts[1:5, 1:6]),
+        colData = data.frame(
+            condition = rep(c("A", "B"), 3),
+            sample_id = paste0("S", 1:6),
+            sample = paste0("S", 1:6)
+        )
+    )
+    
+    config <- TSENAT_config(condition_col = "condition")
+    analysis <- TSENATAnalysis(se = se, config = config)
+    
+    # Request non-existent plot
+    expect_warning(
+        result <- results(analysis, type = "nonexistent_plot", plot = TRUE),
+        "not found"
+    )
+    expect_null(result)
+})
+
+# ============================================================================
+# TEST SUITE 2: .validate_results_params() Function
+# ============================================================================
+# Tests for match.arg() parameter validation
+
+test_that(".validate_results_params accepts valid rankBy values", {
+    skip_if_not_installed("SummarizedExperiment")
+    
+    data(readcounts, package = "TSENAT")
+    se <- SummarizedExperiment::SummarizedExperiment(
+        assays = list(counts = readcounts[1:5, 1:6]),
+        colData = data.frame(
+            condition = rep(c("A", "B"), 3),
+            sample_id = paste0("S", 1:6)
+        )
+    )
+    
+    config <- TSENAT_config(condition_col = "condition")
+    analysis <- TSENATAnalysis(se = se, config = config)
+    
+    # Should not error with valid rankBy values
+    expect_silent(.validate_results_params(analysis, "jackknife", rankBy = "none", filterFDR = NULL))
+    expect_silent(.validate_results_params(analysis, "jackknife", rankBy = "pvalue", filterFDR = NULL))
+    expect_silent(.validate_results_params(analysis, "jackknife", rankBy = "padj", filterFDR = NULL))
+})
+
+test_that(".validate_results_params rejects invalid rankBy values", {
+    skip_if_not_installed("SummarizedExperiment")
+    
+    data(readcounts, package = "TSENAT")
+    se <- SummarizedExperiment::SummarizedExperiment(
+        assays = list(counts = readcounts[1:5, 1:6]),
+        colData = data.frame(
+            condition = rep(c("A", "B"), 3),
+            sample_id = paste0("S", 1:6)
+        )
+    )
+    
+    config <- TSENAT_config(condition_col = "condition")
+    analysis <- TSENATAnalysis(se = se, config = config)
+    
+    # Should error with invalid rankBy
+    expect_error(
+        .validate_results_params(analysis, "jackknife", rankBy = "invalid_rank", filterFDR = NULL),
+        "should be one of"
+    )
+})
+
+test_that(".validate_results_params rejects invalid format values", {
+    skip_if_not_installed("SummarizedExperiment")
+    
+    data(readcounts, package = "TSENAT")
+    se <- SummarizedExperiment::SummarizedExperiment(
+        assays = list(counts = readcounts[1:5, 1:6]),
+        colData = data.frame(
+            condition = rep(c("A", "B"), 3),
+            sample_id = paste0("S", 1:6)
+        )
+    )
+    
+    config <- TSENAT_config(condition_col = "condition")
+    analysis <- TSENATAnalysis(se = se, config = config)
+    
+    # Should error with invalid format
+    expect_error(
+        .validate_results_params(analysis, "diversity", rankBy = "none", format = "invalid_format", filterFDR = NULL),
+        "should be one of"
+    )
+})
+
+test_that(".validate_results_params validates filterFDR range", {
+    skip_if_not_installed("SummarizedExperiment")
+    
+    data(readcounts, package = "TSENAT")
+    se <- SummarizedExperiment::SummarizedExperiment(
+        assays = list(counts = readcounts[1:5, 1:6]),
+        colData = data.frame(
+            condition = rep(c("A", "B"), 3),
+            sample_id = paste0("S", 1:6)
+        )
+    )
+    
+    config <- TSENAT_config(condition_col = "condition")
+    analysis <- TSENATAnalysis(se = se, config = config)
+    
+    # Valid FDR values
+    expect_silent(.validate_results_params(analysis, "jackknife", rankBy = "none", filterFDR = 0.05))
+    expect_silent(.validate_results_params(analysis, "jackknife", rankBy = "none", filterFDR = 0))
+    expect_silent(.validate_results_params(analysis, "jackknife", rankBy = "none", filterFDR = 1))
+    
+    # Invalid FDR values
+    expect_error(
+        .validate_results_params(analysis, "jackknife", rankBy = "none", filterFDR = -0.1),
+        "between 0 and 1"
+    )
+    expect_error(
+        .validate_results_params(analysis, "jackknife", rankBy = "none", filterFDR = 1.5),
+        "between 0 and 1"
+    )
+})
+
+# ============================================================================
+# TEST SUITE 3: .get_diversity_q_value() Function
+# ============================================================================
+# Tests for q-value extraction with various formatting
+
+test_that(".get_diversity_q_value extracts correct q-value from results", {
+    skip_if_not_installed("SummarizedExperiment")
+    
+    # Create result with multiple q-values
+    q_results <- list(
+        q_1 = matrix(1:10, nrow = 2),
+        q_1_5 = matrix(11:20, nrow = 2),
+        q_2 = matrix(21:30, nrow = 2)
+    )
+    class(q_results) <- c("list", "diversity_results")
+    
+    # Extract specific q-value
+    result_q1 <- .get_diversity_q_value(q_results, q = 1.0)
+    expect_is(result_q1, "matrix")
+    expect_equal(result_q1, q_results$q_1)
+    
+    result_q15 <- .get_diversity_q_value(q_results, q = 1.5)
+    expect_is(result_q15, "matrix")
+})
+
+test_that(".get_diversity_q_value handles integer q-values", {
+    # Create result with formatted q-value keys
+    q_results <- list(
+        q_0 = matrix(1:10, nrow = 2),
+        q_1 = matrix(11:20, nrow = 2),
+        q_2 = matrix(21:30, nrow = 2)
+    )
+    
+    # Should match integer q to "q_1" format
+    result <- .get_diversity_q_value(q_results, q = 1)
+    expect_is(result, "matrix")
+})
+
+# ============================================================================
+# TEST SUITE 4: .extract_diversity_table() Function
+# ============================================================================
+# Tests for diversity table extraction (line 281 - uncovered null check)
+
+test_that(".extract_result_by_type routes to correct diversity results", {
+    skip_if_not_installed("SummarizedExperiment")
+    
+    se <- make_test_se_with_metadata(n_genes = 20, n_samples = 12)
+    
+    config <- TSENAT_config(condition_col = "condition", q = 1.0)
+    analysis <- TSENATAnalysis(se = se, config = config)
+    analysis <- calculate_diversity(analysis, q = 1.0)
+    
+    # Test that .extract_result_by_type returns the diversity results correctly
+    result <- .extract_result_by_type(analysis, "diversity")
+    
+    # Should return a list of diversity results
+    expect_is(result, "list")
+})
+
+# ============================================================================
+# TEST SUITE 5: .extract_result_by_type() Function
+# ============================================================================
+# Tests for result extraction with missing result types (lines 345, 347)
+
+test_that(".extract_result_by_type returns error for undefined result type", {
+    skip_if_not_installed("SummarizedExperiment")
+    
+    data(readcounts, package = "TSENAT")
+    se <- SummarizedExperiment::SummarizedExperiment(
+        assays = list(counts = readcounts[1:5, 1:6]),
+        colData = data.frame(
+            condition = rep(c("A", "B"), 3),
+            sample_id = paste0("S", 1:6)
+        )
+    )
+    
+    config <- TSENAT_config(condition_col = "condition")
+    analysis <- TSENATAnalysis(se = se, config = config)
+    
+    # Extract non-existent type should error (not return NULL)
+    expect_error(
+        .extract_result_by_type(analysis, "nonexistent_result"),
+        "Unknown result type"
+    )
+})
+
+test_that(".extract_result_by_type handles various result types", {
+    skip_if_not_installed("SummarizedExperiment")
+    
+    se <- make_test_se_with_metadata(n_genes = 20, n_samples = 12)
+    
+    config <- TSENAT_config(condition_col = "condition", q = 1.0)
+    analysis <- TSENATAnalysis(se = se, config = config)
+    analysis <- calculate_diversity(analysis, q = 1.0)
+    
+    # Extract diversity result (which exists)
+    result_div <- .extract_result_by_type(analysis, "diversity")
+    expect_is(result_div, "list")
+})
+
+# ============================================================================
+# TEST SUITE 6: .get_metadata_field() and .set_metadata_field()
+# ============================================================================
+# Tests for metadata accessors (lines 357, 364 - uncovered NULL checks)
+
+test_that(".get_metadata_field returns NULL when metadata is empty", {
+    skip_if_not_installed("SummarizedExperiment")
+    
+    data(readcounts, package = "TSENAT")
+    se <- SummarizedExperiment::SummarizedExperiment(
+        assays = list(counts = readcounts[1:5, 1:6]),
+        colData = data.frame(
+            condition = rep(c("A", "B"), 3),
+            sample_id = paste0("S", 1:6)
+        )
+    )
+    
+    config <- TSENAT_config(condition_col = "condition")
+    analysis <- TSENATAnalysis(se = se, config = config)
+    # metadata starts as empty list
+    
+    # Should return NULL for non-existent field
+    result <- .get_metadata_field(analysis, "nonexistent_field")
+    expect_null(result)
+})
+
+test_that(".set_metadata_field initializes metadata", {
+    skip_if_not_installed("SummarizedExperiment")
+    
+    data(readcounts, package = "TSENAT")
+    se <- SummarizedExperiment::SummarizedExperiment(
+        assays = list(counts = readcounts[1:5, 1:6]),
+        colData = data.frame(
+            condition = rep(c("A", "B"), 3),
+            sample_id = paste0("S", 1:6)
+        )
+    )
+    
+    config <- TSENAT_config(condition_col = "condition")
+    analysis <- TSENATAnalysis(se = se, config = config)
+    
+    # metadata starts as empty list - set should update it
+    analysis <- .set_metadata_field(analysis, "test_field", "test_value")
+    
+    expect_is(analysis@metadata, "list")
+    expect_equal(analysis@metadata$test_field, "test_value")
+})
+
+test_that(".set_metadata_field updates existing metadata", {
+    skip_if_not_installed("SummarizedExperiment")
+    
+    data(readcounts, package = "TSENAT")
+    se <- SummarizedExperiment::SummarizedExperiment(
+        assays = list(counts = readcounts[1:5, 1:6]),
+        colData = data.frame(
+            condition = rep(c("A", "B"), 3),
+            sample_id = paste0("S", 1:6)
+        )
+    )
+    
+    config <- TSENAT_config(condition_col = "condition")
+    analysis <- TSENATAnalysis(se = se, config = config)
+    analysis@metadata <- list(existing_field = "existing_value")
+    
+    # Should update metadata
+    analysis <- .set_metadata_field(analysis, "new_field", "new_value")
+    
+    expect_equal(analysis@metadata$existing_field, "existing_value")
+    expect_equal(analysis@metadata$new_field, "new_value")
+})
+
+# ============================================================================
+# TEST SUITE 7: .extract_jackknife_result() Function
+# ============================================================================
+# Tests for jackknife result extraction (line 386 - uncovered branch)
+
+test_that(".extract_jackknife_result handles data frame jackknife results", {
+    skip_if_not_installed("SummarizedExperiment")
+    
+    data(readcounts, package = "TSENAT")
+    se <- SummarizedExperiment::SummarizedExperiment(
+        assays = list(counts = readcounts[1:5, 1:6]),
+        colData = data.frame(
+            condition = rep(c("A", "B"), 3),
+            sample_id = paste0("S", 1:6)
+        )
+    )
+    
+    config <- TSENAT_config(condition_col = "condition")
+    analysis <- TSENATAnalysis(se = se, config = config)
+    
+    # Set jackknife results as data frame
+    jk_df <- data.frame(
+        Gene = paste0("Gene", 1:5),
+        estimate = rnorm(5),
+        ci_lower = rnorm(5),
+        ci_upper = rnorm(5)
+    )
+    analysis@jackknife_results <- jk_df
+    
+    # Extract should return the data frame
+    result <- .extract_jackknife_result(analysis)
+    expect_is(result, "data.frame")
+    expect_equal(nrow(result), 5)
+})
+
+test_that(".extract_jackknife_result handles list with results field", {
+    skip_if_not_installed("SummarizedExperiment")
+    
+    data(readcounts, package = "TSENAT")
+    se <- SummarizedExperiment::SummarizedExperiment(
+        assays = list(counts = readcounts[1:5, 1:6]),
+        colData = data.frame(
+            condition = rep(c("A", "B"), 3),
+            sample_id = paste0("S", 1:6)
+        )
+    )
+    
+    config <- TSENAT_config(condition_col = "condition")
+    analysis <- TSENATAnalysis(se = se, config = config)
+    
+    # Set jackknife results as list with results field
+    jk_list <- list(
+        results = data.frame(
+            Gene = paste0("Gene", 1:5),
+            estimate = rnorm(5)
+        ),
+        metadata = "test"
+    )
+    analysis@jackknife_results <- jk_list
+    
+    # Extract should return the results data frame
+    result <- .extract_jackknife_result(analysis)
+    expect_is(result, "data.frame")
+    expect_equal(nrow(result), 5)
+})
+
+test_that(".extract_jackknife_result returns NULL for empty jackknife", {
+    skip_if_not_installed("SummarizedExperiment")
+    
+    data(readcounts, package = "TSENAT")
+    se <- SummarizedExperiment::SummarizedExperiment(
+        assays = list(counts = readcounts[1:5, 1:6]),
+        colData = data.frame(
+            condition = rep(c("A", "B"), 3),
+            sample_id = paste0("S", 1:6)
+        )
+    )
+    
+    config <- TSENAT_config(condition_col = "condition")
+    analysis <- TSENATAnalysis(se = se, config = config)
+    analysis@jackknife_results <- list()  # Empty
+    
+    # Extract should return NULL
+    result <- .extract_jackknife_result(analysis)
+    expect_null(result)
+})
+
+# ============================================================================
+# TEST SUITE 8: .extract_or_compute_switching_tables() Function
+# ============================================================================
+# Tests for switching table extraction/computation (lines 410, 413, 415, 419, 427, 436)
+
+test_that(".extract_or_compute_switching_tables returns NULL for missing sait or jackknife", {
+    skip_if_not_installed("SummarizedExperiment")
+    
+    data(readcounts, package = "TSENAT")
+    se <- SummarizedExperiment::SummarizedExperiment(
+        assays = list(counts = readcounts[1:5, 1:6]),
+        colData = data.frame(
+            condition = rep(c("A", "B"), 3),
+            sample_id = paste0("S", 1:6)
+        )
+    )
+    
+    config <- TSENAT_config(condition_col = "condition")
+    analysis <- TSENATAnalysis(se = se, config = config)
+    analysis@sait_results <- list()  # Empty sait
+    analysis@jackknife_results <- list()  # Empty jackknife
+    
+    # Should return NULL when prerequisites missing
+    result <- .extract_or_compute_switching_tables(analysis)
+    expect_null(result)
+})
+
+test_that(".extract_or_compute_switching_tables handles cached switching tables", {
+    skip_if_not_installed("SummarizedExperiment")
+    
+    data(readcounts, package = "TSENAT")
+    se <- SummarizedExperiment::SummarizedExperiment(
+        assays = list(counts = readcounts[1:5, 1:6]),
+        colData = data.frame(
+            condition = rep(c("A", "B"), 3),
+            sample_id = paste0("S", 1:6)
+        )
+    )
+    
+    config <- TSENAT_config(condition_col = "condition")
+    analysis <- TSENATAnalysis(se = se, config = config)
+    
+    # Create cached switching tables
+    cached_tables <- list(gene1 = data.frame(Transcript = c("T1", "T2")))
+    analysis@metadata <- list(switching_tables = cached_tables)
+    
+    # Should return cached tables immediately
+    result <- .extract_or_compute_switching_tables(analysis)
+    expect_identical(result, cached_tables)
+})
+
+# ============================================================================
+# TEST SUITE 9: .warn_unsupported_params() Function
+# ============================================================================
+# Tests for parameter validation warnings
+
+test_that(".warn_unsupported_params warns for switching_tables with rankBy", {
+    expect_warning(
+        .warn_unsupported_params("switching_tables", filterFDR = NULL, rankBy = "pvalue"),
+        "rankBy.*switching_tables"
+    )
+})
+
+test_that(".warn_unsupported_params warns for unsupported rankBy types", {
+    expect_warning(
+        .warn_unsupported_params("diversity", filterFDR = NULL, rankBy = "pvalue"),
+        "rankBy.*not supported"
+    )
+})
+
+# ============================================================================
+# TEST SUITE 10: .extract_jackknife_multi_q() Function
+# ============================================================================
+# Tests for multi-q jackknife extraction (lines 496-501)
+
+test_that(".extract_jackknife_multi_q extracts specific q-value from list", {
+    jk_res <- list(
+        q_1_00 = data.frame(
+            Gene = paste0("Gene", 1:3),
+            estimate = c(0.5, 0.6, 0.7)
+        ),
+        q_1_50 = data.frame(
+            Gene = paste0("Gene", 1:3),
+            estimate = c(0.4, 0.5, 0.6)
+        )
+    )
+    
+    # Extract q=1.0
+    result <- .extract_jackknife_multi_q(jk_res, q = 1.0, rankBy = "none")
+    expect_is(result, "data.frame")
+})
+
+test_that(".extract_jackknife_multi_q handles missing q-value", {
+    jk_res <- list(
+        q_1_00 = data.frame(Gene = paste0("Gene", 1:3)),
+        q_1_50 = data.frame(Gene = paste0("Gene", 1:3))
+    )
+    
+    # Request non-existent q-value
+    expect_warning(
+        result <- .extract_jackknife_multi_q(jk_res, q = 2.5, rankBy = "none"),
+        "not found"
+    )
+    expect_null(result)
+})
+
+test_that(".extract_jackknife_multi_q extracts multi_q when q is NULL", {
+    jk_res <- list(
+        multi_q = data.frame(
+            Gene = paste0("Gene", 1:3),
+            summary = c("summary1", "summary2", "summary3")
+        ),
+        q_1_00 = data.frame(Gene = paste0("Gene", 1:3))
+    )
+    
+    # Extract multi_q when q=NULL
+    result <- .extract_jackknife_multi_q(jk_res, q = NULL, rankBy = "none")
+    expect_is(result, "data.frame")
+    expect_true("summary" %in% colnames(result))
+})
+
+# ============================================================================
+# TEST SUITE 11: Integration Tests for complete result extraction workflows
+# ============================================================================
+
+test_that("results() successfully extracts diversity results with multiple formats", {
+    skip_if_not_installed("SummarizedExperiment")
+    
+    se <- make_test_se_with_metadata(n_genes = 20, n_samples = 12)
+    
+    config <- TSENAT_config(condition_col = "condition", q = 1.0)
+    analysis <- TSENATAnalysis(se = se, config = config)
+    analysis <- calculate_diversity(analysis, q = 1.0)
+    
+    # Extract with format='text'
+    result_text <- results(analysis, type = "diversity", format = "text")
+    expect_is(result_text, "data.frame")
+    
+    # Extract with format='table'
+    result_table <- results(analysis, type = "diversity", format = "table")
+    expect_is(result_table, "data.frame")
+})
+
+test_that("results() handles NULL result gracefully", {
+    skip_if_not_installed("SummarizedExperiment")
+    
+    data(readcounts, package = "TSENAT")
+    se <- SummarizedExperiment::SummarizedExperiment(
+        assays = list(counts = readcounts[1:5, 1:6]),
+        colData = data.frame(
+            condition = rep(c("A", "B"), 3),
+            sample_id = paste0("S", 1:6)
+        )
+    )
+    
+    config <- TSENAT_config(condition_col = "condition")
+    analysis <- TSENATAnalysis(se = se, config = config)
+    
+    # Request non-computed result type
+    result <- results(analysis, type = "jackknife")
+    expect_null(result)
+})
+
+test_that("results() with q parameter returns correct subset", {
+    skip_if_not_installed("SummarizedExperiment")
+    
+    se <- make_test_se_with_metadata(n_genes = 20, n_samples = 12)
+    
+    config <- TSENAT_config(condition_col = "condition", q = 1.0)
+    analysis <- TSENATAnalysis(se = se, config = config)
+    analysis <- calculate_diversity(analysis, q = 1.0)
+    
+    # Extract specific q-value
+    result <- results(analysis, type = "diversity", q = 1.0, format = "text")
+    expect_is(result, "data.frame")
+})
