@@ -1967,10 +1967,6 @@ test_that("results() with q parameter returns correct subset", {
     expect_is(result, "data.frame")
 })
 
-library(testthat)
-
-context("Phase 1: Critical Coverage - orchestration_results.R")
-
 # ==============================================================================
 # PHASE 1 CRITICAL: .get_ranking_column() Tests - 25% → 90%+ Coverage
 # Issue: Only 2 of 8 code branches tested, nested switch statements
