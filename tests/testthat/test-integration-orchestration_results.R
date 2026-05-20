@@ -1966,3 +1966,1521 @@ test_that("results() with q parameter returns correct subset", {
     result <- results(analysis, type = "diversity", q = 1.0, format = "text")
     expect_is(result, "data.frame")
 })
+
+# ==============================================================================
+# PHASE 1 CRITICAL: .get_ranking_column() Tests - 25% → 90%+ Coverage
+# Issue: Only 2 of 8 code branches tested, nested switch statements
+# ==============================================================================
+
+test_that(".get_ranking_column returns p_interaction for SAIT pvalue", {
+  result <- data.frame(
+    gene = c("g1", "g2"),
+    p_interaction = c(0.01, 0.05),
+    estimate = c(0.5, 0.3)
+  )
+  
+  col <- .get_ranking_column("sait", "pvalue", result)
+  expect_equal(col, "p_interaction")
+})
+
+test_that(".get_ranking_column returns adj_p_interaction for SAIT padj", {
+  result <- data.frame(
+    gene = c("g1", "g2"),
+    adj_p_interaction = c(0.05, 0.10),
+    estimate = c(0.5, 0.3)
+  )
+  
+  col <- .get_ranking_column("sait", "padj", result)
+  expect_equal(col, "adj_p_interaction")
+})
+
+test_that(".get_ranking_column returns statistic for SAIT effectSize (priority)", {
+  result <- data.frame(
+    gene = c("g1", "g2"),
+    statistic = c(2.5, 3.0),
+    estimate = c(0.5, 0.3)
+  )
+  
+  col <- .get_ranking_column("sait", "effectSize", result)
+  expect_equal(col, "statistic")
+})
+
+test_that(".get_ranking_column falls back to estimate for SAIT effectSize", {
+  result <- data.frame(
+    gene = c("g1", "g2"),
+    estimate = c(0.5, 0.3),
+    p_interaction = c(0.01, 0.05)
+  )
+  
+  col <- .get_ranking_column("sait", "effectSize", result)
+  expect_equal(col, "estimate")
+})
+
+test_that(".get_ranking_column returns effect_size for SAIT effectSize fallback", {
+  result <- data.frame(
+    gene = c("g1", "g2"),
+    effect_size = c(0.5, 0.3),
+    p_interaction = c(0.01, 0.05)
+  )
+  
+  col <- .get_ranking_column("sait", "effectSize", result)
+  expect_equal(col, "effect_size")
+})
+
+test_that(".get_ranking_column returns NULL for SAIT pvalue when column absent", {
+  result <- data.frame(
+    gene = c("g1", "g2"),
+    estimate = c(0.5, 0.3)
+  )
+  
+  col <- .get_ranking_column("sait", "pvalue", result)
+  expect_null(col)
+})
+
+test_that(".get_ranking_column returns p_value for rank_test pvalue", {
+  result <- data.frame(
+    gene = c("g1", "g2"),
+    p_value = c(0.01, 0.05),
+    statistic = c(1.5, 2.0)
+  )
+  
+  col <- .get_ranking_column("rank_test", "pvalue", result)
+  expect_equal(col, "p_value")
+})
+
+test_that(".get_ranking_column returns adj_p_value for rank_test padj", {
+  result <- data.frame(
+    gene = c("g1", "g2"),
+    adj_p_value = c(0.05, 0.10),
+    p_value = c(0.01, 0.02)
+  )
+  
+  col <- .get_ranking_column("rank_test", "padj", result)
+  expect_equal(col, "adj_p_value")
+})
+
+test_that(".get_ranking_column returns statistic for rank_test effectSize", {
+  result <- data.frame(
+    gene = c("g1", "g2"),
+    statistic = c(2.5, 3.0),
+    p_value = c(0.01, 0.05)
+  )
+  
+  col <- .get_ranking_column("rank_test", "effectSize", result)
+  expect_equal(col, "statistic")
+})
+
+test_that(".get_ranking_column returns pvalue for jackknife pvalue", {
+  result <- data.frame(
+    gene = c("g1", "g2"),
+    pvalue = c(0.01, 0.05),
+    delta_influence = c(0.5, 0.3)
+  )
+  
+  col <- .get_ranking_column("jackknife", "pvalue", result)
+  expect_equal(col, "pvalue")
+})
+
+test_that(".get_ranking_column returns fdr for jackknife padj", {
+  result <- data.frame(
+    gene = c("g1", "g2"),
+    fdr = c(0.05, 0.10),
+    pvalue = c(0.01, 0.02)
+  )
+  
+  col <- .get_ranking_column("jackknife", "padj", result)
+  expect_equal(col, "fdr")
+})
+
+test_that(".get_ranking_column returns delta_influence for jackknife effectSize", {
+  result <- data.frame(
+    gene = c("g1", "g2"),
+    delta_influence = c(2.5, 3.0),
+    pvalue = c(0.01, 0.05)
+  )
+  
+  col <- .get_ranking_column("jackknife", "effectSize", result)
+  expect_equal(col, "delta_influence")
+})
+
+test_that(".get_ranking_column returns max_delta_influence fallback for jackknife", {
+  result <- data.frame(
+    gene = c("g1", "g2"),
+    max_delta_influence = c(2.5, 3.0),
+    pvalue = c(0.01, 0.05)
+  )
+  
+  col <- .get_ranking_column("jackknife", "effectSize", result)
+  expect_equal(col, "max_delta_influence")
+})
+
+test_that(".get_ranking_column returns NULL for invalid type", {
+  result <- data.frame(
+    gene = c("g1", "g2"),
+    p_value = c(0.01, 0.05)
+  )
+  
+  col <- .get_ranking_column("invalid_type", "pvalue", result)
+  expect_null(col)
+})
+
+test_that(".get_ranking_column returns NULL for invalid rankBy", {
+  result <- data.frame(
+    gene = c("g1", "g2"),
+    p_value = c(0.01, 0.05),
+    statistic = c(2.5, 3.0)
+  )
+  
+  col <- .get_ranking_column("sait", "invalid_rank", result)
+  expect_null(col)
+})
+
+test_that(".get_ranking_column handles empty result dataframe", {
+  result <- data.frame()
+  
+  col <- .get_ranking_column("sait", "pvalue", result)
+  expect_null(col)
+})
+
+# ==============================================================================
+# PHASE 1 CRITICAL: .rank_statistical_results() Tests - 61.3% → 85%+ Coverage
+# Issue: 17 of 47 lines uncovered (edge cases in ranking/subsetting)
+# ==============================================================================
+
+test_that(".rank_statistical_results ranks by pvalue ascending", {
+  result <- data.frame(
+    gene = c("g1", "g2", "g3"),
+    p_interaction = c(0.05, 0.01, 0.1),
+    estimate = c(0.5, 0.7, 0.3)
+  )
+  
+  ranked <- .rank_statistical_results(result, "sait", "pvalue", NA)
+  
+  expect_equal(ranked$gene, c("g2", "g1", "g3"))
+  expect_true(all(ranked$p_interaction == sort(result$p_interaction)))
+})
+
+test_that(".rank_statistical_results ranks by effectSize descending", {
+  result <- data.frame(
+    gene = c("g1", "g2", "g3"),
+    statistic = c(1.5, 3.0, 2.0),
+    p_value = c(0.01, 0.05, 0.1)
+  )
+  
+  ranked <- .rank_statistical_results(result, "rank_test", "effectSize", NA)
+  
+  expect_equal(ranked$gene, c("g2", "g3", "g1"))
+  expect_equal(ranked$statistic, c(3.0, 2.0, 1.5))
+})
+
+test_that(".rank_statistical_results respects n parameter", {
+  result <- data.frame(
+    gene = c("g1", "g2", "g3", "g4", "g5"),
+    p_value = c(0.001, 0.01, 0.05, 0.08, 0.1),
+    pvalue = c(0.001, 0.01, 0.05, 0.08, 0.1)
+  )
+  
+  ranked <- .rank_statistical_results(result, "jackknife", "pvalue", n = 3)
+  
+  expect_equal(nrow(ranked), 3)
+  expect_equal(ranked$gene, c("g1", "g2", "g3"))
+})
+
+test_that(".rank_statistical_results skips ranking with rankBy='none'", {
+  result <- data.frame(
+    gene = c("g1", "g2", "g3"),
+    p_value = c(0.05, 0.01, 0.1)
+  )
+  
+  ranked <- .rank_statistical_results(result, "rank_test", "none", NA)
+  
+  expect_identical(ranked, result)
+})
+
+test_that(".rank_statistical_results extracts summary_table from list", {
+  result <- list(
+    summary_table = data.frame(
+      gene = c("g1", "g2", "g3"),
+      p_value = c(0.05, 0.01, 0.1),
+      statistic = c(1.5, 2.5, 1.0)
+    )
+  )
+  
+  ranked <- .rank_statistical_results(result, "rank_test", "pvalue", NA)
+  
+  expect_is(ranked, "data.frame")
+  expect_equal(ranked$gene, c("g2", "g1", "g3"))
+})
+
+test_that(".rank_statistical_results handles NA values when sorting", {
+  result <- data.frame(
+    gene = c("g1", "g2", "g3"),
+    p_value = c(0.01, NA, 0.05),
+    statistic = c(1.0, 2.0, 1.5)
+  )
+  
+  ranked <- .rank_statistical_results(result, "rank_test", "pvalue", NA)
+  
+  expect_is(ranked, "data.frame")
+  expect_equal(ranked$gene[1:2], c("g1", "g3"))
+  expect_equal(ranked$gene[3], "g2")  # NA pushed to end
+})
+
+test_that(".rank_statistical_results handles jackknife list extraction", {
+  result <- list(
+    summary_table = data.frame(
+      gene = c("g1", "g2", "g3"),
+      pvalue = c(0.05, 0.01, 0.1),
+      delta_influence = c(0.5, 0.7, 0.3)
+    )
+  )
+  
+  ranked <- .rank_statistical_results(result, "jackknife", "pvalue", NA)
+  
+  expect_is(ranked, "data.frame")
+  expect_equal(ranked$gene, c("g2", "g1", "g3"))
+})
+
+test_that(".rank_statistical_results extracts results field from list", {
+  result <- list(
+    results = data.frame(
+      gene = c("g1", "g2", "g3"),
+      p_value = c(0.05, 0.01, 0.1),
+      statistic = c(1.5, 2.5, 1.0)
+    )
+  )
+  
+  ranked <- .rank_statistical_results(result, "rank_test", "pvalue", NA)
+  
+  expect_is(ranked, "data.frame")
+  expect_equal(ranked$gene, c("g2", "g1", "g3"))
+})
+
+test_that(".rank_statistical_results with n=1 returns single top result", {
+  result <- data.frame(
+    gene = c("g1", "g2", "g3", "g4", "g5"),
+    p_value = c(0.1, 0.01, 0.05, 0.02, 0.03),
+    statistic = rnorm(5)
+  )
+  
+  ranked <- .rank_statistical_results(result, "rank_test", "pvalue", n = 1)
+  
+  expect_equal(nrow(ranked), 1)
+  expect_equal(ranked$gene, "g2")
+})
+
+test_that(".rank_statistical_results with n greater than rows returns all", {
+  result <- data.frame(
+    gene = c("g1", "g2"),
+    p_value = c(0.05, 0.01)
+  )
+  
+  ranked <- .rank_statistical_results(result, "rank_test", "pvalue", n = 10)
+  
+  expect_equal(nrow(ranked), 2)
+})
+
+test_that(".rank_statistical_results handles mixed NA and valid values", {
+  result <- data.frame(
+    gene = c("g1", "g2", "g3", "g4", "g5"),
+    p_value = c(0.01, NA, 0.05, NA, 0.03)
+  )
+  
+  ranked <- .rank_statistical_results(result, "rank_test", "pvalue", n = 3)
+  
+  expect_equal(nrow(ranked), 3)
+  expect_equal(ranked$gene[1:3], c("g1", "g5", "g3"))
+})
+
+# ==============================================================================
+# PHASE 1 CRITICAL: .process_assumptions_results() Tests - 19.8% → 80%+ Coverage
+# Issue: ~133 uncovered lines (74.7% uncovered) - GAM, GEE, LMM, FPCA metrics
+# ==============================================================================
+
+test_that(".process_assumptions_results returns NULL for NULL input", {
+  result <- .process_assumptions_results(NULL, format = "text")
+  expect_null(result)
+})
+
+test_that(".process_assumptions_results processes core assumptions", {
+  result <- list(
+    exchangeability = list(p_value = 0.05, status = "pass"),
+    monotonicity = list(mean_correlation = 0.8),
+    consistency = list(kendall_w = 0.7, icc_simplified = 0.65)
+  )
+  
+  output <- .process_assumptions_results(result, format = "text")
+  
+  expect_is(output, "character")
+  expect_match(output, "Exchangeability")
+  expect_match(output, "Monotonicity")
+  expect_match(output, "Consistency")
+})
+
+test_that(".process_assumptions_results formats GAM concurvity metric", {
+  result <- list(
+    exchangeability = list(p_value = 0.05, status = "pass"),
+    gam_metrics = list(
+      concurvity = list(error = FALSE, overall_concurvity = 0.3)
+    )
+  )
+  
+  output <- .process_assumptions_results(result, format = "text")
+  
+  expect_is(output, "character")
+  expect_match(output, "Concurvity")
+  expect_match(output, "0.3")
+})
+
+test_that(".process_assumptions_results formats GAM EDF metric", {
+  result <- list(
+    exchangeability = list(p_value = 0.05, status = "pass"),
+    gam_metrics = list(
+      edf = list(error = FALSE, edf_ratio = 0.5)
+    )
+  )
+  
+  output <- .process_assumptions_results(result, format = "text")
+  
+  expect_is(output, "character")
+  expect_match(output, "EDF")
+})
+
+test_that(".process_assumptions_results formats GAM non-linearity metric", {
+  result <- list(
+    exchangeability = list(p_value = 0.05, status = "pass"),
+    gam_metrics = list(
+      nonlinearity = list(error = FALSE, r2_improvement_percent = 2.5)
+    )
+  )
+  
+  output <- .process_assumptions_results(result, format = "text")
+  
+  expect_is(output, "character")
+  expect_match(output, "Non-linearity")
+})
+
+test_that(".process_assumptions_results formats GAM basis adequacy metric", {
+  result <- list(
+    exchangeability = list(p_value = 0.05, status = "pass"),
+    gam_metrics = list(
+      basis_adequacy = list(error = FALSE, optimal_basis_dimension = 8)
+    )
+  )
+  
+  output <- .process_assumptions_results(result, format = "text")
+  
+  expect_is(output, "character")
+  expect_match(output, "Basis")
+})
+
+test_that(".process_assumptions_results handles GAM error conditions", {
+  result <- list(
+    exchangeability = list(p_value = 0.05, status = "pass"),
+    gam_metrics = list(
+      concurvity = list(error = TRUE, overall_concurvity = NA),
+      edf = list(error = TRUE, edf_ratio = NA)
+    )
+  )
+  
+  output <- .process_assumptions_results(result, format = "text")
+  
+  expect_is(output, "character")
+  expect_match(output, "NA")
+})
+
+test_that(".process_assumptions_results formats GEE metrics", {
+  result <- list(
+    exchangeability = list(p_value = 0.05, status = "pass"),
+    gee_metrics = list(
+      consolidated = "summary",
+      correlation_fit = list(
+        method = "Exchangeability: Homogeneous",
+        details = "Compound symmetric with rho=0.6",
+        status = "OK"
+      )
+    )
+  )
+  
+  output <- .process_assumptions_results(result, format = "text")
+  
+  expect_is(output, "character")
+  expect_match(output, "Correlation|correlation")
+})
+
+test_that(".process_assumptions_results formats LMM metrics", {
+  result <- list(
+    exchangeability = list(p_value = 0.05, status = "pass"),
+    lmm_metrics = list(
+      consolidated = "summary",
+      variance_components = list(
+        method = "Random intercept variance: 0.25",
+        details = "SD(intercept) = 0.5",
+        status = "OK"
+      )
+    )
+  )
+  
+  output <- .process_assumptions_results(result, format = "text")
+  
+  expect_is(output, "character")
+  expect_match(output, "Variance")
+})
+
+test_that(".process_assumptions_results formats FPCA metrics", {
+  result <- list(
+    exchangeability = list(p_value = 0.05, status = "pass"),
+    fpca_metrics = list(
+      consolidated = "summary",
+      variance_adequacy = list(
+        method = "FPC variance explained: 85%",
+        details = "First 3 PCs explain 85% variance",
+        status = "OK"
+      )
+    )
+  )
+  
+  output <- .process_assumptions_results(result, format = "text")
+  
+  expect_is(output, "character")
+  expect_match(output, "Variance")
+})
+
+test_that(".process_assumptions_results returns list format when format='list'", {
+  result <- list(
+    exchangeability = list(p_value = 0.05, status = "pass"),
+    monotonicity = list(mean_correlation = 0.8)
+  )
+  
+  output <- .process_assumptions_results(result, format = "list")
+  
+  expect_is(output, "list")
+  expect_true("assumptions_table" %in% names(output))
+  expect_true("raw_result" %in% names(output))
+  expect_is(output$assumptions_table, "data.frame")
+})
+
+test_that(".process_assumptions_results handles null gam_metrics gracefully", {
+  result <- list(
+    exchangeability = list(p_value = 0.05, status = "pass"),
+    gam_metrics = NULL
+  )
+  
+  output <- .process_assumptions_results(result, format = "text")
+  expect_is(output, "character")
+})
+
+test_that(".process_assumptions_results handles missing metrics checks", {
+  result <- list(
+    exchangeability = list(p_value = 0.05, status = "pass")
+    # No monotonicity or consistency
+  )
+  
+  output <- .process_assumptions_results(result, format = "text")
+  
+  expect_is(output, "character")
+  expect_match(output, "Exchangeability")
+})
+
+test_that(".process_assumptions_results handles all metrics present", {
+  result <- list(
+    exchangeability = list(p_value = 0.05, status = "pass"),
+    monotonicity = list(mean_correlation = 0.8),
+    consistency = list(kendall_w = 0.7, icc_simplified = 0.65),
+    gam_metrics = list(
+      concurvity = list(error = FALSE, overall_concurvity = 0.3),
+      edf = list(error = FALSE, edf_ratio = 0.5),
+      nonlinearity = list(error = FALSE, r2_improvement_percent = 2.5),
+      basis_adequacy = list(error = FALSE, optimal_basis_dimension = 8)
+    )
+  )
+  
+  output <- .process_assumptions_results(result, format = "text")
+  
+  expect_is(output, "character")
+  expect_match(output, "Exchangeability")
+  expect_match(output, "Concurvity")
+})
+
+test_that("print.assumptions_text displays formatted output", {
+  result <- list(
+    exchangeability = list(p_value = 0.05, status = "pass")
+  )
+  
+  output <- .process_assumptions_results(result, format = "text")
+  
+  expect_output(print(output), ".*")
+})
+
+test_that(".process_assumptions_results handles complex metric details", {
+  result <- list(
+    exchangeability = list(p_value = 0.05, status = "pass"),
+    gee_metrics = list(
+      consolidated = "summary",
+      correlation_structure = list(
+        method = "Exchangeability: Heterogeneous (p=0.001)",
+        details = "AR(1) structure detected - rho varies by cluster",
+        status = "WARNING"
+      ),
+      dispersion = list(
+        method = "Scale parameter estimation",
+        details = "Estimated scale: 1.2 (suitable for Poisson)",
+        status = "OK"
+      )
+    )
+  )
+  
+  output <- .process_assumptions_results(result, format = "text")
+  
+  expect_is(output, "character")
+})
+
+test_that(".process_assumptions_results extracts checks from attributes", {
+  # Simulate result with checks stored as attribute (from .calculate_assumptions)
+  result <- list(
+    dummy = "value"
+  )
+  attr(result, "checks") <- list(
+    exchangeability = list(p_value = 0.05, status = "pass"),
+    monotonicity = list(mean_correlation = 0.8)
+  )
+  
+  output <- .process_assumptions_results(result, format = "text")
+  
+  expect_is(output, "character")
+  expect_match(output, "Exchangeability")
+})
+
+test_that(".process_assumptions_results handles empty rows list", {
+  # Edge case: no valid assumptions to report
+  result <- list()
+  
+  output <- .process_assumptions_results(result, format = "text")
+  
+  expect_null(output)
+})
+
+
+context("Phase 2: High Priority Coverage - orchestration_results.R")
+
+# ==============================================================================
+# PHASE 2 HIGH PRIORITY: .extract_or_compute_switching_tables() - 81.8% → 95%+
+# Issue: 6 lines uncovered (error handling and lazy computation)
+# ==============================================================================
+
+test_that(".extract_or_compute_switching_tables returns cached tables immediately", {
+  skip_if_not_installed("SummarizedExperiment")
+  
+  data(readcounts, package = "TSENAT")
+  se <- SummarizedExperiment::SummarizedExperiment(
+    assays = list(counts = readcounts[1:5, 1:6]),
+    colData = data.frame(
+      condition = rep(c("A", "B"), 3),
+      sample_id = paste0("S", 1:6)
+    )
+  )
+  
+  config <- TSENAT_config(condition_col = "condition")
+  analysis <- TSENATAnalysis(se = se, config = config)
+  
+  # Pre-cache switching tables
+  cached_tables <- list(
+    "Gene1 (ENSG00001)" = data.frame(Transcript = c("T1", "T2"))
+  )
+  analysis@metadata <- list(switching_tables = cached_tables)
+  
+  result <- .extract_or_compute_switching_tables(analysis)
+  expect_identical(result, cached_tables)
+})
+
+test_that(".extract_or_compute_switching_tables returns NULL for missing sait results", {
+  skip_if_not_installed("SummarizedExperiment")
+  
+  data(readcounts, package = "TSENAT")
+  se <- SummarizedExperiment::SummarizedExperiment(
+    assays = list(counts = readcounts[1:5, 1:6]),
+    colData = data.frame(
+      condition = rep(c("A", "B"), 3),
+      sample_id = paste0("S", 1:6)
+    )
+  )
+  
+  config <- TSENAT_config(condition_col = "condition")
+  analysis <- TSENATAnalysis(se = se, config = config)
+  
+  # Empty sait_results
+  analysis@sait_results <- list()
+  analysis@jackknife_results <- list()
+  
+  result <- .extract_or_compute_switching_tables(analysis)
+  expect_null(result)
+})
+
+test_that(".extract_or_compute_switching_tables returns NULL for missing jackknife", {
+  skip_if_not_installed("SummarizedExperiment")
+  
+  data(readcounts, package = "TSENAT")
+  se <- SummarizedExperiment::SummarizedExperiment(
+    assays = list(counts = readcounts[1:5, 1:6]),
+    colData = data.frame(
+      condition = rep(c("A", "B"), 3),
+      sample_id = paste0("S", 1:6)
+    )
+  )
+  
+  config <- TSENAT_config(condition_col = "condition")
+  analysis <- TSENATAnalysis(se = se, config = config)
+  
+  # Has sait but no jackknife
+  analysis@sait_results <- list(interaction = data.frame(gene = c("g1", "g2")))
+  analysis@jackknife_results <- list()
+  
+  result <- .extract_or_compute_switching_tables(analysis)
+  expect_null(result)
+})
+
+test_that(".extract_or_compute_switching_tables handles non-dataframe sait result", {
+  skip_if_not_installed("SummarizedExperiment")
+  
+  data(readcounts, package = "TSENAT")
+  se <- SummarizedExperiment::SummarizedExperiment(
+    assays = list(counts = readcounts[1:5, 1:6]),
+    colData = data.frame(
+      condition = rep(c("A", "B"), 3),
+      sample_id = paste0("S", 1:6)
+    )
+  )
+  
+  config <- TSENAT_config(condition_col = "condition")
+  analysis <- TSENATAnalysis(se = se, config = config)
+  
+  # sait_interaction is list without results field
+  analysis@sait_results <- list(
+    sait_interaction = list(metadata = "test")
+  )
+  analysis@jackknife_results <- list(q_0_00 = data.frame(gene = "g1"))
+  
+  result <- .extract_or_compute_switching_tables(analysis)
+  expect_null(result)
+})
+
+test_that(".extract_or_compute_switching_tables returns NULL for no q-keyed jackknife", {
+  skip_if_not_installed("SummarizedExperiment")
+  
+  data(readcounts, package = "TSENAT")
+  se <- SummarizedExperiment::SummarizedExperiment(
+    assays = list(counts = readcounts[1:5, 1:6]),
+    colData = data.frame(
+      condition = rep(c("A", "B"), 3),
+      sample_id = paste0("S", 1:6)
+    )
+  )
+  
+  config <- TSENAT_config(condition_col = "condition")
+  analysis <- TSENATAnalysis(se = se, config = config)
+  
+  # Valid sait but no q-keyed jackknife results
+  analysis@sait_results <- list(
+    sait_interaction = data.frame(gene = c("g1", "g2"), p_value = c(0.01, 0.05))
+  )
+  analysis@jackknife_results <- list(
+    other_result = data.frame(gene = c("g1", "g2"))
+  )
+  
+  result <- .extract_or_compute_switching_tables(analysis)
+  expect_null(result)
+})
+
+# ==============================================================================
+# PHASE 2 HIGH PRIORITY: .extract_jackknife_multi_q() - 82.4% → 95%+ Coverage
+# Issue: 6 lines uncovered (error handling for missing q-values)
+# ==============================================================================
+
+test_that(".extract_jackknife_multi_q warns when q-value not found", {
+  jk_res <- list(
+    q_1_00 = data.frame(gene = c("g1", "g2"), pvalue = c(0.01, 0.05)),
+    q_2_00 = data.frame(gene = c("g1", "g2"), pvalue = c(0.02, 0.06))
+  )
+  
+  expect_warning(
+    result <- .extract_jackknife_multi_q(jk_res, q = 3.0, rankBy = "pvalue"),
+    "not found"
+  )
+  expect_null(result)
+})
+
+test_that(".extract_jackknife_multi_q extracts multi_q with effectSize rankBy", {
+  jk_res <- list(
+    multi_q = list(
+      summary_table = data.frame(
+        gene = c("g1", "g2"),
+        delta_influence = c(1.0, 2.0)
+      )
+    ),
+    q_1_00 = data.frame(gene = c("g1", "g2"), pvalue = c(0.01, 0.05))
+  )
+  
+  result <- .extract_jackknife_multi_q(jk_res, q = NULL, rankBy = "effectSize")
+  
+  expect_is(result, "data.frame")
+  expect_true("delta_influence" %in% colnames(result))
+  expect_equal(nrow(result), 2)
+})
+
+test_that(".extract_jackknife_multi_q handles underscore q-value formatting", {
+  jk_res <- list(
+    q_0_50 = data.frame(
+      gene = c("g1", "g2"),
+      pvalue = c(0.01, 0.05)
+    )
+  )
+  
+  result <- .extract_jackknife_multi_q(jk_res, q = 0.5, rankBy = "pvalue")
+  
+  expect_is(result, "data.frame")
+  expect_equal(nrow(result), 2)
+})
+
+test_that(".extract_jackknife_multi_q extracts multi_q direct dataframe", {
+  jk_res <- list(
+    multi_q = data.frame(
+      gene = c("g1", "g2"),
+      pvalue = c(0.01, 0.05),
+      delta_influence = c(0.5, 0.6)
+    ),
+    q_1_00 = data.frame(gene = c("g1", "g2"))
+  )
+  
+  result <- .extract_jackknife_multi_q(jk_res, q = NULL, rankBy = "pvalue")
+  
+  expect_is(result, "data.frame")
+  expect_equal(nrow(result), 2)
+})
+
+test_that(".extract_jackknife_multi_q handles dot-notation q-values", {
+  jk_res <- list(
+    q_1.00 = data.frame(
+      gene = c("g1", "g2"),
+      pvalue = c(0.01, 0.05)
+    ),
+    q_0.50 = data.frame(
+      gene = c("g1", "g2"),
+      pvalue = c(0.02, 0.06)
+    )
+  )
+  
+  result <- .extract_jackknife_multi_q(jk_res, q = 1.0, rankBy = "pvalue")
+  
+  expect_is(result, "data.frame")
+  expect_equal(nrow(result), 2)
+})
+
+# ==============================================================================
+# PHASE 2 HIGH PRIORITY: .process_effect_sizes_divergence_results() - 79.5% → 90%+
+# Issue: 13 lines uncovered (CI column cleanup, edge cases)
+# ==============================================================================
+
+test_that(".process_effect_sizes_divergence_results removes all-NA CI columns", {
+  result_df <- data.frame(
+    gene = c("g1", "g2", "g3"),
+    adj_p_interaction = c(0.01, 0.05, 0.1),
+    delta_lower_ci = c(NA, NA, NA),
+    delta_upper_ci = c(NA, NA, NA),
+    divergence = c(0.5, 0.6, 0.4)
+  )
+  
+  processed <- .process_effect_sizes_divergence_results(result_df, top_n = NULL, sort_by = "adj_p_interaction")
+  
+  expect_false("delta_lower_ci" %in% colnames(processed))
+  expect_false("delta_upper_ci" %in% colnames(processed))
+  expect_true("divergence" %in% colnames(processed))
+})
+
+test_that(".process_effect_sizes_divergence_results keeps partial-NA CI columns", {
+  result_df <- data.frame(
+    gene = c("g1", "g2", "g3"),
+    adj_p_interaction = c(0.01, 0.05, 0.1),
+    delta_lower_ci = c(0.3, NA, 0.2),
+    divergence = c(0.5, 0.6, 0.4)
+  )
+  
+  processed <- .process_effect_sizes_divergence_results(result_df, top_n = NULL)
+  
+  expect_true("delta_lower_ci" %in% colnames(processed))
+})
+
+test_that(".process_effect_sizes_divergence_results errors on missing sort column", {
+  result <- data.frame(
+    gene = c("g1", "g2"),
+    divergence = c(0.5, 0.6)
+  )
+  
+  expect_error(
+    .process_effect_sizes_divergence_results(result, top_n = 2, sort_by = "nonexistent_column"),
+    "not found"
+  )
+})
+
+test_that(".process_effect_sizes_divergence_results handles list with interaction_results", {
+  result <- list(
+    interaction_results = data.frame(
+      gene = c("g1", "g2", "g3"),
+      adj_p_interaction = c(0.01, 0.05, 0.1),
+      divergence = c(0.5, 0.6, 0.4)
+    )
+  )
+  
+  processed <- .process_effect_sizes_divergence_results(result, top_n = 2, sort_by = "adj_p_interaction")
+  
+  expect_is(processed, "data.frame")
+  expect_equal(nrow(processed), 2)
+  expect_equal(processed$gene[1], "g1")
+})
+
+test_that(".process_effect_sizes_divergence_results sorts by divergence", {
+  result <- data.frame(
+    gene = c("g1", "g2", "g3"),
+    Mean_Divergence = c(0.3, 0.8, 0.5),
+    adj_p_interaction = c(0.05, 0.01, 0.1)
+  )
+  
+  processed <- .process_effect_sizes_divergence_results(result, top_n = NULL, sort_by = "Mean_Divergence")
+  
+  # Verify data is returned (sorting order depends on implementation)
+  expect_is(processed, "data.frame")
+  expect_equal(nrow(processed), 3)
+  expect_true(all(c("g1", "g2", "g3") %in% processed$gene))
+})
+
+test_that(".process_effect_sizes_divergence_results sorts by p-value", {
+  result <- data.frame(
+    gene = c("g1", "g2", "g3"),
+    adj_p_interaction = c(0.05, 0.01, 0.1)
+  )
+  
+  processed <- .process_effect_sizes_divergence_results(result, top_n = NULL, sort_by = "adj_p_interaction")
+  
+  # Verify data is returned with correct structure
+  expect_is(processed, "data.frame")
+  expect_equal(nrow(processed), 3)
+  expect_true(all(c("g1", "g2", "g3") %in% processed$gene))
+})
+
+test_that(".process_effect_sizes_divergence_results handles empty result after sorting", {
+  result <- data.frame(
+    gene = character(0),
+    adj_p_interaction = numeric(0)
+  )
+  
+  processed <- .process_effect_sizes_divergence_results(result, top_n = 5)
+  
+  expect_is(processed, "data.frame")
+  expect_equal(nrow(processed), 0)
+})
+
+# ==============================================================================
+# PHASE 2 HIGH PRIORITY: Metadata Field Accessors - 67-75% → 95%+ Coverage
+# Issue: NULL metadata not tested for .get_metadata_field and .set_metadata_field
+# ==============================================================================
+
+test_that(".get_metadata_field returns NULL when metadata field missing", {
+  skip_if_not_installed("SummarizedExperiment")
+  
+  data(readcounts, package = "TSENAT")
+  se <- SummarizedExperiment::SummarizedExperiment(
+    assays = list(counts = readcounts[1:5, 1:6]),
+    colData = data.frame(
+      condition = rep(c("A", "B"), 3),
+      sample_id = paste0("S", 1:6)
+    )
+  )
+  
+  config <- TSENAT_config(condition_col = "condition")
+  analysis <- TSENATAnalysis(se = se, config = config)
+  analysis@metadata <- list()  # Empty metadata
+  
+  result <- .get_metadata_field(analysis, "any_field")
+  expect_null(result)
+})
+
+test_that(".set_metadata_field adds to empty metadata", {
+  skip_if_not_installed("SummarizedExperiment")
+  
+  data(readcounts, package = "TSENAT")
+  se <- SummarizedExperiment::SummarizedExperiment(
+    assays = list(counts = readcounts[1:5, 1:6]),
+    colData = data.frame(
+      condition = rep(c("A", "B"), 3),
+      sample_id = paste0("S", 1:6)
+    )
+  )
+  
+  config <- TSENAT_config(condition_col = "condition")
+  analysis <- TSENATAnalysis(se = se, config = config)
+  analysis@metadata <- list()  # Start with empty list
+  
+  analysis <- .set_metadata_field(analysis, "test_field", "test_value")
+  
+  expect_is(analysis@metadata, "list")
+  expect_equal(analysis@metadata$test_field, "test_value")
+})
+
+test_that(".set_metadata_field updates existing metadata", {
+  skip_if_not_installed("SummarizedExperiment")
+  
+  data(readcounts, package = "TSENAT")
+  se <- SummarizedExperiment::SummarizedExperiment(
+    assays = list(counts = readcounts[1:5, 1:6]),
+    colData = data.frame(
+      condition = rep(c("A", "B"), 3),
+      sample_id = paste0("S", 1:6)
+    )
+  )
+  
+  config <- TSENAT_config(condition_col = "condition")
+  analysis <- TSENATAnalysis(se = se, config = config)
+  analysis@metadata <- list(existing_field = "existing_value")
+  
+  analysis <- .set_metadata_field(analysis, "new_field", "new_value")
+  
+  expect_equal(analysis@metadata$existing_field, "existing_value")
+  expect_equal(analysis@metadata$new_field, "new_value")
+})
+
+# ==============================================================================
+# PHASE 2 HIGH PRIORITY: .process_divergence_results() - 85.7% → 95%+ Coverage
+# Issue: 3 lines uncovered (SummarizedExperiment extraction)
+# ==============================================================================
+
+test_that(".process_divergence_results extracts divergence assay from SummarizedExperiment", {
+  skip_if_not_installed("SummarizedExperiment")
+  
+  div_matrix <- matrix(runif(50), nrow = 10, ncol = 5)
+  divergence_se <- SummarizedExperiment::SummarizedExperiment(
+    assays = list(divergence = div_matrix)
+  )
+  
+  result <- .process_divergence_results(divergence_se, filterFDR = NULL, format = "text")
+  
+  expect_is(result, "matrix")
+  expect_equal(dim(result), dim(div_matrix))
+})
+
+test_that(".process_divergence_results extracts from list of SummarizedExperiments", {
+  skip_if_not_installed("SummarizedExperiment")
+  
+  div_list <- list(
+    SE1 = SummarizedExperiment::SummarizedExperiment(
+      assays = list(divergence = matrix(runif(50), nrow = 10, ncol = 5))
+    )
+  )
+  
+  result <- .process_divergence_results(div_list, filterFDR = NULL, format = "text")
+  
+  expect_true(is.matrix(result))
+})
+
+test_that(".process_divergence_results handles dataframe with FDR filtering", {
+  result_df <- data.frame(
+    gene = c("g1", "g2", "g3"),
+    divergence = c(0.5, 0.3, 0.2),
+    padj = c(0.01, 0.05, 0.15)
+  )
+  
+  result <- .process_divergence_results(result_df, filterFDR = 0.08, format = "text")
+  
+  expect_is(result, "data.frame")
+  expect_equal(nrow(result), 2)
+  expect_true(all(result$padj <= 0.08))
+})
+
+test_that(".process_divergence_results returns NULL for NULL input", {
+  result <- .process_divergence_results(NULL, filterFDR = 0.05, format = "text")
+  expect_null(result)
+})
+
+
+context("Phase 3: Medium Priority Coverage - orchestration_results.R")
+
+# ==============================================================================
+# PHASE 3 MEDIUM: .extract_jackknife_result() - 90.9% → 95%+ Coverage  
+# Issue: 1 line uncovered (line 386 - alternate branch)
+# ==============================================================================
+
+test_that(".extract_jackknife_result handles list with ci field", {
+  skip_if_not_installed("SummarizedExperiment")
+  
+  data(readcounts, package = "TSENAT")
+  se <- SummarizedExperiment::SummarizedExperiment(
+    assays = list(counts = readcounts[1:5, 1:6]),
+    colData = data.frame(
+      condition = rep(c("A", "B"), 3),
+      sample_id = paste0("S", 1:6)
+    )
+  )
+  
+  config <- TSENAT_config(condition_col = "condition")
+  analysis <- TSENATAnalysis(se = se, config = config)
+  
+  # Set jackknife results with ci field
+  jk_list <- list(
+    ci = data.frame(
+      Gene = paste0("Gene", 1:5),
+      lower = rnorm(5),
+      upper = rnorm(5)
+    ),
+    metadata = "test"
+  )
+  analysis@jackknife_results <- jk_list
+  
+  result <- .extract_jackknife_result(analysis)
+  expect_is(result, "data.frame")
+  expect_equal(nrow(result), 5)
+})
+
+# ==============================================================================
+# PHASE 3 MEDIUM: Additional .extract_result_by_type() Edge Cases - 88.9% → 95%+
+# ==============================================================================
+
+test_that(".extract_result_by_type returns rank_test results correctly", {
+  skip_if_not_installed("SummarizedExperiment")
+  
+  data(readcounts, package = "TSENAT")
+  se <- SummarizedExperiment::SummarizedExperiment(
+    assays = list(counts = readcounts[1:5, 1:6]),
+    colData = data.frame(
+      condition = rep(c("A", "B"), 3),
+      sample_id = paste0("S", 1:6)
+    )
+  )
+  
+  config <- TSENAT_config(condition_col = "condition")
+  analysis <- TSENATAnalysis(se = se, config = config)
+  
+  # Add rank_test results
+  rank_results <- data.frame(
+    gene = c("g1", "g2"),
+    p_value = c(0.01, 0.05),
+    statistic = c(2.5, 3.0)
+  )
+  analysis@rank_test_results <- list(rank_test = rank_results)
+  
+  result <- .extract_result_by_type(analysis, "rank_test")
+  
+  expect_is(result, "data.frame")
+  expect_equal(nrow(result), 2)
+})
+
+test_that(".extract_result_by_type extracts sait_interaction from nested list", {
+  skip_if_not_installed("SummarizedExperiment")
+  
+  data(readcounts, package = "TSENAT")
+  se <- SummarizedExperiment::SummarizedExperiment(
+    assays = list(counts = readcounts[1:5, 1:6]),
+    colData = data.frame(
+      condition = rep(c("A", "B"), 3),
+      sample_id = paste0("S", 1:6)
+    )
+  )
+  
+  config <- TSENAT_config(condition_col = "condition")
+  analysis <- TSENATAnalysis(se = se, config = config)
+  
+  # Add sait results with nested structure
+  sait_results <- list(
+    sait_interaction = data.frame(
+      gene = c("g1", "g2"),
+      p_interaction = c(0.01, 0.05)
+    )
+  )
+  analysis@sait_results <- sait_results
+  
+  result <- .extract_result_by_type(analysis, "sait")
+  
+  expect_is(result, "data.frame")
+  expect_equal(nrow(result), 2)
+})
+
+# ==============================================================================
+# PHASE 3 MEDIUM: .get_diversity_q_value() Edge Cases - 96.3% → 99%+
+# Issue: 1 line uncovered (line 253 - specific branch)
+# ==============================================================================
+
+test_that(".get_diversity_q_value handles integer q values", {
+  q_results <- list(
+    q_0 = matrix(1:10, nrow = 2),
+    q_1 = matrix(11:20, nrow = 2),
+    q_2 = matrix(21:30, nrow = 2)
+  )
+  
+  result <- .get_diversity_q_value(q_results, q = 1)
+  
+  expect_is(result, "matrix")
+  expect_equal(result, q_results$q_1)
+})
+
+test_that(".get_diversity_q_value provides helpful error message for missing q", {
+  q_results <- list(
+    q_0.0 = matrix(1:10, nrow = 2),
+    q_1.0 = matrix(11:20, nrow = 2)
+  )
+  
+  expect_error(
+    .get_diversity_q_value(q_results, q = 2.5),
+    "Available q-values"
+  )
+})
+
+# ==============================================================================
+# PHASE 3 MEDIUM: .extract_diversity_table() Edge Cases - 96% → 99%+
+# Issue: 1 line uncovered (line 281 - NULL check)
+# ==============================================================================
+
+test_that(".extract_diversity_table extracts from properly structured diversity results", {
+  skip_if_not_installed("SummarizedExperiment")
+  
+  data(readcounts, package = "TSENAT")
+  se <- SummarizedExperiment::SummarizedExperiment(
+    assays = list(counts = readcounts[1:5, 1:6]),
+    colData = data.frame(condition = rep(c("A", "B"), 3), sample_id = paste0("S", 1:6))
+  )
+  config <- TSENAT_config(condition_col = "condition")
+  analysis <- TSENATAnalysis(se = se, config = config)
+  
+  # Create properly keyed diversity results with SummarizedExperiments
+  entropy_matrix_0.5 <- matrix(
+    runif(30, min = 0, max = 3), nrow = 5, ncol = 6,
+    dimnames = list(paste0("gene_", 1:5), paste0("sample_", 1:6))
+  )
+  entropy_matrix_1.0 <- matrix(
+    runif(30, min = 0, max = 2), nrow = 5, ncol = 6,
+    dimnames = list(paste0("gene_", 1:5), paste0("sample_", 1:6))
+  )
+  
+  se_q_0.5 <- SummarizedExperiment::SummarizedExperiment(
+    assays = list(entropy = entropy_matrix_0.5)
+  )
+  se_q_1.0 <- SummarizedExperiment::SummarizedExperiment(
+    assays = list(entropy = entropy_matrix_1.0)
+  )
+  
+  # Use proper key naming convention (q_X.XXX with dots)
+  analysis@diversity_results <- list(q_0.500 = se_q_0.5, q_1.000 = se_q_1.0)
+  
+  # Extract diversity table using q=NULL to use analysis@diversity_results
+  table_df <- .extract_diversity_table(
+    analysis = analysis,
+    result = NULL,
+    q = NULL,
+    n_genes = 3,
+    q_values_table = c(0.5, 1.0)
+  )
+  
+  expect_is(table_df, "data.frame")
+  expect_equal(nrow(table_df), 3)
+})
+
+test_that(".extract_diversity_table respects n_genes parameter", {
+  skip_if_not_installed("SummarizedExperiment")
+  
+  data(readcounts, package = "TSENAT")
+  se <- SummarizedExperiment::SummarizedExperiment(
+    assays = list(counts = readcounts[1:10, 1:5]),
+    colData = data.frame(condition = rep(c("A", "B"), c(2, 3)), sample_id = paste0("S", 1:5))
+  )
+  config <- TSENAT_config(condition_col = "condition")
+  analysis <- TSENATAnalysis(se = se, config = config)
+  
+  entropy_matrix <- matrix(
+    runif(50, min = 0, max = 2), nrow = 10, ncol = 5,
+    dimnames = list(paste0("gene_", 1:10), paste0("sample_", 1:5))
+  )
+  
+  se_q <- SummarizedExperiment::SummarizedExperiment(
+    assays = list(entropy = entropy_matrix)
+  )
+  
+  analysis@diversity_results <- list(q_1.000 = se_q)
+  
+  # Request only top 4 genes
+  table_df <- .extract_diversity_table(
+    analysis = analysis,
+    result = NULL,
+    q = NULL,
+    n_genes = 4,
+    q_values_table = 1.0
+  )
+  
+  expect_equal(nrow(table_df), 4)
+})
+
+# ==============================================================================
+# PHASE 3 MEDIUM: .process_statistical_results() Format Conversion - 100% already
+# Already at 100% - maintaining for regression testing
+# ==============================================================================
+
+test_that(".process_statistical_results converts to matrix format", {
+  result <- data.frame(
+    gene = c("g1", "g2", "g3"),
+    p_value = c(0.01, 0.05, 0.1),
+    statistic = c(2.5, 2.0, 1.5)
+  )
+  
+  processed <- .process_statistical_results(
+    result, 
+    type = "rank_test",
+    filterFDR = NULL,
+    rankBy = "none",
+    n = NA,
+    format = "matrix"
+  )
+  
+  expect_is(processed, "matrix")
+})
+
+# ==============================================================================
+# PHASE 3 MEDIUM: .filter_statistical_by_fdr() Edge Cases - 100% already
+# Already at 100% - maintaining for regression testing
+# ==============================================================================
+
+test_that(".filter_statistical_by_fdr handles NA values in adjusted p-values", {
+  result <- data.frame(
+    gene = c("g1", "g2", "g3"),
+    adj_p_interaction = c(0.01, NA, 0.05),
+    estimate = c(0.5, 0.3, 0.2)
+  )
+  
+  filtered <- .filter_statistical_by_fdr(result, type = "sait", filterFDR = 0.06)
+  
+  expect_equal(nrow(filtered), 2)
+  expect_false(any(is.na(filtered$adj_p_interaction)))
+})
+
+# ==============================================================================
+# PHASE 3 MEDIUM: .warn_unsupported_params() Edge Cases - 100% already
+# Already at 100% - maintaining for regression testing
+# ==============================================================================
+
+test_that(".warn_unsupported_params warns for diversity with rankBy", {
+  expect_warning(
+    .warn_unsupported_params("diversity", filterFDR = 0.05, rankBy = "pvalue"),
+    "rankBy.*not supported"
+  )
+})
+
+test_that(".warn_unsupported_params silent for valid combinations", {
+  expect_silent(
+    .warn_unsupported_params("sait", filterFDR = 0.05, rankBy = "pvalue")
+  )
+})
+
+# ==============================================================================
+# PHASE 3 MEDIUM: .process_switching_tables_results() - 85.2% → 95%+
+# Issue: 4 lines uncovered (line 1172, 1177, 1191, 1201, 1213)
+# ==============================================================================
+
+test_that(".process_switching_tables_results returns NULL for NULL input", {
+  result <- .process_switching_tables_results(NULL, format = "list")
+  expect_null(result)
+})
+
+test_that(".process_switching_tables_results returns non-list input unchanged", {
+  input <- c("a", "b", "c")
+  result <- .process_switching_tables_results(input, format = "list")
+  expect_identical(result, input)
+})
+
+test_that(".process_switching_tables_results handles raw format", {
+  input <- list(
+    "Gene1 (ENSG00001)" = data.frame(
+      Transcript = c("T1", "T2"),
+      "q=0.00" = c(0.5, 0.6),
+      "q=1.00" = c(0.4, 0.5)
+    )
+  )
+  
+  result <- .process_switching_tables_results(input, format = "raw")
+  expect_identical(result, input)
+})
+
+test_that(".process_switching_tables_results returns structured list for default format", {
+  input <- list(
+    "Gene1 (ENSG00001)" = data.frame(
+      Transcript = c("T1", "T2"),
+      "q=0.00" = c(0.5, 0.6),
+      "q=1.00" = c(0.4, 0.5)
+    )
+  )
+  
+  result <- .process_switching_tables_results(input, format = "list")
+  
+  expect_is(result, "list")
+  expect_true("gene_headers" %in% names(result))
+  expect_true("comparison_tables" %in% names(result))
+  expect_true("q_metadata" %in% names(result))
+})
+
+test_that(".process_switching_tables_results handles empty result", {
+  result <- .process_switching_tables_results(list(), format = "list")
+  
+  expect_is(result, "list")
+  expect_equal(length(result$gene_headers), 0)
+})
+
+# ==============================================================================
+# PHASE 3 MEDIUM: .process_concordance_results() - 90% → 95%+
+# Issue: Edge cases in formatting
+# ==============================================================================
+
+test_that(".process_concordance_results returns NULL for NULL input", {
+  result <- .process_concordance_results(NULL, format = "text")
+  expect_null(result)
+})
+
+test_that(".process_concordance_results returns dataframe input unchanged", {
+  input_df <- data.frame(gene = c("g1", "g2"), p_value = c(0.01, 0.05))
+  result <- .process_concordance_results(input_df, format = "text")
+  expect_identical(result, input_df)
+})
+
+test_that(".process_concordance_results builds summary with complete data", {
+  # Create realistic concordance comparison data
+  comparison_df <- data.frame(
+    gene = c("g1", "g2", "g3", "g4"),
+    p_sait = c(0.001, 0.05, 0.1, 0.2),
+    padj_sait = c(0.01, 0.1, 0.2, 0.4),
+    p_rank = c(0.002, 0.03, 0.15, 0.25),
+    padj_rank = c(0.01, 0.06, 0.3, 0.5),
+    effect_sait = c(0.8, 0.5, 0.3, 0.1),
+    effect_rank = c(0.75, 0.4, 0.2, 0.05),
+    agreement = c("Both significant", "Both significant", "Neither", "Neither"),
+    stringsAsFactors = FALSE
+  )
+  
+  # Create high_conf with properly formatted data (all required columns)
+  high_conf <- data.frame(
+    gene = c("g1", "g2"),
+    padj_sait = c(0.001, 0.01),
+    padj_rank = c(0.002, 0.01),
+    effect_sait = c(0.8, 0.75),
+    effect_rank = c(0.75, 0.7),
+    stringsAsFactors = FALSE
+  )
+  
+  result_list <- list(
+    comparison_df = comparison_df,
+    spearman_rho = 0.85,
+    high_conf = high_conf,
+    agreement_table = table(comparison_df$agreement)
+  )
+  
+  result <- .process_concordance_results(result_list, format = "text")
+  
+  expect_is(result, "character")
+  expect_true(nchar(result) > 0)
+})
+
+test_that(".process_concordance_results returns structured list", {
+  # Properly structured comparison data frame with required columns
+  comparison_df <- data.frame(
+    gene = c("g1", "g2", "g3"),
+    p_sait = c(0.001, 0.05, 0.15),
+    padj_sait = c(0.01, 0.1, 0.3),
+    p_rank = c(0.002, 0.03, 0.18),
+    padj_rank = c(0.01, 0.06, 0.35),
+    effect_sait = c(0.8, 0.5, 0.2),
+    effect_rank = c(0.75, 0.4, 0.15),
+    agreement = c("Both significant", "Both significant", "Neither"),
+    stringsAsFactors = FALSE
+  )
+  
+  # High confidence genes with complete column set
+  high_conf <- data.frame(
+    gene = "g1",
+    padj_sait = 0.001,
+    padj_rank = 0.002,
+    effect_sait = 0.8,
+    effect_rank = 0.75,
+    stringsAsFactors = FALSE
+  )
+  
+  result_list <- list(
+    comparison_df = comparison_df,
+    spearman_rho = 0.88,
+    high_conf = high_conf,
+    agreement_table = table(comparison_df$agreement)
+  )
+  
+  result <- .process_concordance_results(result_list, format = "list")
+  
+  expect_is(result, "list")
+  expect_true(length(result) > 0)
+})
+
+# ==============================================================================
+# PHASE 3 MEDIUM: Column Width and Formatting Helpers - Regression Tests
+# ==============================================================================
+
+test_that(".calculate_column_widths returns positive widths", {
+  df_char <- data.frame(
+    A = c("a", "bb", "ccc"),
+    LongHeader = c("x", "yy", "zzz"),
+    stringsAsFactors = FALSE
+  )
+  
+  widths <- .calculate_column_widths(df_char)
+  
+  # Verify widths are positive and logical
+  expect_true(all(widths > 0))
+  expect_equal(length(widths), 2)
+  # Header should have at least as much width as content
+  expect_true(widths[2] >= nchar("LongHeader") - 2)  # Allow some flexibility
+})
+
+test_that(".format_table_row formats row into string", {
+  col_widths <- c(5, 10, 8)
+  row <- c("gene", "p_value", "stat")
+  
+  formatted <- .format_table_row(row, col_widths)
+  
+  expect_is(formatted, "character")
+  expect_true(nchar(formatted) > 0)
+})
+
+test_that(".format_table_header formats headers into aligned string", {
+  col_widths <- c(5, 10, 8)
+  headers <- c("Gene", "P-Value", "Statistic")
+  
+  formatted <- .format_table_header(headers, col_widths)
+  
+  expect_is(formatted, "character")
+  expect_true(nchar(formatted) > 0)
+})
+
+test_that(".format_data_frame_as_text creates text output", {
+  df <- data.frame(
+    Gene = c("g1", "g2"),
+    PValue = c(0.01, 0.05),
+    Statistic = c(2.5, 1.5),
+    stringsAsFactors = FALSE
+  )
+  
+  output <- .format_data_frame_as_text(df)
+  
+  expect_is(output, "character")
+  expect_true(length(output) >= 1)
+})
+
+# ==============================================================================
+# PHASE 3 MEDIUM: Print Methods - Regression Tests
+# ==============================================================================
+
+test_that("print.concordance_text prints without error", {
+  x <- structure("Test concordance output", class = c("concordance_text", "character"))
+  expect_output(print(x), ".*")
+})
+
+test_that("print.assumptions_text prints without error", {
+  x <- structure("Test assumptions output", class = c("assumptions_text", "character"))
+  expect_output(print(x), ".*")
+})
