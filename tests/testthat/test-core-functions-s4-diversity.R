@@ -1152,7 +1152,7 @@ test_that(".validate_norm_method rejects invalid normalization methods", {
   
   expect_error(
     TSENAT:::.validate_norm_method("invalid_method"),
-    "must be one of"
+    "should be one of"
   )
 })
 

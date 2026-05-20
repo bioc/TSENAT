@@ -858,7 +858,7 @@ test_that(".adjust_pvalues_multicorr rejects unknown method", {
             multicorr = "unknown_method",
             wy_randomizations = 100
         ),
-        "Unknown multicorr method"
+        "should be one of"
     )
 })
 

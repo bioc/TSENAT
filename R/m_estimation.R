@@ -83,9 +83,13 @@
 #'   Recommended when data contamination is suspected.
 #'
 #' @noRd
-.calculate_m_estimator <- function(x, samples, loss_type = "huber", scale = NULL,
+.calculate_m_estimator <- function(x, samples, loss_type = c("huber", "tukey", "lsq"), scale = NULL,
     max_iter = 50, tol = 1e-06, paired = FALSE, pcorr = "BH", q_combine_method = "mean",
-    influence_threshold = 0.75, scale_method = "mad", verbose = FALSE) {
+    influence_threshold = 0.75, scale_method = c("mad", "proposal2", "s-estimator"), verbose = FALSE) {
+    # Validate parameters per Bioconductor code syntax standards
+    loss_type <- match.arg(loss_type)
+    scale_method <- match.arg(scale_method)
+
     # Handle SummarizedExperiment input with multi-q analysis
     if (inherits(x, "SummarizedExperiment")) {
         return(.handleMEstimateSEInput(x, samples, q_combine_method, paired, scale,
@@ -247,8 +251,12 @@
 #'     - `scale_used`: numeric scalar, scale parameter used for standardization
 #'
 #' @noRd
-.mest_irls_location <- function(y, loss_type = "huber", scale = NULL, scale_method = "mad",
+.mest_irls_location <- function(y, loss_type = c("huber", "tukey", "lsq"), scale = NULL, scale_method = c("mad", "proposal2", "s-estimator"),
     max_iter = 50, tol = 1e-06, return_weights = FALSE) {
+    # Validate parameters per Bioconductor code syntax standards
+    loss_type <- match.arg(loss_type)
+    scale_method <- match.arg(scale_method)
+
     # Input validation
     y <- as.numeric(y)
     n_obs <- length(y)
@@ -390,8 +398,12 @@
 
 #' @noRd
 .mest_influence_loo <- function(entropy_by_sample, group_assignment_unique, unique_samples,
-    m_est_full, loss_type = "huber", scale = NULL, max_iter = 50, tol = 1e-06, pcorr = "BH",
-    scale_method = "mad") {
+    m_est_full, loss_type = c("huber", "tukey", "lsq"), scale = NULL, max_iter = 50, tol = 1e-06, pcorr = "BH",
+    scale_method = c("mad", "proposal2", "s-estimator")) {
+    # Validate parameters per Bioconductor code syntax standards
+    loss_type <- match.arg(loss_type)
+    scale_method <- match.arg(scale_method)
+
     n_samples <- length(unique_samples)
     dfbeta_threshold <- 2/sqrt(max(n_samples, 2))
 
@@ -575,7 +587,11 @@
 
 
 #' @noRd
-.validateMEstimateInputs <- function(x, samples, loss_type, scale_method, paired) {
+.validateMEstimateInputs <- function(x, samples, loss_type = c("huber", "tukey", "lsq"), scale_method = c("mad", "proposal2", "s-estimator"), paired) {
+    # Validate parameters per Bioconductor code syntax standards
+    loss_type <- match.arg(loss_type)
+    scale_method <- match.arg(scale_method)
+
     # Helper: Validate inputs for m_estimate function
 
     # Input validation
@@ -590,14 +606,6 @@
     groups <- unique(samples)
     if (length(groups) != 2) {
         stop("Must have exactly 2 groups")
-    }
-
-    if (!(loss_type %in% c("huber", "tukey", "lsq"))) {
-        stop("loss_type must be 'huber', 'tukey', or 'lsq'")
-    }
-
-    if (!(scale_method %in% c("mad", "proposal2", "s-estimator"))) {
-        stop("scale_method must be 'mad', 'proposal2', or 's-estimator'")
     }
 
     invisible(NULL)

@@ -52,8 +52,7 @@
 #' understand
 #' the relationship between entropy changes and divergence patterns.
 #'
-#' @importFrom ggplot2 ggplot aes geom_line geom_point geom_ribbon labs
-#' theme_minimal element_text
+#' @importFrom ggplot2 ggplot aes geom_line geom_point geom_ribbon labs theme_minimal element_text
 #' @importFrom SummarizedExperiment assay rowData
 #' @importFrom stats IQR var
 #'

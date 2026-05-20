@@ -96,7 +96,7 @@
 
 
 #' @noRd
-
+#' @exportS3Method
 print.gtable <- function(x, ...) {
     grid::grid.draw(x)
     invisible(x)

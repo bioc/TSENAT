@@ -1380,3 +1380,85 @@ test_that(".apply_diversity_post_hoc_norm ignores normalization for non-SE input
   
   expect_identical(result, result_df)
 })
+
+# ============================================================================
+# TEST SUITE: Bioconductor c2e8214 - Divergence Normalization (match.arg)
+# ============================================================================
+# Tests for match.arg() parameter validation in divergence normalization
+
+test_that(".normalize_divergence_matrix accepts valid norm parameter", {
+    # Create test data
+    assay_mat <- matrix(rnorm(20), nrow = 5, ncol = 4)
+    row_data <- data.frame(Gene = paste0("Gene", 1:5))
+    q_vals <- 1.5
+    
+    # Test with "none"
+    result_none <- .normalize_divergence_matrix(assay_mat, row_data, q_vals, norm = "none")
+    expect_is(result_none, "list")
+    expect_true("assay" %in% names(result_none))
+    
+    # Test with "range"
+    result_range <- .normalize_divergence_matrix(assay_mat, row_data, q_vals, norm = "range")
+    expect_is(result_range, "list")
+    
+    # Test with "zscore"
+    result_zscore <- .normalize_divergence_matrix(assay_mat, row_data, q_vals, norm = "zscore")
+    expect_is(result_zscore, "list")
+})
+
+test_that(".normalize_divergence_matrix accepts all valid norm options", {
+    assay_mat <- matrix(runif(20), nrow = 5, ncol = 4)
+    row_data <- data.frame(Gene = paste0("Gene", 1:5))
+    q_vals <- 1.5
+    
+    # Test valid normalization methods
+    # Skip log_odds_ratio and relative_reference as they need special input handling
+    valid_norms <- c("none", "range", "zscore")
+    
+    for (norm in valid_norms) {
+        result <- .normalize_divergence_matrix(assay_mat, row_data, q_vals, norm = norm)
+        expect_is(result, "list", label = paste("norm =", norm))
+    }
+})
+
+test_that(".normalize_divergence_matrix rejects invalid norm parameter", {
+    assay_mat <- matrix(rnorm(20), nrow = 5, ncol = 4)
+    row_data <- data.frame(Gene = paste0("Gene", 1:5))
+    q_vals <- 1.5
+    
+    # Invalid norm should error with match.arg message
+    expect_error(
+        .normalize_divergence_matrix(assay_mat, row_data, q_vals, norm = "invalid"),
+        regexp = "should be one of"
+    )
+})
+
+test_that(".normalize_divergence_matrix uses default norm = 'none'", {
+    assay_mat <- matrix(rnorm(20), nrow = 5, ncol = 4)
+    row_data <- data.frame(Gene = paste0("Gene", 1:5))
+    q_vals <- 1.5
+    
+    # Calling without norm should use default "none"
+    result_default <- .normalize_divergence_matrix(assay_mat, row_data, q_vals)
+    result_explicit <- .normalize_divergence_matrix(assay_mat, row_data, q_vals, norm = "none")
+    
+    expect_identical(result_default, result_explicit)
+})
+
+test_that(".normalize_divergence_matrix accepts advanced normalization methods", {
+    # For log_odds_ratio and relative_reference, we need to match
+    # the function's expectation: q_vals must have length = ncol(assay_matrix)
+    assay_mat <- matrix(runif(20, min = 0.1, max = 2), nrow = 5, ncol = 4)
+    row_data <- data.frame(Gene = paste0("Gene", 1:5))
+    q_vals <- c(0.5, 1, 1.5, 2)  # Must match number of columns
+    
+    # Test log_odds_ratio with positive values and proper q_vals length
+    result_log_odds <- .normalize_divergence_matrix(assay_mat, row_data, q_vals, norm = "log_odds_ratio")
+    expect_is(result_log_odds, "list")
+    expect_true(all(is.finite(result_log_odds$assay), na.rm = TRUE))
+    
+    # Test relative_reference with positive values and proper q_vals length
+    result_relative <- .normalize_divergence_matrix(assay_mat, row_data, q_vals, norm = "relative_reference")
+    expect_is(result_relative, "list")
+    expect_true(all(is.finite(result_relative$assay), na.rm = TRUE))
+})

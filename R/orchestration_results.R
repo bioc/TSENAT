@@ -210,21 +210,13 @@ results <- function(analysis, type, q = NULL, rankBy = "none", n = NA, filterFDR
 # ============================================================================
 
 #' @noRd
-.validate_results_params <- function(analysis, type, rankBy, format, filterFDR) {
+.validate_results_params <- function(analysis, type, rankBy = c("none", "pvalue", "padj", "effectSize"), format = c("text", "list", "dataframe", "matrix", "se", "table", "raw"), filterFDR) {
+    # Validate rankBy and format parameters per Bioconductor code syntax standards
+    rankBy <- match.arg(rankBy)
+    format <- match.arg(format)
+
     if (!is(analysis, "TSENATAnalysis")) {
         stop("'analysis' must be a TSENATAnalysis object", call. = FALSE)
-    }
-
-    valid_rank_methods <- c("none", "pvalue", "padj", "effectSize")
-    if (!rankBy %in% valid_rank_methods) {
-        stop("'rankBy' must be one of: ", paste(valid_rank_methods, collapse = ", "),
-            call. = FALSE)
-    }
-
-    valid_formats <- c("text", "list", "dataframe", "matrix", "se", "table", "raw")
-    if (!format %in% valid_formats) {
-        stop("'format' must be one of: ", paste(valid_formats, collapse = ", "),
-            call. = FALSE)
     }
 
     if (!is.null(filterFDR) && (filterFDR < 0 || filterFDR > 1)) {
@@ -1150,7 +1142,7 @@ results <- function(analysis, type, q = NULL, rankBy = "none", n = NA, filterFDR
 #' @return Invisibly returns the input object
 #'
 #' @noRd
-#' @method print assumptions_text
+#' @exportS3Method
 print.assumptions_text <- function(x, ...) {
     cat(x)
     invisible(x)
@@ -1418,7 +1410,7 @@ print.assumptions_text <- function(x, ...) {
 # ============================================================================
 
 #' @noRd
-#' @method print concordance_text
+#' @exportS3Method
 print.concordance_text <- function(x, ...) {
     cat(x)
     invisible(x)

@@ -89,8 +89,7 @@
 #'
 
 #' @noRd
-#' @importFrom ggplot2 ggplot aes geom_line geom_point facet_wrap labs
-#' theme_minimal scale_color_brewer
+#' @importFrom ggplot2 ggplot aes geom_line geom_point facet_wrap labs theme_minimal scale_color_brewer
 #' @importFrom cowplot plot_grid
 
 .plot_sait <- function(se, sait_res, condition_col = "condition", genes = NULL, n_top = 6,

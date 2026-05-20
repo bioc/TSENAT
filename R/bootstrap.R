@@ -1249,8 +1249,7 @@ summary.tsenat_bootstrap_ci <- function(object, ...) {
 
 
 #' @noRd
-#' @method print tsenat_bootstrap_ci
-
+#' @exportS3Method
 print.tsenat_bootstrap_ci <- function(x, ...) {
     message("Tsallis Entropy Bootstrap Confidence Interval")
     message("Point estimate: ", sprintf("%.6f", x$estimate))
@@ -1260,8 +1259,7 @@ print.tsenat_bootstrap_ci <- function(x, ...) {
 }
 
 #' @noRd
-#' @method print tsenat_bootstrap_ci_list
-
+#' @exportS3Method
 print.tsenat_bootstrap_ci_list <- function(x, ...) {
     message("Bootstrap Confidence Intervals for Multiple q Values")
     message("Number of q values: ", length(x))
@@ -1833,8 +1831,7 @@ print.tsenat_bootstrap_ci_list <- function(x, ...) {
 # ============================================================================
 
 #' @noRd
-#' @method print tsenat_divergence_bootstrap_ci
-
+#' @exportS3Method
 print.tsenat_divergence_bootstrap_ci <- function(x, ...) {
     invisible(x)
 }
@@ -2002,24 +1999,21 @@ print.tsenat_divergence_bootstrap_ci <- function(x, ...) {
 }
 
 # From diversity_core.R: Compute bootstrap CI for diversity measures
-.bootstrap_diversity_ci <- function(bootstrap, result, genes, se_assay_mat, bootstrap_method,
+.bootstrap_diversity_ci <- function(bootstrap, result, genes, se_assay_mat, bootstrap_method = c("percentile", "bca"),
     bootstrap_ci, bootstrap_nboot, q, pseudocount, nthreads, bootstrap_include_diagnostics,
     verbose, effective_length = NULL, show_messages = FALSE, min_valid_frac = 0.75) {
+
+    # Validate bootstrap_method parameter per Bioconductor code syntax standards
+    bootstrap_method <- match.arg(bootstrap_method)
 
     bootstrap_ci_results <- NULL
 
     if (!bootstrap)
         return(NULL)
 
-
-
     if (verbose && show_messages)
         message("Computing bootstrap confidence intervals...")
 
-    # Validate bootstrap parameters
-    if (!(bootstrap_method %in% c("percentile", "bca"))) {
-        stop("bootstrap_method must be 'percentile' or 'bca'", call. = FALSE)
-    }
     if (!is.numeric(bootstrap_ci) || bootstrap_ci <= 0 || bootstrap_ci >= 1) {
         stop("bootstrap_ci must be a probability in (0, 1)", call. = FALSE)
     }
@@ -2430,7 +2424,10 @@ summary.tsenat_divergence_bootstrap_ci <- function(object, ...) {
 #'
 #' @noRd
 #' @noRd
-.detect_multimodality <- function(boot_dist, method = "kde") {
+.detect_multimodality <- function(boot_dist, method = c("kde", "histogram", "gaps")) {
+
+    # Validate method parameter per Bioconductor code syntax standards
+    method <- match.arg(method)
 
     # Remove NA values
     x <- boot_dist[!is.na(boot_dist)]
@@ -2441,24 +2438,12 @@ summary.tsenat_divergence_bootstrap_ci <- function(object, ...) {
             separation_score = NA_real_, method_used = "insufficient_data", interpretation = "Bootstrap distribution too small (n < 10) for mode detection"))
     }
 
-    # Validate method parameter
-    if (!(method %in% c("kde", "histogram", "gaps", "all"))) {
-        stop("method must be one of: 'kde', 'histogram', 'gaps', 'all'")
-    }
-
-    # If user requests 'all', run kde (most accurate) and return
-    if (method == "all") {
-        method <- "kde"
-    }
-
     result <- if (method == "kde") {
         .detect_multimodality_kde(x)
     } else if (method == "histogram") {
         .detect_multimodality_histogram(x)
     } else if (method == "gaps") {
         .detect_multimodality_gaps(x)
-    } else {
-        stop("Unknown method: ", method)
     }
 
     return(result)

@@ -72,8 +72,10 @@
 #' }
 #'
 #' @export
-TSENAT <- function(analysis, output_dir = "tsenat_outputs", save_output = TRUE, output_format = "tsv",
+TSENAT <- function(analysis, output_dir = "tsenat_outputs", save_output = TRUE, output_format = c("tsv", "csv", "txt", "rds"),
     verbose = TRUE) {
+    # Validate output_format parameter per Bioconductor code syntax standards
+    output_format <- match.arg(output_format)
     # Setup: validation and output configuration
     setup_result <- .TSENAT_setup(analysis, output_dir, save_output, output_format, verbose)
     analysis <- setup_result$analysis
@@ -116,11 +118,6 @@ TSENAT <- function(analysis, output_dir = "tsenat_outputs", save_output = TRUE, 
     }
     
     # Validate and set up output
-    valid_formats <- c("tsv", "csv", "txt", "rds")
-    if (!(output_format %in% valid_formats)) {
-        stop("'output_format' must be one of: ", paste(valid_formats, collapse = ", "),
-            call. = FALSE)
-    }
     
     if (!save_output) {
         output_dir <- NULL
@@ -460,11 +457,16 @@ TSENAT <- function(analysis, output_dir = "tsenat_outputs", save_output = TRUE, 
 #' @export
 TSENAT_config <- function(q = 1, condition_col = "condition", subject_col = NULL,
     sample_col = "sample", paired = FALSE, control = NULL, p_threshold = 0.05, fdr_threshold = 0.05,
-    significance_threshold = 0.05, bootstrap = FALSE, nboot = 1000, bootstrap_method = "percentile",
+    significance_threshold = 0.05, bootstrap = FALSE, nboot = 1000, bootstrap_method = c("percentile", "bca"),
     stringency = "medium", nthreads = 1, norm = TRUE, bootstrap_ci = 0.95, bootstrap_include_diagnostics = TRUE,
     min_valid_frac = 0.75, norm_method = NULL, pseudocount = 0, shrinkage = "none",
-    sait_method = "gam", sait_pcorr = "BH", jis_use_sait_fdr = TRUE, divergence_ci = 0.95,
-    assumptions_checks = "all", ...) {
+    sait_method = c("gam", "lmm", "fpca", "gee"), sait_pcorr = c("BH", "bonferroni", "hochberg", "holm"), jis_use_sait_fdr = TRUE, divergence_ci = 0.95,
+    assumptions_checks = c("rank", "gam", "all"), ...) {
+    # Validate parameters per Bioconductor code syntax standards
+    bootstrap_method <- match.arg(bootstrap_method)
+    sait_method <- match.arg(sait_method)
+    sait_pcorr <- match.arg(sait_pcorr)
+    assumptions_checks <- match.arg(assumptions_checks)
     # Validate always-required parameters
     if (is.null(sample_col) || !is.character(sample_col)) {
         stop("'sample_col' is required and must be character (column name for samples)",
@@ -484,36 +486,9 @@ TSENAT_config <- function(q = 1, condition_col = "condition", subject_col = NULL
         stop("'q' must be numeric value(s) between 0 and 2", call. = FALSE)
     }
 
-    # Validate bootstrap_method
-    valid_bootstrap_methods <- c("percentile", "bca")
-    if (!bootstrap_method %in% valid_bootstrap_methods) {
-        stop("'bootstrap_method' must be 'percentile' or 'bca'", call. = FALSE)
-    }
-
-    # Validate sait_method
-    valid_sait_methods <- c("gam", "lmm", "fpca", "gee")
-    if (!sait_method %in% valid_sait_methods) {
-        stop("'sait_method' must be one of: ", paste(valid_sait_methods, collapse = ", "),
-            call. = FALSE)
-    }
-
-    # Validate sait_pcorr
-    valid_sait_pcorr <- c("BH", "bonferroni", "hochberg", "holm")
-    if (!sait_pcorr %in% valid_sait_pcorr) {
-        stop("'sait_pcorr' must be one of: ", paste(valid_sait_pcorr, collapse = ", "),
-            call. = FALSE)
-    }
-
     # Validate divergence_ci
     if (!is.numeric(divergence_ci) || divergence_ci <= 0 || divergence_ci >= 1) {
         stop("'divergence_ci' must be a probability in (0, 1)", call. = FALSE)
-    }
-
-    # Validate assumptions_checks
-    valid_assumptions_checks <- c("rank", "gam", "all")
-    if (!assumptions_checks %in% valid_assumptions_checks) {
-        stop("'assumptions_checks' must be one of: ", paste(valid_assumptions_checks,
-            collapse = ", "), call. = FALSE)
     }
 
     # Build config list with all parameters

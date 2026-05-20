@@ -3,10 +3,10 @@ title: "Appendix A: Equivalence Validation - TSENAT vs SplicingFactory"
 author: "Cristobal Gallardo <gallardoalba@pm.me>"
 date: "`r Sys.Date()`"
 output:
-  rmarkdown::html_document:
+  BiocStyle::html_document:
     toc: true
-    fig_width: 10
-    fig_height: 6.5
+    toc_float: true
+    toc_depth: 2
   rmarkdown::pdf_document:
     toc: true
     fig_width: 10
@@ -17,7 +17,7 @@ header-includes:
   - \usepackage{tabu}
 bibliography: TSENAT.bib
 vignette: |
-  %\VignetteIndexEntry{TSENAT Appendix A: Validation}
+  %\VignetteIndexEntry{2. TSENAT Appendix A: Equivalence Validation}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
@@ -295,9 +295,9 @@ shannon_summary <- data.frame(
 knitr::kable(shannon_summary, row.names = FALSE, 
              col.names = c("Method", "Genes Tested", "Significant (padj<0.05)", "Mean log2FC", "SD log2FC"),
              caption = if (knitr::is_latex_output()) {
-               "Supplementary Table 5 | Shannon Entropy Analysis Summary Statistics. Differential analysis comparing Normal (N=8) vs Tumor (N=8) samples using SplicingFactory's \\texttt{calculate\\_difference()} method."
+               "Supplementary Table 8 | Shannon Entropy Analysis Summary Statistics. Differential analysis comparing Normal (N=8) vs Tumor (N=8) samples using SplicingFactory's \\texttt{calculate\\_difference()} method."
              } else {
-               "**Supplementary Table 5 | Shannon Entropy Analysis Summary Statistics.** Differential analysis comparing Normal (N=8) vs Tumor (N=8) samples using SplicingFactory's `calculate_difference()` method."
+               "**Supplementary Table 8 | Shannon Entropy Analysis Summary Statistics.** Differential analysis comparing Normal (N=8) vs Tumor (N=8) samples using SplicingFactory's `calculate_difference()` method."
              }, 
              align = c("l", "r", "r", "r", "r"))
 ```
@@ -315,7 +315,7 @@ shannon_sf_top <- TSENAT:::.format_top_genes(
   select_cols = c("genes", "Normal_mean", "Tumor_mean", "mean_difference", "log2_fold_change", "raw_p_values", "adjusted_p_values"),
   col_names = c("Gene", "Normal Mean", "Tumor Mean", "Mean Diff", "log2FC", "p-value", "adj p-value")
 )
-knitr::kable(shannon_sf_top, row.names = FALSE, caption = "**Supplementary Table 6a | SplicingFactory method - Top 10 genes identified by Shannon entropy (naive mode).** Ranked by adjusted *P*-value.", align = c("l", "r", "r", "r", "r", "r", "r"))
+knitr::kable(shannon_sf_top, row.names = FALSE, caption = "**Supplementary Table 9 | SplicingFactory method - Top 10 genes identified by Shannon entropy (naive mode).** Ranked by adjusted *P*-value.", align = c("l", "r", "r", "r", "r", "r", "r"))
 ```
 
 #### Top 10 Significant Genes - TSENAT (Tsallis q=1)
@@ -331,9 +331,9 @@ shannon_tsenat_top <- TSENAT:::.format_top_genes(
   col_names = c("Gene", "Normal Mean", "Tumor Mean", "Mean Diff", "log2FC", "p-value", "adj p-value")
 )
 knitr::kable(shannon_tsenat_top, row.names = FALSE, caption = if (knitr::is_latex_output()) {
-  "Supplementary Table 6b | TSENAT method - Top 10 genes identified by Tsallis entropy at q=1 (Shannon equivalence). Results obtained using SplicingFactory's \\texttt{calculate\\_difference()} method applied to TSENAT Tsallis q=1 diversity values. Ranked by adjusted p-value."
+  "Supplementary Table 10 | TSENAT method - Top 10 genes identified by Tsallis entropy at q=1 (Shannon equivalence). Results obtained using SplicingFactory's \\texttt{calculate\\_difference()} method applied to TSENAT Tsallis q=1 diversity values. Ranked by adjusted p-value."
 } else {
-  "**Supplementary Table 6b | TSENAT method - Top 10 genes identified by Tsallis entropy at q=1 (Shannon equivalence).** Results obtained using SplicingFactory's `calculate_difference()` method applied to TSENAT Tsallis q=1 diversity values. Ranked by adjusted *P*-value."
+  "**Supplementary Table 10 | TSENAT method - Top 10 genes identified by Tsallis entropy at q=1 (Shannon equivalence).** Results obtained using SplicingFactory's `calculate_difference()` method applied to TSENAT Tsallis q=1 diversity values. Ranked by adjusted *P*-value."
 }, align = c("l", "r", "r", "r", "r", "r", "r"))
 ```
 
@@ -369,9 +369,9 @@ simpson_summary <- data.frame(
 knitr::kable(simpson_summary, row.names = FALSE,
              col.names = c("Method", "Genes Tested", "Significant (padj<0.05)", "Mean log2FC", "SD log2FC"),
              caption = if (knitr::is_latex_output()) {
-               "Supplementary Table 8 | Simpson Index Analysis Summary Statistics. Differential analysis using Simpson diversity metric (Gini-Simpson index) comparing Normal (N=8) vs Tumor (N=8) samples using SplicingFactory's \\texttt{calculate\\_difference()} method."
+               "Supplementary Table 11 | Simpson Index Analysis Summary Statistics. Differential analysis using Simpson diversity metric (Gini-Simpson index) comparing Normal (N=8) vs Tumor (N=8) samples using SplicingFactory's \\texttt{calculate\\_difference()} method."
              } else {
-               "**Supplementary Table 8 | Simpson Index Analysis Summary Statistics.** Differential analysis using Simpson diversity metric (Gini-Simpson index) comparing Normal (N=8) vs Tumor (N=8) samples using SplicingFactory's `calculate_difference()` method."
+               "**Supplementary Table 11 | Simpson Index Analysis Summary Statistics.** Differential analysis using Simpson diversity metric (Gini-Simpson index) comparing Normal (N=8) vs Tumor (N=8) samples using SplicingFactory's `calculate_difference()` method."
              },
              align = c("l", "r", "r", "r", "r"))
 ```
@@ -389,7 +389,7 @@ simpson_sf_top <- TSENAT:::.format_top_genes(
   select_cols = c("genes", "Normal_mean", "Tumor_mean", "mean_difference", "log2_fold_change", "raw_p_values", "adjusted_p_values"),
   col_names = c("Gene", "Normal Mean", "Tumor Mean", "Mean Diff", "log2FC", "p-value", "adj p-value")
 )
-knitr::kable(simpson_sf_top, row.names = FALSE, caption = "**Supplementary Table 9a | SplicingFactory method - Top 10 genes by Simpson index (Gini-Simpson, emphasizes dominant isoforms).** Ranked by adjusted *P*-value.", align = c("l", "r", "r", "r", "r", "r", "r"))
+knitr::kable(simpson_sf_top, row.names = FALSE, caption = "**Supplementary Table 12 | SplicingFactory method - Top 10 genes by Simpson index (Gini-Simpson, emphasizes dominant isoforms).** Ranked by adjusted *P*-value.", align = c("l", "r", "r", "r", "r", "r", "r"))
 ```
 
 #### Top 10 Significant Genes - TSENAT (Tsallis q=2)
@@ -405,9 +405,9 @@ simpson_tsenat_top <- TSENAT:::.format_top_genes(
   col_names = c("Gene", "Normal Mean", "Tumor Mean", "Mean Diff", "log2FC", "p-value", "adj p-value")
 )
 knitr::kable(simpson_tsenat_top, row.names = FALSE, caption = if (knitr::is_latex_output()) {
-  "Supplementary Table 9b | TSENAT method - Top 10 genes by Tsallis entropy at q=2 (Simpson equivalence). Results obtained using SplicingFactory's \\texttt{calculate\\_difference()} method applied to TSENAT Tsallis q=2 diversity values. Ranked by adjusted p-value."
+  "Supplementary Table 13 | TSENAT method - Top 10 genes by Tsallis entropy at q=2 (Simpson equivalence). Results obtained using SplicingFactory's \\texttt{calculate\\_difference()} method applied to TSENAT Tsallis q=2 diversity values. Ranked by adjusted p-value."
 } else {
-  "**Supplementary Table 9b | TSENAT method - Top 10 genes by Tsallis entropy at q=2 (Simpson equivalence).** Results obtained using SplicingFactory's `calculate_difference()` method applied to TSENAT Tsallis q=2 diversity values. Ranked by adjusted *P*-value."
+  "**Supplementary Table 13 | TSENAT method - Top 10 genes by Tsallis entropy at q=2 (Simpson equivalence).** Results obtained using SplicingFactory's `calculate_difference()` method applied to TSENAT Tsallis q=2 diversity values. Ranked by adjusted *P*-value."
 }, align = c("l", "r", "r", "r", "r", "r"))
 ```
 

@@ -197,7 +197,7 @@ test_that("m_estimate rejects invalid scale_method parameter", {
   
   expect_error(
     .calculate_m_estimator(x, samples, loss_type = "huber", scale_method = "invalid"),
-    "scale_method must be"
+    "should be one of"
   )
 })
 
@@ -1015,7 +1015,7 @@ test_that("m_estimate rejects invalid loss_type gracefully", {
   
   expect_error(
     .calculate_m_estimator(x, samples, loss_type = "invalid_loss"),
-    "loss_type must be"
+    "should be one of"
   )
 })
 
@@ -1163,7 +1163,7 @@ test_that(".validateMEstimateInputs rejects invalid loss_type", {
   
   expect_error(
     TSENAT:::.validateMEstimateInputs(x, samples, "invalid", "mad", FALSE),
-    "loss_type must be"
+    "should be one of"
   )
 })
 
@@ -1173,7 +1173,7 @@ test_that(".validateMEstimateInputs rejects invalid scale_method", {
   
   expect_error(
     TSENAT:::.validateMEstimateInputs(x, samples, "huber", "not_a_method", FALSE),
-    "scale_method must be"
+    "should be one of"
   )
 })
 
@@ -1789,15 +1789,15 @@ test_that(".mest_irls_location uses different loss functions correctly", {
     result_tukey <- .mest_irls_location(y, loss_type = "tukey")
     expect_true(!is.na(result_tukey))
     
-    # Test Bisquare loss
-    result_bisq <- .mest_irls_location(y, loss_type = "bisquare")
-    expect_true(!is.na(result_bisq))
+    # Test LSQ loss
+    result_lsq <- .mest_irls_location(y, loss_type = "lsq")
+    expect_true(!is.na(result_lsq))
     
     # All should produce reasonable estimates (not far from median)
     med_y <- median(y)
     expect_true(abs(result_huber - med_y) < 5)
     expect_true(abs(result_tukey - med_y) < 5)
-    expect_true(abs(result_bisq - med_y) < 5)
+    expect_true(abs(result_lsq - med_y) < 5)
 })
 
 test_that(".mest_irls_location handles edge cases (all NA, empty, single value)", {
@@ -1854,3 +1854,60 @@ test_that(".mest_irls_location uses specified scale parameter", {
 
 
 
+
+# ============================================================================
+# TEST SUITE: Bioconductor c2e8214 - M-Estimation Parameter Validation
+# ============================================================================
+# Tests for match.arg() parameter validation in m-estimation functions
+
+test_that(".calculate_m_estimator accepts valid loss_type parameter", {
+    x <- matrix(rnorm(40), nrow = 5, ncol = 8)
+    samples <- c(rep("A", 4), rep("B", 4))
+    
+    # Test with "lsq"
+    result_lsq <- .calculate_m_estimator(x, samples, loss_type = "lsq")
+    expect_is(result_lsq, "data.frame")
+    
+    # Test with "huber"
+    result_huber <- .calculate_m_estimator(x, samples, loss_type = "huber")
+    expect_is(result_huber, "data.frame")
+    
+    # Test with "tukey"
+    result_tukey <- .calculate_m_estimator(x, samples, loss_type = "tukey")
+    expect_is(result_tukey, "data.frame")
+})
+
+test_that(".calculate_m_estimator accepts valid scale_method parameter", {
+    x <- matrix(rnorm(40), nrow = 5, ncol = 8)
+    samples <- c(rep("A", 4), rep("B", 4))
+    
+    # Test with "mad"
+    result_mad <- .calculate_m_estimator(x, samples, scale_method = "mad")
+    expect_is(result_mad, "data.frame")
+    
+    # Test with "proposal2"
+    result_proposal2 <- .calculate_m_estimator(x, samples, scale_method = "proposal2")
+    expect_is(result_proposal2, "data.frame")
+})
+
+test_that(".calculate_m_estimator rejects invalid loss_type", {
+    x <- matrix(rnorm(40), nrow = 5, ncol = 8)
+    samples <- c(rep("A", 4), rep("B", 4))
+    
+    # Invalid loss_type should error with match.arg message
+    expect_error(
+        .calculate_m_estimator(x, samples, loss_type = "invalid_loss"),
+        regexp = "should be one of"
+    )
+})
+
+test_that(".calculate_m_estimator rejects invalid scale_method", {
+    x <- matrix(rnorm(40), nrow = 5, ncol = 8)
+    samples <- c(rep("A", 4), rep("B", 4))
+    
+    # Invalid scale_method should error with match.arg message
+    expect_error(
+        .calculate_m_estimator(x, samples, scale_method = "invalid_scale"),
+        regexp = "should be one of"
+    )
+})

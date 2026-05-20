@@ -4237,12 +4237,7 @@ plot_diversity_violin_density <- function(se, assay_name = "diversity", title = 
     }
 }
 
-#' @importFrom ggplot2 ggplot aes geom_col geom_point geom_line
-#' scale_y_continuous
-#' @importFrom ggplot2 labs theme_minimal theme element_text geom_hline
-#' geom_vline
-#' @importFrom ggplot2 scale_color_manual scale_shape_manual geom_tile
-#' scale_fill_gradient2
+#' @importFrom ggplot2 ggplot aes geom_col geom_point geom_line scale_y_continuous labs theme_minimal theme element_text geom_hline geom_vline scale_color_manual scale_shape_manual geom_tile scale_fill_gradient2
 NULL
 
 

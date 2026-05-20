@@ -285,7 +285,10 @@
 
 # ============================================================================
 # HELPER: Calculate min_samples and min_tx_per_gene based on stringency @noRd
-.calculate_stringency_thresholds <- function(stringency, n_samples, n_pairs = NULL) {
+.calculate_stringency_thresholds <- function(stringency = c("soft", "medium", "severe"), n_samples, n_pairs = NULL) {
+    # Validate stringency parameter per Bioconductor code syntax standards
+    stringency <- match.arg(stringency)
+
     if (stringency == "soft") {
         min_samples <- max(2L, ceiling(0.25 * n_samples))
         min_tx_per_gene <- 2L
@@ -580,10 +583,8 @@
     # Handle stringency-based auto-calculation
     pair_col_used <- NULL
     if (!is.null(stringency)) {
-        if (!(stringency %in% c("soft", "medium", "severe"))) {
-            stop("'stringency' must be one of: 'soft', 'medium', 'severe', or NULL",
-                call. = FALSE)
-        }
+        # Validate stringency parameter per Bioconductor code syntax standards
+        stringency <- match.arg(stringency, c("soft", "medium", "severe"))
 
         # Auto-detect or validate pair column
         if (is.null(pair_col)) {

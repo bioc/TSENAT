@@ -506,11 +506,12 @@
     pvals_vec <- vapply(all_pvalues, function(x) x$pvalue, FUN.VALUE = numeric(1))
     fdr_vec <- p.adjust(pvals_vec, method = "BH")
 
-    # OPTIMIZED: Vectorized FDR assignment (replaces loop with direct
-    # assignment)
-    for (i in seq_along(all_pvalues)) {
-        all_pvalues[[i]]$fdr <- fdr_vec[i]
-    }
+    # Vectorized FDR assignment per Bioconductor efficiency standards
+    # Use Map() instead of for loop to assign FDR values to list elements
+    all_pvalues <- Map(function(x, fdr) {
+        x$fdr <- fdr
+        x
+    }, all_pvalues, fdr_vec)
 
     # OPTIMIZED: Pre-compute matches to avoid repeated lookups in loop
     genes <- vapply(all_pvalues, function(x) x$gene, FUN.VALUE = character(1))

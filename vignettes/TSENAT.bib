@@ -794,3 +794,35 @@
   year = {2018},
   note = {Comprehensive guide to forecasting methods for time series data. Covers ARIMA models, exponential smoothing, dynamic regression, and forecast evaluation. Provides practical methodology directly applicable to analyzing temporal dynamics in gene expression patterns, isoform abundance trajectories, and RNA-seq count time-series data with autoregressive structures and trend components.}
 }
+
+@article{S070,
+  author = {Anders, Simon and Reyes, Alejandro and Huber, Wolfgang},
+  title = {Detecting differential usage of exons from {{RNA}}-{{Seq}} data},
+  journal = {Nature Precedings},
+  year = {2012},
+  doi = {10.1038/npre.2012.6837.2},
+  note = {Foundational paper introducing DEXSeq method for detecting differential exon usage in RNA-seq data. Employs generalized linear models (GLMs) with interaction terms to test whether specific exons or transcript isoforms are used at different rates between conditions. Demonstrates high sensitivity for detecting differential transcript usage patterns while accounting for biological variation through proper dispersion estimation.}
+}
+
+@article{S199,
+  author = {Baldoni, Pedro L. and Chen, Lizhong and Smyth, Gordon K.},
+  title = {Faster and more accurate assessment of differential transcript expression with {{G}}ibbs sampling and {{edgeR}} v4},
+  journal = {NAR Genomics and Bioinformatics},
+  volume = {6},
+  number = {4},
+  pages = {lqae151},
+  year = {2024},
+  doi = {10.1093/nargab/lqae151},
+  note = {Recent work extending edgeR divided-count approach for differential transcript expression (DTE) analysis of RNA-seq data. Optimizes edgeR v4 with Gibbs resampling for transcript-level quantification from kallisto and Salmon, improving statistical power and accuracy for DTE detection. Demonstrates that modern edgeR versions are purpose-built for transcript-level differential expression analysis with improved quasi-likelihood treatment of small counts at the transcript level.}
+}
+
+@article{S198,
+  author = {Love, Michael I. and Soneson, Charlotte and Patro, Rob},
+  title = {Swimming downstream: statistical analysis of differential transcript usage following {{S}}almon quantification},
+  journal = {F1000Research},
+  volume = {7},
+  pages = {952},
+  year = {2018},
+  doi = {10.12688/f1000research.15398.3},
+  note = {Comprehensive workflow for detecting differential transcript usage (DTU) from RNA-seq data following Salmon quantification. Explicitly defines and distinguishes DTU (transcript proportion changes), DTE (transcript abundance changes), and DGE (gene-level abundance changes) as complementary analyses. Shows that DTU and DTE can occur independently of gene-level expression changes, validating the need for transcript-level analysis methods designed specifically for these phenomena.}
+}

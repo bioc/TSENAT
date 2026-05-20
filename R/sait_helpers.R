@@ -1364,11 +1364,14 @@ if (getOption("TSENAT.memoization", TRUE)) {
 #'
 
 #' @noRd
-.adjust_pvalues_multicorr <- function(p_values, multicorr, wy_randomizations, fit_one_fn = NULL,
+.adjust_pvalues_multicorr <- function(p_values, multicorr = c("hochberg", "westfall-young", "benjamini-yekutieli"), wy_randomizations, fit_one_fn = NULL,
     metadata = NULL, mat = NULL, rownames_mat = NULL, se = NULL, assay_name = "diversity",
     method = NULL, pvalue = NULL, subject_col = NULL, paired = FALSE, min_obs = 10,
     nthreads = 1, verbose = FALSE, bias_correction = TRUE, regularization = NULL,
     corstr = "ar1", adaptive_knots = TRUE, storey = FALSE) {
+    # Validate multicorr parameter per Bioconductor code syntax standards
+    multicorr <- match.arg(multicorr)
+
     if (multicorr == "hochberg") {
         adj_p <- .hochberg_stepup(p_values)
         if (verbose) {

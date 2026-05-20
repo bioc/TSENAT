@@ -104,8 +104,7 @@
 #' bootstrap=TRUE, nboot=1000)`
 #'   or appropriate divergence function with bootstrap enabled.
 #'
-#' @importFrom ggplot2 ggplot aes geom_line geom_ribbon geom_point theme_minimal
-#'   scale_color_manual scale_fill_manual labs theme element_text annotate
+#' @importFrom ggplot2 ggplot aes geom_line geom_ribbon geom_point theme_minimal scale_color_manual scale_fill_manual labs theme element_text annotate
 #' @importFrom dplyr filter group_by summarise pull
 #' @importFrom SummarizedExperiment assayNames assay colData rowData
 #' @importFrom tidyr pivot_longer

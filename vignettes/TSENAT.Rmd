@@ -3,24 +3,14 @@ title: "TSENAT: Tsallis Entropy Analysis Toolbox"
 author: "Cristobal Gallardo <gallardoalba@pm.me>"
 date: "`r Sys.Date()`"
 output:
-  rmarkdown::html_document:
+  BiocStyle::html_document:
     toc: true
-    fig_width: 10
-    fig_height: 6.5
+    toc_float: true
     toc_depth: 2
-  rmarkdown::pdf_document:
-    toc: true
-    fig_width: 10
-    fig_height: 6.5
-    toc_depth: 2
-    latex_engine: xelatex
-header-includes:
-  - \usepackage{float}
-  - \usepackage{tabu}
 bibliography: TSENAT.bib
 suppress-bibliography: true
 vignette: |
-  %\VignetteIndexEntry{TSENAT}
+  %\VignetteIndexEntry{1. TSENAT: Tsallis Entropy Analysis Toolbox}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
@@ -40,9 +30,9 @@ knitr::opts_chunk$set(
 suppressPackageStartupMessages(library(kableExtra))
 ```
 
-# Overview
+# Introduction
 
-TSENAT (Tsallis Entropy Analysis Toolbox) allows the modelization and quantification of isoform-usage complexity in RNA-seq data using Tsallis entropy, a scale-dependent diversity measure distinct from abundance-focused tools (DESeq2, edgeR) and differential transcript usage packages (DRIMSeq). By tuning the entropy index parameter (q), TSENAT enables to examine transcriptome heterogeneity at different scales: rare variants (low q) or dominant isoforms (high q). This package enables computing Tsallis entropy and Tsallis divergence from transcript-level abundance estimates, comparing measures between groups, and visualizing scale-dependent differences via q-curves.
+TSENAT (Tsallis Entropy Analysis Toolbox) allows the modelization and quantification of isoform-usage complexity in RNA-seq data using Tsallis entropy, a scale-dependent diversity measure distinct from differential abundance tools (DESeq2, edgeR) and differential usage tools (DEXSeq, DRIMSeq). By tuning the entropy index parameter (q), TSENAT enables to examine transcriptome heterogeneity at different scales: rare variants (low q) or dominant isoforms (high q). This package enables computing Tsallis entropy and Tsallis divergence from transcript-level abundance estimates, comparing measures between groups, and visualizing scale-dependent differences via q-curves.
 
 ## Motivation
 
@@ -60,17 +50,20 @@ In this guide, we demonstrate the complete workflow: preprocessing transcript co
 Design assumptions: This guide assumes paired or longitudinal designs with >=6-8 samples per group for adequate power to detect entropy shifts while controlling false discovery rate. Smaller sample sizes may be underpowered to detect subtle isoform complexity changes.
 
 
+
+
 ## Installation
 
 The easiest way to install TSENAT is through Bioconda:
 
-```bash
-conda install -c bioconda r-tsenat
+```{r install-bioconda, eval = FALSE}
+# Install from Bioconda
+# conda install -c bioconda r-tsenat
 ```
 
 To install the latest development version from GitHub:
 
-```r
+```{r install-github, eval = FALSE}
 remotes::install_github("gallardoalba/TSENAT")
 ```
 
@@ -84,6 +77,9 @@ library(SummarizedExperiment)
 
 # Load example data
 data("readcounts", package = "TSENAT")
+
+# Load readcounts object, which contains Salmon-quantified
+# fragment counts with EM-based ambiguity resolution applied
 readcounts <- as.matrix(readcounts)
 
 # Load sample metadata and annotation
@@ -186,7 +182,7 @@ TSENAT enables detection of these changes through entropy-based approaches, whic
 
 ## Beyond Classical Abundance Measures
 
-Traditional RNA-seq analysis focuses on fold-changes and differential abundance. Since isoform reorganization can occur independently of total abundance changes, entropy-based approaches complement classical methods by detecting complexity shifts that transcript-level statistics alone cannot reveal. Standard statistical tests (t-tests, DESeq2, etc.) miss the phenomenon entirely: a gene can show zero fold-change while experiencing dramatic isoform reshuffling. This represents a fundamental analytical gap that entropy-based methods address.
+Traditional RNA-seq analysis focuses on fold-changes and differential abundance of specific transcripts. Tools like edgeR [@S195; @S199], DESeq2 [@S069], and DEXSeq [@S070] measure whether individual transcripts increase/decrease in expression or shift in relative proportion.Entropy-based approaches complement these methods by detecting complexity shifts —whether genes consolidate onto fewer dominant isoforms or maintain balanced distributions. TSENAT detects this reorganization answering a fundamentally different biological question: not "which transcripts change?" but "how is the isoform complexity changing?"
 
 ## Mechanistic Evidence: Disease and Evolution
 
@@ -231,9 +227,9 @@ Now we will load the example dataset and associated metadata:
 ```{r prepare-example-data}
 # Load example dataset (lazy-loaded as 'readcounts' by default)
 # This includes SALMON preprocessing outputs:
-# - readcounts: transcript-level NumReads (raw fragment counts)
-# - tpm: TPM matrix (length- and library-normalized estimates)
-# - effective_length: EffectiveLength vector (read-length corrected)
+# - readcounts: Salmon NumReads (raw fragment counts with EM-based ambiguity resolution)
+# - tpm: Salmon TPM matrix (length and library-normalized expression)
+# - effective_length: Salmon EffectiveLength vector (accounts for fragment length distribution)
 data(readcounts)
 
 readcounts <- as.matrix(readcounts)
@@ -380,19 +376,24 @@ if (!is.null(sample_data) && nrow(sample_data) > 0) {
 }
 ```
 
-With the q-spectrum we can produce a q-curve per sample and gene.
-These curves show how diversity emphasis shifts from rare to dominant
-isoforms as `q` increases and form the basis for interaction tests. The
-q-curve shows entropy as a function of `q`. Diverging curves between
-groups indicate scale-dependent diversity differences: separation at low
-`q` implies differences in rare isoforms, while separation at high `q`
-signals differences in dominant isoforms.
+With the q-spectrum we can produce q-curves at two levels:
+
+1. **Overall diversity profile (Figure 1)**: Shows how entropy changes across q-values
+for all samples aggregated, colored by condition (control vs. treatment).
+
+2. **Gene-specific q-curves (Figure 2)**: For genes with significant q×condition interactions,
+shows how each gene's diversity pattern differs by condition across the entropic spectrum.
+
 
 ```{r fig-1-isoform-diversity-profiles, fig.width=10, fig.height=5.2, out.width="98%", fig.pos="H", fig.cap = "**Figure 1:** Isoform diversity profiles across entropic indices. Lines show normalized Tsallis entropy (0-1) for each sample, blue control and red treatment."}
 # Plot overall q-curve
 p_qcurve <- plot_diversity_spectrum(analysis)
 print(p_qcurve)
 ```
+
+Diverging curves between groups indicate
+scale-dependent diversity differences: separation at low `q` implies differences in rare
+isoforms, while separation at high `q` signals differences in dominant isoforms.
 
 ## Quality Control: Sample Influence Assessment
 
@@ -655,7 +656,7 @@ if (exists("analysis")) {
         
         knitr::kable(
             div_table,
-            caption = "**Table 3 | Pairwise Tsallis divergence estimates.** Divergence (distance) between conditions from Tsallis entropy framework. Columns: gene identifier; pairwise comparison; divergence value; confidence interval (95%). Ranked by magnitude.",
+            caption = "**Table 5 | Pairwise Tsallis divergence estimates.** Divergence (distance) between conditions from Tsallis entropy framework. Columns: gene identifier; pairwise comparison; divergence value; confidence interval (95%). Ranked by magnitude.",
             digits = 5,
             row.names = TRUE
         )
@@ -667,7 +668,7 @@ if (exists("analysis")) {
             
             knitr::kable(
                 div_table,
-                caption = "**Table 4 | Pairwise Tsallis divergence from list-based results.** Alternative representation of divergence metrics for leading genes. Columns: gene identifier; pairwise comparison; divergence value; uncertainty. Asymmetry ($D(A \\to B) \\ne D(B \\to A)$) reflects information-theoretic properties. Ordered by divergence magnitude.",
+                caption = "**Table 6 | Pairwise Tsallis divergence from list-based results.** Alternative representation of divergence metrics for leading genes. Columns: gene identifier; pairwise comparison; divergence value; uncertainty. Asymmetry ($D(A \\to B) \\ne D(B \\to A)$) reflects information-theoretic properties. Ordered by divergence magnitude.",
                 digits = 5,
                 row.names = TRUE
             )
@@ -718,7 +719,7 @@ colnames(top_genes_display) <- col_names[1:ncol(top_genes_display)]
 # Display the result as a formatted table
 knitr::kable(
     top_genes_display, 
-    caption = "Top 6 Genes by Effect Size (Tsallis Divergence)",
+    caption = "**Table 7 | Top 6 Genes by Effect Size (Tsallis Divergence).** Genes ranked by interaction p-value; columns show divergence at key q-values (0.5, 1.0, 2.0) and inferred pattern type (rare-driven, abundant-driven, or balanced).",
     digits = 4,
     row.names = FALSE
 )
@@ -742,7 +743,7 @@ abundant isoforms) in another, revealing scale-dependent regulatory mechanisms. 
 for investigation of condition-specific splicing architecture and dynamic isoform switching.
 
 
-```{r effect-size-plot-multiq, fig.width=10, fig.height=6, out.width="98%", fig.align='center', fig.pos="H"}
+```{r effect-size-plot-multiq, fig.width=10, fig.height=6, out.width="98%", fig.align='center', fig.pos="H", fig.cap='**Figure 5:** Distribution of Tsallis divergence effect sizes across genes. X-axis shows divergence values; y-axis shows gene density. Threshold line indicates substantial divergence (D > 0.1) distinguishing signal genes from background.'}
 # Visualize the distribution of Tsallis divergence effect sizes across genes
 plot_obj <- plot_divergence_distribution(
     analysis, 
@@ -752,7 +753,7 @@ plot_obj <- plot_divergence_distribution(
 print(plot_obj)
 ```
 
-```{r compare-q-spectra-plot, fig.width=10, fig.height=6, out.width='100%', fig.align='center', fig.cap='**Figure 5:** Q-spectrum curves for top genes by significance. Each line represents divergence as a function of q-value; shape reveals biological pattern (rare-driven, balanced, or abundant-driven).'}
+```{r compare-q-spectra-plot, fig.width=10, fig.height=6, out.width='100%', fig.align='center', fig.cap='**Figure 6:** Q-spectrum curves for top genes by significance. Each line represents divergence as a function of q-value; shape reveals biological pattern (rare-driven, balanced, or abundant-driven).'}
 # Visualize q-spectrum curves for top 4 genes by significance
 p_multi <- plot_divergence_spectrum(
     analysis, 
@@ -779,7 +780,7 @@ We can also plot the global divergence spectrum across all genes.
 This curve is the full biological signature of **isoform switching**-the pattern encodes which 
 abundance scales (rare vs. abundant) are affected.
 
-```{r visualize-q-spectrum, fig.width=10, fig.height=5, out.width='100%', fig.align='center', fig.cap='**Figure 6:** Global divergence spectrum across all genes. Aggregated q-spectrum pattern shows which abundance scales (rare vs. abundant isoforms) are affected genome-wide.'}
+```{r visualize-q-spectrum, fig.width=10, fig.height=5, out.width='100%', fig.align='center', fig.cap='**Figure 7:** Global divergence spectrum across all genes. Aggregated q-spectrum pattern shows which abundance scales (rare vs. abundant isoforms) are affected genome-wide.'}
 # Visualize global divergence q-spectrum across all genes (aggregated)
 # Plot is rendered directly by knitr (no file dependency)
 p <- plot_divergence_spectrum(analysis)

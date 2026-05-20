@@ -8,7 +8,7 @@ TSENAT(
   analysis,
   output_dir = "tsenat_outputs",
   save_output = TRUE,
-  output_format = "tsv",
+  output_format = c("tsv", "csv", "txt", "rds"),
   verbose = TRUE
 )
 }
