@@ -191,8 +191,8 @@
         pi0 <- min(1, pi0_boot_mean[optimal_idx])
         lambda_used <- lambda_grid[optimal_idx]
 
-        return(list(pi0 = pi0, lambda = lambda_used, pi0_method = "bootstrap", n_hypotheses = m,
-            n_null = round(pi0 * m)))
+        list(pi0 = pi0, lambda = lambda_used, pi0_method = "bootstrap", n_hypotheses = m,
+            n_null = round(pi0 * m))
     }
 }
 
