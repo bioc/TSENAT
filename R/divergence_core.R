@@ -985,7 +985,10 @@
 #' Apply normalization to results
 #' Dispatcher that calls appropriate normalization method
 #' @noRd
-.normalize_divergence_matrix <- function(assay_matrix, row_data_df, q_vals, norm) {
+.normalize_divergence_matrix <- function(assay_matrix, row_data_df, q_vals, norm = c("none", "range", "zscore", "log_odds_ratio", "relative_reference")) {
+    # Validate norm parameter per Bioconductor code syntax standards
+    norm <- match.arg(norm)
+
     if (norm == "none") {
         return(list(assay = assay_matrix, rowData = row_data_df))
     }

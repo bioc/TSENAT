@@ -249,11 +249,8 @@ calculate_diversity <- function(analysis, q = NULL, norm = TRUE, norm_method = N
 #' @noRd
 .validate_norm_method <- function(norm_method) {
     if (!is.null(norm_method)) {
-        valid_methods <- c("default", "zscore", "log_odds_ratio", "relative_reference")
-        if (!(norm_method %in% valid_methods)) {
-            stop("'norm_method' must be one of: ", paste(valid_methods, collapse = ", "),
-                call. = FALSE)
-        }
+        # Validate norm_method parameter per Bioconductor code syntax standards
+        norm_method <- match.arg(norm_method, c("default", "zscore", "log_odds_ratio", "relative_reference"))
     }
 }
 

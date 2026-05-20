@@ -4,11 +4,14 @@
 
 ## The Problem
 
-Standard differential expression tools (DESeq2, edgeR) detect changes in total transcript abundance. However, genes often reorganize their isoform diversity *without* changing total abundance: they may shift from a balanced isoform distribution to dominance by a single isoform, or vice versa. This **isoform switching and splicing-driven regulation** is biologically important for cell state and function but invisible to abundance-focused methods.
+RNA-seq analysis typically addresses one of three complementary biological questions: (1) **which genes change in total abundance?**, (2) **which individual transcripts shift their abundance?**; (3) **which transcripts shift their *proportions* within genes, independent of total abundance?**. 
+
+However, a fourth question remains largely invisible: **how does isoform-usage complexity change?**.
+
 
 ## The Solution
 
-TSENAT captures isoform diversity independently of which specific isoforms are abundant. The method uses Tsallis entropy, whose entropic index parameter (q) enables to evaluate different data dimensions:
+TSENAT captures isoform-usage complexity  throught Tsallis entropy, whose entropic index parameter (q) enables to evaluate different data dimensions:
 
 - **Low q** (e.g., 0.5): Focuses on rare isoforms - detects if diversity is maintained or collapsed
 
@@ -16,7 +19,7 @@ TSENAT captures isoform diversity independently of which specific isoforms are a
 
 - **High q** (e.g., 2.0): Focuses on dominant isoforms - detects dominance shifts
 
-By examining diversity across multiple entropic indices (q-values), you identify scale-dependent diversity changes - the hallmark of coordinate isoform switching.
+By examining diversity across multiple entropic indices (q-values), TSENAT allows to identify scale-dependent diversity changes - the hallmark of coordinate isoform switching.
 
 ## The Mathematics Behind Tsallis Entropy
 
@@ -147,11 +150,11 @@ For a complete walkthrough of the analysis pipeline with real biological example
 
 ## Statistical Inference Methods 
 
-TSENAT provides a flexible statistical framework optimized for entropy-based diversity analysis. The recommended main workflow relies on **Generalized Additive Models (GAM)** via [`mgcv::gam()`](https://CRAN.R-project.org/package=mgcv) combined with ARIMA differencing.
+TSENAT provides a flexible statistical framework optimized for entropy-based diversity analysis. The recommended main workflow (paired design) relies on **Generalized Additive Mixed Models (GAMM)** via [`mgcv::gamm()`](https://CRAN.R-project.org/package=mgcv) combined with ARIMA differencing.
 
 The statistical methods available in TSENAT include:
 
-- **Scale-adaptive interaction tests (SAIT)**: Multiple modeling approaches optimized for repeated measures with AR(1) correlation structure. GAM, LMM, GEE and FPCA are all parametrized to handle the non-normality and heteroscedasticity characteristic of entropy data.
+- **Scale-adaptive interaction tests (SAIT)**: Multiple modeling approaches optimized for repeated measures with AR(1) correlation structure. GAM/GAMM, LMM, GEE and FPCA are all parametrized to handle the non-normality and heteroscedasticity characteristic of entropy data.
 - **Scheirer-Ray-Hare (SRH) rank tests**: The test operates solely on ranks, making it robust to outliers and extreme values. However, it shows lower power for interactions and can inflate Type I errors under heterogeneous variance. These limitations are mitigated through Hochberg multiple testing correction.
 - **M-estimation**: Robust location estimation for group comparison using iteratively re-weighted least squares, resistant to outliers.
 - **Jackknife isoform switching (JIS)**: Leave-one-out resampling to identify transcripts with condition-specific switching patterns and quantify their influence on entropy differences.
@@ -162,8 +165,8 @@ The statistical methods available in TSENAT include:
 
 | Tool | Answers | TSENAT Difference |
 |------|---------|-------------------|
-| **DESeq2, edgeR, limma** | Which genes change in *total abundance*? | TSENAT detects isoform-usage complexity changes independent of total abundance |
-| **DRIMSeq** | Which *individual transcripts* shift usage? | TSENAT measures overall isoform diversity, not individual transcript shifts |
+| **edgeR, DESeq2** | Do individual transcripts increase/decrease in expression? Do genes change in total abundance? | TSENAT measures isoform-usage complexity changes independent of transcript or gene abundance |
+| **DEXSeq, DRIMSeq** | Which transcripts shift their *proportions* within genes, independent of abundance changes? | TSENAT detects whether the isoform landscape consolidates or fragments |
 | **IsoformSwitchAnalyzeR** | Which *individual isoforms* switch; what are the *functional consequences*? | TSENAT measures overall isoform diversity and diversity shifts rather than cataloging individual transcript switches or predicting functional consequences; complements switch identification with diversity patterns |
 | **SplicingFactory** | What is the *overall isoform diversity*? | TSENAT extends with scale-dependent diversity (q-spectrum) vs fixed measures |
 | **Kallisto, Salmon** | How many reads per transcript? | TSENAT uses their quantification as input; adds diversity analysis layer |

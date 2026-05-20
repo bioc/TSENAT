@@ -53,10 +53,9 @@
     }
 
     # Monotone increasing constraint (Hochberg stepup)
+    # Vectorized using cummax per Bioconductor efficiency standards
     if (valid_m > 1) {
-        for (i in 2:valid_m) {
-            adjusted_valid[i] <- max(adjusted_valid[i - 1], adjusted_valid[i])
-        }
+        adjusted_valid <- cummax(adjusted_valid)
     }
 
     # Map adjusted back to original positions
@@ -115,9 +114,8 @@
 
     # Ensure monotone increasing (cumulative minimum from the back) For sorted
     # p-values, adjusted p-values should be non-decreasing
-    for (i in seq(valid_m - 1, 1, -1)) {
-        adjusted[i] <- pmin(adjusted[i], adjusted[i + 1])
-    }
+    # Vectorized using rev() + cummin() per Bioconductor efficiency standards
+    adjusted <- rev(cummin(rev(adjusted)))
 
     # Map adjusted back to original positions
     adjusted_result <- numeric(valid_m)

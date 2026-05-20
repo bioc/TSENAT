@@ -4675,7 +4675,7 @@ test_that(".detect_multimodality rejects invalid methods", {
   
   expect_error(
     TSENAT:::.detect_multimodality(boot_dist, method = "invalid"),
-    "must be one of"
+    "should be one of"
   )
 })
 

@@ -548,13 +548,13 @@ test_that(".validate_results_params rejects invalid rankBy values", {
   
   expect_error(
     TSENAT:::.validate_results_params(analysis, type = "diversity", rankBy = "invalid", format = "text", filterFDR = NULL),
-    "must be one of",
+    "should be one of",
     fixed = TRUE
   )
   
   expect_error(
     TSENAT:::.validate_results_params(analysis, type = "diversity", rankBy = "byScore", format = "text", filterFDR = NULL),
-    "must be one of"
+    "should be one of"
   )
 })
 
@@ -563,12 +563,12 @@ test_that(".validate_results_params rejects invalid format values", {
   
   expect_error(
     TSENAT:::.validate_results_params(analysis, type = "diversity", rankBy = "none", format = "xlsx", filterFDR = NULL),
-    "must be one of"
+    "should be one of"
   )
   
   expect_error(
     TSENAT:::.validate_results_params(analysis, type = "diversity", rankBy = "none", format = "invalid_format", filterFDR = NULL),
-    "must be one of"
+    "should be one of"
   )
 })
 

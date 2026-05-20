@@ -319,8 +319,7 @@ setGeneric("calculate_concordance", function(analysis_sait, analysis_rank = NULL
 })
 
 #' @rdname calculate_concordance
-
-#' Helper: Validate calculate_concordance inputs
+#' @keywords internal
 #' @param analysis_sait TSENATAnalysis object
 #' @param analysis_rank TSENATAnalysis object or NULL
 #' @param ... Additional arguments
@@ -1009,6 +1008,9 @@ plot_expression <- function(analysis, gene = NULL, condition_col = NULL, top_n =
 
     # Load visualization dependencies (ggplot2, cowplot, pheatmap, etc.)
     .load_visualization_deps()
+
+    # Validate parameters per Bioconductor code syntax standards
+    metric <- match.arg(metric)
 
     # Extract verbose parameter if not provided
     verbose <- resolve_slot_param(verbose, analysis@config, "verbose", FALSE)

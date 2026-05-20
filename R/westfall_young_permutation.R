@@ -99,6 +99,9 @@
 
 .estimate_storey_pi0 <- function(pvalues, lambda = 0.5, pi0_method = "lambda", na.rm = TRUE) {
 
+    # Validate pi0_method parameter per Bioconductor code syntax standards
+    pi0_method <- match.arg(pi0_method, c("lambda", "smoother", "bootstrap"))
+
     if (na.rm) {
         pvalues <- pvalues[!is.na(pvalues)]
     }
@@ -130,12 +133,11 @@
     # method when lambda unknown)
     if (pi0_method == "smoother") {
         lambda_grid <- seq(0, 0.95, length.out = 50)
-        pi0_estimate <- numeric(length(lambda_grid))
-
-        for (i in seq_along(lambda_grid)) {
-            n_above <- sum(pvalues > lambda_grid[i], na.rm = TRUE)
-            pi0_estimate[i] <- n_above/((1 - lambda_grid[i]) * m)
-        }
+        # Vectorized pi0 estimation: avoid for loop per Bioconductor efficiency standards
+        pi0_estimate <- vapply(lambda_grid, function(lambda) {
+            n_above <- sum(pvalues > lambda, na.rm = TRUE)
+            n_above / ((1 - lambda) * m)
+        }, FUN.VALUE = numeric(1))
 
         # Smooth the estimates via loess Use tryCatch to gracefully fall back
         # if loess fails
@@ -170,13 +172,14 @@
         pi0_boot_mat <- matrix(NA, nrow = n_boot, ncol = length(lambda_grid))
 
         # Seed handling left to caller for Bioconductor compliance
-        for (b in seq_len(n_boot)) {
+        # Vectorize bootstrap loop: first use vapply over lambdas for each bootstrap sample
+        pi0_boot_mat <- t(vapply(seq_len(n_boot), function(b) {
             boot_p <- sample(pvalues, size = m, replace = TRUE)
-            for (i in seq_along(lambda_grid)) {
-                n_above <- sum(boot_p > lambda_grid[i])
-                pi0_boot_mat[b, i] <- n_above/((1 - lambda_grid[i]) * m)
-            }
-        }
+            vapply(lambda_grid, function(lambda) {
+                n_above <- sum(boot_p > lambda)
+                n_above / ((1 - lambda) * m)
+            }, FUN.VALUE = numeric(1))
+        }, FUN.VALUE = numeric(length(lambda_grid))))
 
         # Use bootstrap mean and find stable lambda
         pi0_boot_mean <- colMeans(pi0_boot_mat, na.rm = TRUE)
@@ -191,8 +194,6 @@
         return(list(pi0 = pi0, lambda = lambda_used, pi0_method = "bootstrap", n_hypotheses = m,
             n_null = round(pi0 * m)))
     }
-
-    stop("Unknown pi0_method. Use 'lambda', 'smoother', or 'bootstrap'")
 }
 
 

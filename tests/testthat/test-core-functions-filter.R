@@ -429,7 +429,7 @@ test_that(".filter_se invalid stringency parameter raises error", {
   # Invalid stringency should raise error
   expect_error(
     .filter_se(se, stringency = "invalid_level", verbose = FALSE),
-    "must be one of"
+    "should be one of"
   )
 })
 
@@ -3170,10 +3170,11 @@ test_that(".calculate_stringency_thresholds severe level", {
   expect_equal(result$min_isoform_abundance, 0.15)
 })
 
-test_that(".calculate_stringency_thresholds returns NULL for invalid stringency", {
-  result <- TSENAT:::.calculate_stringency_thresholds("invalid", n_samples = 10)
-  
-  expect_null(result)
+test_that(".calculate_stringency_thresholds rejects invalid stringency", {
+  expect_error(
+    TSENAT:::.calculate_stringency_thresholds("invalid", n_samples = 10),
+    "should be one of"
+  )
 })
 
 # ============================================================================
@@ -3294,7 +3295,7 @@ test_that(".resolve_filter_parameters raises error for invalid stringency", {
   
   expect_error(
     TSENAT:::.resolve_filter_parameters(se, 5, 1, "invalid_level", NULL, NULL, "counts", 2, NULL),
-    "must be one of.*soft.*medium.*severe"
+    "should be one of"
   )
 })
 

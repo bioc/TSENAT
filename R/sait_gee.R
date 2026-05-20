@@ -74,16 +74,13 @@
 #'   - **kc_method**: method applied ('hc1', 'hc3', or 'kc')
 #' @importFrom stats vcov
 #' @noRd
-.gee_interaction <- function(df, q_vals, g, subject = NULL, min_obs = 5, corstr = "auto",
+.gee_interaction <- function(df, q_vals, g, subject = NULL, min_obs = 5, corstr = c("auto", "ar1", "exchangeable", "independence"),
     bias_correction = TRUE, weights = NULL) {
+    # Validate corstr parameter per Bioconductor code syntax standards
+    corstr <- match.arg(corstr)
+
     if (!requireNamespace("geepack", quietly = TRUE)) {
         stop("Package 'geepack' is required for method = 'gee'")
-    }
-
-    # Validate correlation structure
-    if (corstr != "auto" && !(corstr %in% c("ar1", "exchangeable", "independence"))) {
-        corstr <- "auto"
-        warning("Invalid corstr; using 'auto' to select via QIC")
     }
 
     # Validate inputs

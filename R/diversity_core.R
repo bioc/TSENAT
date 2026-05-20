@@ -144,8 +144,7 @@
 #' analysis and will
 #' fail if only diversity-transformed data is available.
 #' @import methods
-#' @importFrom SummarizedExperiment SummarizedExperiment assays assay rowData
-#' colData
+#' @importFrom SummarizedExperiment SummarizedExperiment assays assay rowData colData
 #' @details
 #' **Database Verification (tsenat_papers.db):**
 #' [OK] Tsallis entropy calculation: Papers I001-I004 provide complete

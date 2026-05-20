@@ -689,7 +689,7 @@
 #' @param ... Additional arguments (unused)
 #'
 #' @noRd
-#' @method print tsenat_jackknife
+#' @exportS3Method
 print.tsenat_jackknife <- function(x, ...) {
     message("Jackknife Diagnostics for Tsallis Entropy (q = ", x$q, ")")
     message("Estimate: ", sprintf("%.6f", x$estimate))
@@ -706,8 +706,7 @@ print.tsenat_jackknife <- function(x, ...) {
 #'
 
 #' @noRd
-#' @method print tsenat_jackknife_list
-
+#' @exportS3Method
 print.tsenat_jackknife_list <- function(x, ...) {
     message("Jackknife Results for Multiple Genes")
     message("Number of genes: ", length(x))

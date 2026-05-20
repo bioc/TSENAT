@@ -348,8 +348,7 @@
 #'
 
 #' @noRd
-#' @method print rank_assumptions
-
+#' @exportS3Method
 print.rank_assumptions <- function(x, ...) {
     message("STATISTICAL ASSUMPTIONS: Rank-Based & Method-Specific Tests")
     message(strrep("=", 70))
@@ -1435,8 +1434,7 @@ print.rank_assumptions <- function(x, ...) {
 #'
 
 #' @noRd
-#' @method print rank_correlation_ci
-
+#' @exportS3Method
 print.rank_correlation_ci <- function(x, ...) {
     message("RANK CORRELATION CONFIDENCE INTERVALS")
     message(strrep("=", 60))
