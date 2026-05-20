@@ -2662,7 +2662,7 @@ test_that(".extract_or_compute_switching_tables handles non-dataframe sait resul
   analysis@sait_results <- list(
     sait_interaction = list(metadata = "test")
   )
-  analysis@jackknife_results <- list(q_0_00 = data.frame(gene = c("g1")))
+  analysis@jackknife_results <- list(q_0_00 = data.frame(gene = "g1"))
   
   result <- .extract_or_compute_switching_tables(analysis)
   expect_null(result)
@@ -3212,7 +3212,7 @@ test_that(".extract_diversity_table respects n_genes parameter", {
     result = NULL,
     q = NULL,
     n_genes = 4,
-    q_values_table = c(1.0)
+    q_values_table = 1.0
   )
   
   expect_equal(nrow(table_df), 4)
