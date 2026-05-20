@@ -965,9 +965,9 @@ make_test_se_diversity <- function(n_genes = 8, n_samples = 8, q_values = c(0.5,
     
     # Create column names with replicates: e.g., "control_rep1_q0.5", "control_rep2_q0.5", etc.
     # Must match pattern: sample_q[numeric] for the parser
-    col_names <- c()
-    condition_list <- c()
-    q_list <- c()
+    col_names <- character()
+    condition_list <- character()
+    q_list <- numeric()
     
     for (cond in unique_conds) {
         for (q in q_values) {
@@ -1452,7 +1452,7 @@ test_that(".plot_tsallis_gene_specific with empty gene vector errors", {
             se = se,
             assay_name = "diversity",
             condition_col = "condition",
-            gene = c(),
+            gene = NULL,
             sait_res = NULL,
             n_top = NULL,
             metric = "iqr",
