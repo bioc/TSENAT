@@ -555,7 +555,7 @@ test_that(".save_jis_output handles text file output", {
   
   # Verify RDS file was created successfully
   expect_true(file.exists(temp_file),
-              label = "Text output file should be created")
+              info = "Text output file should be created")
   
   file.remove(temp_file)
 })
@@ -954,7 +954,7 @@ test_that("TSV output files have correct structure and numerical values", {
     # Verify numerical correctness - check that p-values are preserved
     if ("p_value" %in% colnames(gene_data)) {
       expect_true(all(gene_data$p_value >= 0 & gene_data$p_value <= 1),
-                  label = "p-values should be between 0 and 1")
+                  info = "p-values should be between 0 and 1")
     }
     
     # Verify no NaN or Inf values sneak in
@@ -1050,7 +1050,7 @@ test_that("Output files have correct dimension consistency", {
   
   # Verify RDS file was created
   expect_true(file.exists(temp_file),
-              label = "Output file should be created with dimension consistency")
+              info = "Output file should be created with dimension consistency")
   
   # Read back and verify structure
   saved_data <- readRDS(temp_file)
@@ -1096,7 +1096,7 @@ test_that("Output files handle edge cases: single gene, single transcript", {
   
   # Verify RDS file was created successfully
   expect_true(file.exists(temp_file),
-              label = "RDS output file should be created")
+              info = "RDS output file should be created")
   
   # Clean up
   unlink(temp_file)
@@ -1144,7 +1144,7 @@ test_that("Output files maintain column ordering and naming", {
   
   # Verify RDS file was created
   expect_true(file.exists(temp_file),
-              label = "Output file should be created with column ordering")
+              info = "Output file should be created with column ordering")
   
   # Read back and verify structure
   saved_data <- readRDS(temp_file)
@@ -1172,11 +1172,11 @@ test_that("Output files handle large numerical ranges correctly", {
   
   # Verify very small values are preserved (not rounded to 0)
   expect_true(all(read_data$very_small_pval > 0),
-              label = "Very small p-values should remain > 0")
+              info = "Very small p-values should remain > 0")
   
   # Verify large values are preserved
   expect_true(max(read_data$fold_change) > 100,
-              label = "Large values should be preserved")
+              info = "Large values should be preserved")
   
   file.remove(temp_file)
 })

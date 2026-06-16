@@ -116,14 +116,19 @@
             stop("effective_length must have same length as x")
         }
         # Check for valid effective_length values (must be positive)
-        if (any(effective_length <= 0, na.rm = TRUE)) {
-            warning("Some effective_length values are <= 0, treating as NA")
-            effective_length[effective_length <= 0] <- NA
+        invalid_length_idx <- which(effective_length <= 0 | is.na(effective_length))
+        if (length(invalid_length_idx) > 0) {
+            stop("[.calculate_diversity] CRITICAL: ",
+                 length(invalid_length_idx), " out of ", length(effective_length),
+                 " transcripts have invalid effective_length (<=0 or NA). ",
+                 "These transcripts are unreliable and must be filtered before analysis. ",
+                 "Affected transcript indices: ", paste(head(invalid_length_idx, 5), collapse=", "),
+                 if(length(invalid_length_idx) > 5) paste(", ... and", length(invalid_length_idx)-5, "more") else "",
+                 ". Please review your quantification output for quality issues.",
+                 call. = FALSE)
         }
         # Normalize counts: x_norm = x / effective_length
         x_normalized <- x/effective_length
-        # Replace any NaN/Inf with 0 (when effective_length is 0 or NA)
-        x_normalized[!is.finite(x_normalized)] <- 0
         # Calculate proportions from normalized counts
         p <- x_normalized/sum(x_normalized)
     } else {

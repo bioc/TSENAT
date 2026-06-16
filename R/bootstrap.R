@@ -26,9 +26,20 @@
 #' @noRd
 block_bootstrap_compute_cpp_wrapper <- function(x, q = 1, normalize = TRUE, nboot = 1000L,
     log_base = exp(1), pseudocount = 0) {
-    # Input must have even length (pairs)
+    # Comprehensive paired data validation
+    if (length(x) == 0) {
+        stop("For paired bootstrap, input vector cannot be empty")
+    }
     if (length(x)%%2 != 0) {
-        stop("For paired bootstrap, input vector must have even length")
+        stop("For paired bootstrap, input vector must have even length (pairs). Got length=",
+             length(x), ". Please verify pairing structure.")
+    }
+    if (any(is.na(x))) {
+        warning("Input vector contains NA values. These will affect bootstrap resampling. ",
+                "Consider removing NA values before calling paired bootstrap.")
+    }
+    if (all(x == 0, na.rm = TRUE)) {
+        stop("All values in paired bootstrap data are zero. Cannot compute meaningful entropy estimates.")
     }
 
     # Handle vector pseudocount

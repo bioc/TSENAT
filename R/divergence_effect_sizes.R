@@ -204,8 +204,22 @@
         gene_idx_map[missing_idx] <- rowname_idx
     }
 
+    # VALIDATION: Check that genes were successfully matched
+    n_found <- sum(!is.na(gene_idx_map))
+    if (n_found == 0) {
+        stop("[calculate_effect_sizes] CRITICAL ERROR: No genes from LMM results matched ",
+             "in divergence dataset. This indicates gene identifier format mismatch. ",
+             "LMM genes use format: ", paste(head(significant_genes, 3), collapse=", "),
+             ". Divergence uses: ", paste(head(rd$gene_name[!is.na(rd$gene_name)], 3), collapse=", "),
+             ". Please verify gene ID format consistency (ENSEMBL vs gene symbols).",
+             call. = FALSE)
+    }
+    if (n_found < length(significant_genes)) {
+        warning("[calculate_effect_sizes] Only matched ", n_found, "/", length(significant_genes),
+                " genes. Check gene identifier format consistency.", call. = FALSE)
+    }
+
     if (verbose) {
-        n_found <- sum(!is.na(gene_idx_map))
         message("[calculate_effect_sizes] OPTIMIZATION: Pre-computed gene index map")
         message("  - Genes found: ", n_found, "/", length(significant_genes))
     }

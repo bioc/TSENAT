@@ -113,10 +113,11 @@ testthat::test_that("LM fallback helpers choose appropriate method", {
     # fit1 can be lme, glmmTMB, or lm depending on which strategy succeeded
     testthat::expect_true(inherits(res$fit1, "lme") || inherits(res$fit1, "glmmTMB") || inherits(res$fit1, "lm") || inherits(res$fit1, "NA"))
 
-    # drop subject -> should pick nosubject fallback
-    df2 <- df[, c("entropy", "q", "group")]
+    # Test with categorical group only (no subject) - should fall back to nosubject strategy
+    df2 <- data.frame(entropy = entropy, q = q, group = factor(group))
     res2 <- TSENAT:::.try_sait_fallbacks(df2)
     testthat::expect_type(res2, "list")
+    # Without subject column, should use nosubject fallback
     testthat::expect_equal(res2$method, "sait_nosubject")
 })
 

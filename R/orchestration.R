@@ -147,9 +147,18 @@ TSENAT <- function(analysis, output_dir = "tsenat_outputs", save_output = TRUE, 
     tryCatch({
         stringency_level <- cfg$stringency %||% "medium"
         analysis <- filter_analysis(analysis, stringency = stringency_level)
-        if (verbose) message("          [OK] Complete")
+        
+        # Validate that filtering produced non-empty result
+        if (nrow(se(analysis)) == 0) {
+            stop("[filter_analysis] ERROR: Filtering removed ALL transcripts. ",
+                 "No data remaining for downstream analysis. ",
+                 "Likely causes: 1) Filter stringency too high (min_tpm or min_samples), ",
+                 "2) Input data has very low expression, 3) Gene annotation issues. ",
+                 "Please review filter parameters or input data quality.", call. = FALSE)
+        }
+        if (verbose) message("          [OK] Complete - ", nrow(se(analysis)), " transcripts remaining")
     }, error = function(e) {
-        warning("Filtering failed: ", conditionMessage(e), call. = FALSE)
+        stop("[filter_analysis] ", conditionMessage(e), call. = FALSE)
     })
     step_times[["filtering"]] <- Sys.time() - step_start
     

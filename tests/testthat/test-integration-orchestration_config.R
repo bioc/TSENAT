@@ -1636,5 +1636,5 @@ test_that("S3 method registration is complete per NAMESPACE", {
     # At least some S3methods should be present
     s3_lines <- grep("^S3method", ns_content)
     expect_true(length(s3_lines) > 0, 
-               label = "S3method entries exist in NAMESPACE")
+               info = "S3method entries exist in NAMESPACE")
 })

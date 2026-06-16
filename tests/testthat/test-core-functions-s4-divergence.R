@@ -813,10 +813,10 @@ test_that("divergence q-parameter scaling: smaller q emphasizes rare events", {
   # At least some genes should show variation across q-parameters
   # Even low-divergence data should have some q-dependent noise
   has_variation <- sum(q_sensitivity > 0.0001, na.rm = TRUE)  # Very relaxed threshold
-  expect_gt(length(q_sensitivity), 0, label = "Should have q-sensitivity values for all genes")
+  expect_gt(length(q_sensitivity), 0)
   # Expect that most genes show some finite variation (not identical across q)
   has_real_values <- sum(is.finite(q_sensitivity), na.rm = TRUE)
-  expect_gt(has_real_values, 0, label = "Q-parameter calculations should produce finite results")
+  expect_gt(has_real_values, 0)
   
   # Clean up
   if (file.exists(output_file)) unlink(output_file)
