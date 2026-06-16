@@ -1615,9 +1615,8 @@ test_that("S3 method registration is complete per NAMESPACE", {
     # Check that all exported S3 methods are properly registered
     # This tests the @exportS3Method roxygen directive effectiveness
     
-    # Read NAMESPACE file from package root
-    ns_file <- file.path(system.file(package = "TSENAT"), "..", "NAMESPACE")
-    skip_if_not(file.exists(ns_file), "NAMESPACE file not found")
+    # Read NAMESPACE file from installed package directory
+    ns_file <- file.path(system.file(package = "TSENAT"), "NAMESPACE")
     
     ns_content <- readLines(ns_file)
     

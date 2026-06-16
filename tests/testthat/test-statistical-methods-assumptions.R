@@ -1390,9 +1390,9 @@ test_that("concurvity values are mathematically sound", {
     # Collinear predictors should have higher concurvity
     q_collinear <- seq(0, 2, length.out = ncol(x_collinear))
     result_cor <- TSENAT:::.compute_concurvity_index(x_collinear, q_values = q_collinear)
-    if (!is.na(result_uncor$overall_concurvity) && !is.na(result_cor$overall_concurvity)) {
-        expect_true(result_cor$overall_concurvity >= result_uncor$overall_concurvity)
-    }
+    
+    # Collinear data should have concurvity >= uncorrelated data (with tolerance for numerical differences)
+    expect_gte(result_cor$overall_concurvity, result_uncor$overall_concurvity - 1e-10)
 })
 
 test_that("EDF values are bounded and reasonable", {
