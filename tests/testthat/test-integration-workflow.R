@@ -21,6 +21,18 @@ setup_workflow_data <- function() {
     
     # Create config FIRST (Bioconductor pattern: immutable object construction)
     # OPTIMIZATION: Use 10 q-values for tests (covers 0 to 2)
+    # Respect _R_CHECK_LIMIT_CORES_ environment variable for Bioconductor compatibility
+    # Windows note: parallel::mclapply() doesn't support mc.cores > 1 on Windows,
+    # so force nthreads=1 on Windows to avoid errors in SRH/WY tests
+    core_limit <- suppressWarnings(as.integer(Sys.getenv("_R_CHECK_LIMIT_CORES_", NA)))
+    nthreads_config <- if (.Platform$OS.type == "windows") {
+        1  # Windows limitation: mclapply requires mc.cores=1
+    } else if (is.na(core_limit)) {
+        4
+    } else {
+        min(4, core_limit)
+    }
+    
     config <- TSENAT_config(
         sample_col = "sample",
         condition_col = "condition",
@@ -28,7 +40,7 @@ setup_workflow_data <- function() {
         q = seq(0, 2, length.out = 10),
         paired = TRUE,
         control = "normal",
-        nthreads = 4
+        nthreads = nthreads_config
     )
     
     # Build analysis with config and explicit metadata parameter
@@ -405,6 +417,17 @@ test_that("CONFIG EMBEDDING: Settings applied once via build_analysis, not redun
     # Test the correct pattern: config applied exactly ONCE at build time
     
     set.seed(42)
+    # Respect _R_CHECK_LIMIT_CORES_ environment variable for Bioconductor compatibility
+    # Windows note: parallel::mclapply() doesn't support mc.cores > 1 on Windows
+    core_limit <- suppressWarnings(as.integer(Sys.getenv("_R_CHECK_LIMIT_CORES_", NA)))
+    nthreads_config <- if (.Platform$OS.type == "windows") {
+        1  # Windows limitation: mclapply requires mc.cores=1
+    } else if (is.na(core_limit)) {
+        4
+    } else {
+        min(4, core_limit)
+    }
+    
     config1 <- TSENAT_config(
         sample_col = "sample",
         condition_col = "condition",
@@ -412,7 +435,7 @@ test_that("CONFIG EMBEDDING: Settings applied once via build_analysis, not redun
         q = seq(0, 1, length.out = 5),
         paired = TRUE,
         control = "normal",
-        nthreads = 4
+        nthreads = nthreads_config
     )
     
     data("readcounts", package = "TSENAT")

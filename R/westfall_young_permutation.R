@@ -401,11 +401,10 @@
             return(min_pval)
         }
 
-        # Use parallel::mclapply for distributed computation mc.cores limits to
-        # nthreads; automatically falls back to serial on Windows
-        perm_minima <- unlist(parallel::mclapply(X = seq_len(wy_randomizations),
-            FUN = compute_permutation, mc.cores = .get_effective_nthreads(nthreads),
-            mc.preschedule = TRUE, mc.set.seed = TRUE))
+        # Use .bplapply for distributed computation with cross-platform support
+        # (Windows compatible via BiocParallel backend)
+        perm_minima <- unlist(.bplapply(X = seq_len(wy_randomizations),
+            FUN = compute_permutation, nthreads = nthreads))
 
     } else {
         # Serial execution: standard for loop OPTIMIZATION (March 2026):
@@ -530,11 +529,10 @@
             return(perm_stats)  # Return FULL vector, not min
         }
 
-        # Use parallel::mclapply for distributed computation FIXED: Collect as
-        # list of vectors (one per permutation), not just minima
-        perm_stats_list <- parallel::mclapply(X = seq_len(wy_randomizations), FUN = compute_permutation,
-            mc.cores = .get_effective_nthreads(nthreads), mc.preschedule = TRUE,
-            mc.set.seed = TRUE)
+        # Use .bplapply for distributed computation with cross-platform support
+        # FIXED: Collect as list of vectors (one per permutation), not just minima
+        perm_stats_list <- .bplapply(X = seq_len(wy_randomizations), FUN = compute_permutation,
+            nthreads = nthreads)
 
         # Convert list of vectors to matrix (genes × permutations)
         perm_stats_matrix <- do.call(cbind, perm_stats_list)

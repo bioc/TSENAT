@@ -541,7 +541,6 @@ divergence_bootstrap_flexible_cpp_wrapper <- function(x, y, x_pair_ids, y_pair_i
     nthreads <- as.integer(nthreads)
 
     gene_names <- rownames(x) %||% paste0("Gene_", seq_len(nrow(x)))
-    is_windows <- .Platform$OS.type != "unix"
 
     # DIAGNOSTIC: Check input matrix
     if (nrow(x) == 0) {
@@ -549,25 +548,14 @@ divergence_bootstrap_flexible_cpp_wrapper <- function(x, y, x_pair_ids, y_pair_i
             call. = FALSE)
     }
 
-    if (nthreads > 1 && !is_windows) {
-        results_list <- parallel::mclapply(seq_len(nrow(x)), function(i) {
-            .calculate_tsallis_entropy_bootstrap(x = x[i, ], se = NULL, res = NULL,
-                top_n = 1, q = q, norm = norm, nboot = nboot, ci = ci, method = method,
-                log_base = log_base, pseudocount = pseudocount, what = what, gene_name = gene_names[i],
-                verbose = FALSE, include_diagnostics = include_diagnostics, use_job = use_job,
-                nthreads = 1, paired = paired)
-        }, mc.cores = nthreads)
-    } else {
-        if (nthreads > 1 && is_windows)
-            warning("Parallel not supported on Windows.")
-        results_list <- lapply(seq_len(nrow(x)), function(i) {
-            .calculate_tsallis_entropy_bootstrap(x = x[i, ], se = NULL, res = NULL,
-                top_n = 1, q = q, norm = norm, nboot = nboot, ci = ci, method = method,
-                log_base = log_base, pseudocount = pseudocount, what = what, gene_name = gene_names[i],
-                verbose = FALSE, include_diagnostics = include_diagnostics, use_job = use_job,
-                nthreads = 1, paired = paired)
-        })
-    }
+    # Use .bplapply for cross-platform parallel support (Windows compatible)
+    results_list <- .bplapply(seq_len(nrow(x)), function(i) {
+        .calculate_tsallis_entropy_bootstrap(x = x[i, ], se = NULL, res = NULL,
+            top_n = 1, q = q, norm = norm, nboot = nboot, ci = ci, method = method,
+            log_base = log_base, pseudocount = pseudocount, what = what, gene_name = gene_names[i],
+            verbose = FALSE, include_diagnostics = include_diagnostics, use_job = use_job,
+            nthreads = 1, paired = paired)
+    }, nthreads = nthreads)
 
     # DIAGNOSTIC: Check output list
     if (length(results_list) != nrow(x)) {

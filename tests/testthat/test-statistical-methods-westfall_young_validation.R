@@ -615,6 +615,8 @@ test_that("WY permutation respects .get_effective_nthreads() for high thread cou
   data_wy$condition <- data_wy$sample_type
   
   # Test 1: Normal execution with reasonable nthreads (should succeed)
+  core_limit <- suppressWarnings(as.integer(Sys.getenv("_R_CHECK_LIMIT_CORES_", NA)))
+  wy_threads <- if (is.na(core_limit)) 4 else min(4, core_limit)
   result_normal <- .calculate_srh(
     data = data_wy,
     entropy_col = "entropy",
@@ -625,7 +627,7 @@ test_that("WY permutation respects .get_effective_nthreads() for high thread cou
     subject_col = "subject",
     multicorr = "westfall-young",
     wy_randomizations = 30,
-    nthreads = 4,
+    nthreads = wy_threads,
     verbose = FALSE
   )
   
