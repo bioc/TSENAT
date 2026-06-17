@@ -89,84 +89,16 @@ setMethod("calculate_assumptions", signature(analysis = "TSENATAnalysis"), funct
     q = NULL, checks = "rank", alpha = 0.05, format = "text", ...) {
 
     # Validate inputs
-    if (!methods::is(analysis, "TSENATAnalysis")) {
-        stop("'analysis' must be a TSENATAnalysis object", call. = FALSE)
-    }
+    .validate_object_class(analysis, "TSENATAnalysis", "analysis")
 
-    # Extract diversity data
-    diversity_data <- NULL
-    q_used <- q
+    # Extract diversity data using consolidated helper
+    diversity_result <- .extract_diversity_data(analysis, q = q)
+    diversity_data <- diversity_result$diversity_data
+    q_used <- diversity_result$q_used
 
-    # If q is specified, try to get that specific q-value
-    if (!is.null(q)) {
-        q_key <- if (nchar(as.character(q)) > 3) {
-            paste0("q_", round(q, 1))
-        } else {
-            paste0("q_", q)
-        }
-
-        if (q_key %in% names(analysis@diversity_results)) {
-            div_se <- analysis@diversity_results[[q_key]]
-            diversity_data <- assay(div_se, "diversity")
-        }
-    }
-
-    # If q is NULL and multiple diversity results exist, combine all q-values
-    if (is.null(diversity_data) && is.null(q) && length(analysis@diversity_results) >
-        1) {
-        entropy_list <- lapply(analysis@diversity_results, function(se) {
-            mat <- assay(se, "diversity")
-            if (!is.matrix(mat)) {
-                mat <- as.matrix(mat)
-            }
-            return(mat)
-        })
-
-        # Use complete case analysis: keep only genes present in ALL q-value
-        # matrices. This is mathematically sound for rank-based tests
-        # (Scheirer-Ray-Hare) and follows best practices per scholarly
-        # literature (Springer Handbook, Permutation Tests)
-        all_genes <- lapply(entropy_list, rownames)
-        common_genes <- Reduce(intersect, all_genes)
-
-        # Subset all matrices to common genes in same order
-        entropy_list <- lapply(entropy_list, function(mat) {
-            mat[common_genes, , drop = FALSE]
-        })
-
-        # Combine all matrices column-wise (genes x all samples across
-        # q-values)
-        diversity_data <- do.call(cbind, entropy_list)
-        # Keep natural column names from cbind to preserve structure
-        q_used <- "all"
-    }
-
-    # If q is NULL and only one result, use it
-    if (is.null(diversity_data) && is.null(q) && length(analysis@diversity_results) ==
-        1) {
-        div_se <- analysis@diversity_results[[1]]
-        diversity_data <- assay(div_se, "diversity")
-        q_used <- .extract_q_from_key(names(analysis@diversity_results)[1])
-    }
-
-    # Fallback: use first diversity result
-    if (is.null(diversity_data) && length(analysis@diversity_results) > 0) {
-        div_se <- analysis@diversity_results[[1]]
-        diversity_data <- assay(div_se, "diversity")
-        if (is.null(q_used) || is.na(q_used)) {
-            q_used <- .extract_q_from_key(names(analysis@diversity_results)[1])
-        }
-    }
-
-    # Check that we have data
     if (is.null(diversity_data)) {
-        stop("No diversity results found in analysis object. ", "Run calculate_diversity() first.",
-            call. = FALSE)
-    }
-
-    # Ensure we have a matrix
-    if (!is.matrix(diversity_data)) {
-        diversity_data <- as.matrix(diversity_data)
+        stop("No diversity results found in analysis object. ",
+            "Run calculate_diversity() first.", call. = FALSE)
     }
 
     # Extract q-values from diversity_results names for GAM metrics
@@ -192,24 +124,15 @@ setMethod("calculate_assumptions", signature(analysis = "TSENATAnalysis"), funct
     analysis@metadata$function_calls <- c(analysis@metadata$function_calls, paste0("calculate_assumptions[q=",
         q_used, "]"))
 
-    # Handle output file and verbose from ... arguments
+    # Handle optional parameters and output file
     dots <- list(...)
-    output_file <- dots$output_file
-    verbose <- if (is.null(dots$verbose))
-        FALSE else dots$verbose
+    params <- .extract_dot_params(dots, c("output_file", "verbose"), 
+                                   list(output_file = NULL, verbose = FALSE))
 
-    # Save results to file if output_file specified
-    if (!is.null(output_file)) {
-        # Convert assumptions results to data frame for output
+    if (!is.null(params$output_file)) {
         assumptions_df <- .format_assumptions_for_output(result)
-
-        tryCatch({
-            save_analysis_output(assumptions_df, output_file, object = analysis,
-                verbose = verbose, func_name = "calculate_assumptions")
-        }, error = function(e) {
-            warning("[calculate_assumptions] Could not write assumptions results to file: ",
-                conditionMessage(e), call. = FALSE)
-        })
+        .handle_optional_output(analysis, params$output_file, assumptions_df,
+            "calculate_assumptions", params$verbose)
     }
 
     analysis
@@ -255,6 +178,144 @@ setMethod("calculate_assumptions", signature(analysis = "TSENATAnalysis"), funct
         stringsAsFactors = FALSE)
 
     output_df
+}
+
+# ============================================================================
+# OPTIMIZATION: Consolidated Helper Functions for Refactoring
+# ============================================================================
+# These helpers consolidate repeated code patterns to reduce duplication,
+# improve testability, and increase coverage.
+
+#' Extract parameters from dots list with defaults
+#'
+#' @param dots List from ... arguments
+#' @param param_names Character vector of parameter names to extract
+#' @param defaults List of default values (optional)
+#' @return Named list with extracted parameters
+#' @noRd
+.extract_dot_params <- function(dots, param_names, defaults = NULL) {
+    result <- defaults %||% list()
+    
+    for (param in param_names) {
+        if (param %in% names(dots)) {
+            result[[param]] <- dots[[param]]
+        }
+    }
+    
+    result
+}
+
+#' Handle optional output file writing
+#'
+#' @param analysis TSENATAnalysis object
+#' @param output_file Character path or NULL
+#' @param results_df Data frame to write
+#' @param func_name Character; function name for logging
+#' @param verbose Logical; print progress
+#' @return Invisible NULL (writes file as side effect)
+#' @noRd
+.handle_optional_output <- function(analysis, output_file, results_df, func_name, verbose) {
+    if (is.null(output_file)) {
+        return(invisible(NULL))
+    }
+    
+    tryCatch({
+        if (verbose) {
+            message("[", func_name, "] Writing results to: ", output_file)
+        }
+        save_analysis_output(results_df, output_file, object = analysis,
+            verbose = verbose, func_name = func_name)
+    }, error = function(e) {
+        warning("[", func_name, "] Could not write results to file: ",
+            conditionMessage(e), call. = FALSE)
+    })
+    
+    invisible(NULL)
+}
+
+#' Extract diversity data with multi-path fallback
+#'
+#' Handles diversity data extraction with smart fallback:
+#' 1. If q specified: uses diversity result for that q-value
+#' 2. If q NULL and multiple results: combines all q-values
+#' 3. If q NULL and single result: uses it
+#' 4. Fallback: uses first available
+#'
+#' @param analysis TSENATAnalysis object
+#' @param q Numeric; specific q-value or NULL
+#' @return List(diversity_data = matrix, q_used = character/numeric)
+#' @noRd
+.extract_diversity_data <- function(analysis, q = NULL) {
+    diversity_data <- NULL
+    q_used <- q
+    
+    # If q is specified, try to get that specific q-value
+    if (!is.null(q)) {
+        q_key <- paste0("q_", q)
+        if (q_key %in% names(analysis@diversity_results)) {
+            div_se <- analysis@diversity_results[[q_key]]
+            diversity_data <- assay(div_se, "diversity")
+        }
+    }
+    
+    # If q is NULL and multiple diversity results exist, combine all q-values
+    if (is.null(diversity_data) && is.null(q) && length(analysis@diversity_results) > 1) {
+        entropy_list <- lapply(analysis@diversity_results, function(se) {
+            mat <- assay(se, "diversity")
+            if (!is.matrix(mat)) mat <- as.matrix(mat)
+            return(mat)
+        })
+        
+        all_genes <- lapply(entropy_list, rownames)
+        common_genes <- Reduce(intersect, all_genes)
+        entropy_list <- lapply(entropy_list, function(mat) {
+            mat[common_genes, , drop = FALSE]
+        })
+        
+        diversity_data <- do.call(cbind, entropy_list)
+        q_used <- "all"
+    }
+    
+    # If q is NULL and only one result, use it
+    if (is.null(diversity_data) && is.null(q) && length(analysis@diversity_results) == 1) {
+        div_se <- analysis@diversity_results[[1]]
+        diversity_data <- assay(div_se, "diversity")
+        q_used <- .extract_q_from_key(names(analysis@diversity_results)[1])
+    }
+    
+    # Fallback: use first diversity result
+    if (is.null(diversity_data) && length(analysis@diversity_results) > 0) {
+        div_se <- analysis@diversity_results[[1]]
+        diversity_data <- assay(div_se, "diversity")
+        if (is.null(q_used) || is.na(q_used)) {
+            q_used <- .extract_q_from_key(names(analysis@diversity_results)[1])
+        }
+    }
+    
+    if (is.null(diversity_data)) {
+        return(list(diversity_data = NULL, q_used = NULL))
+    }
+    
+    if (!is.matrix(diversity_data)) {
+        diversity_data <- as.matrix(diversity_data)
+    }
+    
+    list(diversity_data = diversity_data, q_used = q_used)
+}
+
+#' Validate object class and provide clear error messages
+#'
+#' @param obj Object to validate
+#' @param expected_class Character; expected class name
+#' @param param_name Character; parameter name for error message
+#' @return Invisible(TRUE) on success, stops on failure
+#' @noRd
+.validate_object_class <- function(obj, expected_class, param_name = "object") {
+    if (!is(obj, expected_class)) {
+        stop("'", param_name, "' must be a ", expected_class, " object",
+            call. = FALSE)
+    }
+    invisible(TRUE)
 }
 
 
@@ -387,15 +448,11 @@ setGeneric("calculate_concordance", function(analysis_sait, analysis_rank = NULL
     
     # Auto-detect SAIT method
     default_sait_method <- names(analysis_sait@sait_results)[1]
-    if (!(default_sait_method %in% names(analysis_sait@sait_results))) {
-        available_methods <- paste(names(analysis_sait@sait_results), collapse = ", ")
-        stop("SAIT method '", default_sait_method, "' not found. Available: ",
-            available_methods, call. = FALSE)
-    }
     
     # Auto-detect rank method
     rank_method <- "rank_test"
     if (is.null(analysis_sait@rank_test_results) || 
+        length(analysis_sait@rank_test_results) == 0 ||
         !("rank_test" %in% names(analysis_sait@rank_test_results))) {
         if (is.null(analysis_sait@rank_test_results) || 
             length(analysis_sait@rank_test_results) == 0) {
@@ -791,7 +848,7 @@ setMethod("plot_concordance", "TSENATAnalysis", function(analysis, verbose = FAL
 
     # Validate that concordance results exist
     if (is.null(analysis@metadata$method_concordance)) {
-        stop("[plot_concordance] No concordance results found in @metadata.\n", "  Please run calculate_concordance() first.)")
+        stop("[plot_concordance] No concordance results found in @metadata.\n", "  Please run calculate_concordance() first.")
     }
 
     concordance_results <- analysis@metadata$method_concordance
@@ -806,8 +863,8 @@ setMethod("plot_concordance", "TSENATAnalysis", function(analysis, verbose = FAL
     if (verbose) {
         message("[plot_concordance] Plotting concordance for ", nrow(comparison_df),
             " genes")
-        message("[plot_concordance] Methods compared: ", concordance_results$gam_method,
-            " vs Scheirer-Ray-Hare rank test")
+        message("[plot_concordance] Methods compared: ", concordance_results$sait_method,
+            " vs ", concordance_results$rank_method)
     }
 
     # Call standard plotting function
