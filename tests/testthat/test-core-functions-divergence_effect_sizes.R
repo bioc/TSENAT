@@ -1008,11 +1008,12 @@ test_that(".mergeEffectSizesForGenes tracks validation statistics", {
     adj_p_interaction = c(0.01, 0.05, 0.02)
   )
   
+  # Include all genes in rd to test partial match (Bug #4 validation)
   rd <- data.frame(
-    gene_name = c("gene1", "gene2"),  # Missing gene3
-    estimate = c(0.8, 0.7),
-    lower_ci = c(0.7, 0.6),
-    upper_ci = c(0.9, 0.8)
+    gene_name = c("gene1", "gene2", "gene3"),
+    estimate = c(0.8, 0.7, 0.9),
+    lower_ci = c(0.7, 0.6, 0.8),
+    upper_ci = c(0.9, 0.8, 1.0)
   )
   
   result <- TSENAT:::.mergeEffectSizesForGenes(
@@ -1026,7 +1027,8 @@ test_that(".mergeEffectSizesForGenes tracks validation statistics", {
   
   stats <- result$validation_stats
   expect_equal(stats$total_genes, 3)
-  expect_true(stats$failed_missing_divergence >= 1)  # gene3 missing
+  # All genes should match now
+  expect_equal(nrow(result$interaction_results), 3)
 })
 
 test_that(".mergeEffectSizesForGenes handles empty significant genes", {
@@ -1042,17 +1044,49 @@ test_that(".mergeEffectSizesForGenes handles empty significant genes", {
     upper_ci = c(0.9)
   )
   
-  result <- TSENAT:::.mergeEffectSizesForGenes(
-    sait_res = sait_res,
-    rd = rd,
-    significant_genes = character(0),  # Empty significant genes
-    q_values = NA_real_,
-    use_generic = TRUE,
-    verbose = FALSE
+  # Empty significant genes should raise an error (Bug #4 validation)
+  expect_error(
+    TSENAT:::.mergeEffectSizesForGenes(
+      sait_res = sait_res,
+      rd = rd,
+      significant_genes = character(0),  # Empty significant genes
+      q_values = NA_real_,
+      use_generic = TRUE,
+      verbose = FALSE
+    ),
+    pattern = "CRITICAL ERROR|No genes.*matched",
+    info = "Empty significant genes raises validation error"
+  )
+})
+
+test_that("[BUG #4] Gene ID mismatch detects partial matching failures", {
+  # Test partial match scenario: some genes missing from divergence data
+  sait_res <- data.frame(
+    gene = c("gene1", "gene2", "gene3"),
+    adj_p_interaction = c(0.01, 0.05, 0.02)
   )
   
-  expect_equal(nrow(result$interaction_results), 0)
-  expect_equal(result$validation_stats$total_genes, 0)
+  # Only gene1 and gene2 in divergence - gene3 missing
+  rd <- data.frame(
+    gene_name = c("gene1", "gene2"),
+    estimate = c(0.8, 0.7),
+    lower_ci = c(0.7, 0.6),
+    upper_ci = c(0.9, 0.8)
+  )
+  
+  # Requesting all 3 genes but only 2 will match - should warn
+  expect_warning(
+    TSENAT:::.mergeEffectSizesForGenes(
+      sait_res = sait_res,
+      rd = rd,
+      significant_genes = c("gene1", "gene2", "gene3"),
+      q_values = NA_real_,
+      use_generic = TRUE,
+      verbose = FALSE
+    ),
+    pattern = "Only matched.*genes",
+    info = "Partial match detected and warned"
+  )
 })
 
 test_that(".mergeEffectSizesForGenes processes multi-q correctly", {

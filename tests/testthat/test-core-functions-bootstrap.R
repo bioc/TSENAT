@@ -7522,3 +7522,39 @@ test_that(".detect_multimodality partial matching for method parameter", {
     result2 <- .detect_multimodality(boot_dist, method = "k")
     expect_is(result2, "list")
 })
+
+# ============================================================================
+# BUG FIX #3: Paired Bootstrap Data Structure Validation (May 2026)
+# ============================================================================
+# Reference: Statistical Science (2004), Bolker (2015)
+# Bug: Only checked length%2==0, missing pair structure validation
+# Fix: Added comprehensive validation
+
+test_that("[BUG #3] Paired bootstrap validates data structure comprehensively", {
+    # Valid paired data: even length, no zeros
+    valid_data <- c(1, 2, 3, 4, 5, 6)
+    expect_silent(
+        block_bootstrap_compute_cpp_wrapper(valid_data, nboot = 100L)
+    )
+    
+    # Invalid: odd length
+    expect_error(
+        block_bootstrap_compute_cpp_wrapper(c(1, 2, 3), nboot = 100L),
+        pattern = "even length",
+        info = "Odd length paired data rejected"
+    )
+    
+    # Invalid: all zeros
+    expect_error(
+        block_bootstrap_compute_cpp_wrapper(c(0, 0, 0, 0), nboot = 100L),
+        pattern = "zero",
+        info = "All-zero paired data rejected"
+    )
+    
+    # Warning: contains NA
+    expect_warning(
+        block_bootstrap_compute_cpp_wrapper(c(1, 2, NA, 4), nboot = 100L),
+        pattern = "NA values",
+        info = "NA values trigger warning"
+    )
+})

@@ -658,11 +658,13 @@ test_that("calculate_divergence handles small gene count correctly", {
     )
     
     # Request parallel computation (should work even though few genes)
+    core_limit <- suppressWarnings(as.integer(Sys.getenv("_R_CHECK_LIMIT_CORES_", NA)))
+    max_threads <- if (is.na(core_limit)) min(3, parallel::detectCores()) else min(3, core_limit)
     result <- .calculate_divergence(
         se = se,
         q = 1,
         nboot = 100,
-        nthreads = min(3, parallel::detectCores()),  # Request parallel
+        nthreads = max_threads,  # Respects environment core limit
         progress = FALSE,
     )
     
@@ -1049,8 +1051,9 @@ test_that("Increasing threads maintains numerical stability", {
     nthreads = 1
   )
   
-  # Run with 4 threads (if available)
-  max_threads <- parallel::detectCores()
+  # Run with 4 threads (if available, respecting environment core limit)
+  core_limit <- suppressWarnings(as.integer(Sys.getenv("_R_CHECK_LIMIT_CORES_", NA)))
+  max_threads <- if (is.na(core_limit)) parallel::detectCores() else core_limit
   if (max_threads >= 4) {
     analysis <- create_test_analysis()
     result_4threads <- silent_calculate_divergence(

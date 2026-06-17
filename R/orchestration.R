@@ -147,9 +147,18 @@ TSENAT <- function(analysis, output_dir = "tsenat_outputs", save_output = TRUE, 
     tryCatch({
         stringency_level <- cfg$stringency %||% "medium"
         analysis <- filter_analysis(analysis, stringency = stringency_level)
-        if (verbose) message("          [OK] Complete")
+        
+        # Validate that filtering produced non-empty result
+        if (nrow(se(analysis)) == 0) {
+            stop("[filter_analysis] ERROR: Filtering removed ALL transcripts. ",
+                 "No data remaining for downstream analysis. ",
+                 "Likely causes: 1) Filter stringency too high (min_tpm or min_samples), ",
+                 "2) Input data has very low expression, 3) Gene annotation issues. ",
+                 "Please review filter parameters or input data quality.", call. = FALSE)
+        }
+        if (verbose) message("          [OK] Complete - ", nrow(se(analysis)), " transcripts remaining")
     }, error = function(e) {
-        warning("Filtering failed: ", conditionMessage(e), call. = FALSE)
+        stop("[filter_analysis] ", conditionMessage(e), call. = FALSE)
     })
     step_times[["filtering"]] <- Sys.time() - step_start
     
@@ -361,6 +370,61 @@ TSENAT <- function(analysis, output_dir = "tsenat_outputs", save_output = TRUE, 
 # CONFIG BUILDER: TSENAT_config()
 # ============================================================================
 
+# Internal validation helper: Checks TSENAT_config parameters
+# Extracted for better testability and code coverage
+.validate_tsenat_config_params <- function(sample_col, condition_col, q, divergence_ci, 
+                                             paired, subject_col, control) {
+    # Validate always-required parameters
+    if (is.null(sample_col) || !is.character(sample_col)) {
+        stop("'sample_col' is required and must be character (column name for samples)",
+            call. = FALSE)
+    }
+    if (is.null(condition_col) || !is.character(condition_col)) {
+        stop("'condition_col' is required and must be character (column name for experimental condition)",
+            call. = FALSE)
+    }
+
+    # Validate q parameter (single or multiple q-values)
+    if (is.null(q)) {
+        stop("'q' is required (q-value or q-values for diversity/statistics calculations).",
+            call. = FALSE)
+    }
+    if (!is.numeric(q) || any(q < 0) || any(q > 2)) {
+        stop("'q' must be numeric value(s) between 0 and 2", call. = FALSE)
+    }
+
+    # Validate divergence_ci
+    if (!is.numeric(divergence_ci) || divergence_ci <= 0 || divergence_ci >= 1) {
+        stop("'divergence_ci' must be a probability in (0, 1)", call. = FALSE)
+    }
+
+    # Validate paired design configuration (fail-fast principle)
+    if (paired == TRUE) {
+        missing_paired_params <- c()
+
+        if (is.null(subject_col) || !is.character(subject_col)) {
+            missing_paired_params <- c(missing_paired_params, "subject_col")
+        }
+        if (is.null(control) || !is.character(control)) {
+            missing_paired_params <- c(missing_paired_params, "control")
+        }
+
+        if (length(missing_paired_params) > 0) {
+            stop("[TSENAT_config] Paired design (paired=TRUE) requires: ", paste(missing_paired_params,
+                collapse = ", "), "\n", "  Provide all parameters: \n", "    config <- TSENAT_config(\n",
+                "      q = 1.0,                              # Q-value for Tsallis entropy\n",
+                "      sample_col = 'sample',               # Required always\n",
+                "      condition_col = 'condition',         # Required always\n",
+                "      subject_col = 'paired_samples',      # Required for paired=TRUE\n",
+                "      paired = TRUE,\n", "      control = 'normal'                    # Required for paired=TRUE\n",
+                "    )", call. = FALSE)
+        }
+    }
+    
+    # Validation successful - no return value needed
+    invisible(NULL)
+}
+
 #' Create and return TSENAT configuration
 #'
 #' Builds a configuration list for use with \code{\link{TSENAT}}().
@@ -467,29 +531,10 @@ TSENAT_config <- function(q = 1, condition_col = "condition", subject_col = NULL
     sait_method <- match.arg(sait_method)
     sait_pcorr <- match.arg(sait_pcorr)
     assumptions_checks <- match.arg(assumptions_checks)
-    # Validate always-required parameters
-    if (is.null(sample_col) || !is.character(sample_col)) {
-        stop("'sample_col' is required and must be character (column name for samples)",
-            call. = FALSE)
-    }
-    if (is.null(condition_col) || !is.character(condition_col)) {
-        stop("'condition_col' is required and must be character (column name for experimental condition)",
-            call. = FALSE)
-    }
-
-    # Validate q parameter (single or multiple q-values)
-    if (is.null(q)) {
-        stop("'q' is required (q-value or q-values for diversity/statistics calculations).",
-            call. = FALSE)
-    }
-    if (!is.numeric(q) || any(q < 0) || any(q > 2)) {
-        stop("'q' must be numeric value(s) between 0 and 2", call. = FALSE)
-    }
-
-    # Validate divergence_ci
-    if (!is.numeric(divergence_ci) || divergence_ci <= 0 || divergence_ci >= 1) {
-        stop("'divergence_ci' must be a probability in (0, 1)", call. = FALSE)
-    }
+    
+    # Extract validation logic for better testability
+    .validate_tsenat_config_params(sample_col, condition_col, q, divergence_ci, 
+                                    paired, subject_col, control)
 
     # Build config list with all parameters
     config <- list(q = q, condition_col = condition_col, subject_col = subject_col,
@@ -516,29 +561,6 @@ TSENAT_config <- function(q = 1, condition_col = "condition", subject_col = NULL
     }
     if (length(extra_args) > 0) {
         config <- c(config, extra_args)
-    }
-
-    # Validate paired design configuration (fail-fast principle)
-    if (paired == TRUE) {
-        missing_paired_params <- c()
-
-        if (is.null(subject_col) || !is.character(subject_col)) {
-            missing_paired_params <- c(missing_paired_params, "subject_col")
-        }
-        if (is.null(control) || !is.character(control)) {
-            missing_paired_params <- c(missing_paired_params, "control")
-        }
-
-        if (length(missing_paired_params) > 0) {
-            stop("[TSENAT_config] Paired design (paired=TRUE) requires: ", paste(missing_paired_params,
-                collapse = ", "), "\n", "  Provide all parameters: \n", "    config <- TSENAT_config(\n",
-                "      q = 1.0,                              # Q-value for Tsallis entropy\n",
-                "      sample_col = 'sample',               # Required always\n",
-                "      condition_col = 'condition',         # Required always\n",
-                "      subject_col = 'paired_samples',      # Required for paired=TRUE\n",
-                "      paired = TRUE,\n", "      control = 'normal'                    # Required for paired=TRUE\n",
-                "    )", call. = FALSE)
-        }
     }
 
     # Mark as TSENATConfig (but keep as list for S4 slot)

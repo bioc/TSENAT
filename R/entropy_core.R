@@ -47,7 +47,7 @@
 
     # Species richness (q=0): just count species
     if (q < q_tol) {
-        H <- (log(length(p)) - 1)/log(log_base)
+        H <- log(length(p))/log(log_base)
         return(H)
     }
 
@@ -55,21 +55,23 @@
     if (abs(q - 1) < q_tol) {
         H <- -sum(p * log(p))/log(log_base)
     } else {
-        # Tsallis entropy: (1 - sum(p^q)) / (q-1) Note: Unlike Shannon,
-        # log_base is NOT applied to Tsallis
+        # Tsallis entropy: (1 - sum(p^q)) / (q-1)
+        # Apply log_base transformation consistently with Shannon for cross-study comparability
         H <- (1 - sum(p^q))/(q - 1)
+        H <- H / log(log_base)
     }
 
     # Normalize by maximum entropy if requested
     if (norm) {
         n <- length(p)
         if (q < q_tol) {
-            H_max <- (log(n) - 1)/log(log_base)
+            H_max <- log(n)/log(log_base)
         } else if (abs(q - 1) < q_tol) {
             H_max <- log(n)/log(log_base)
         } else {
-            # Tsallis: max entropy without log_base (unlike Shannon)
+            # Tsallis: max entropy with log_base applied consistently
             H_max <- (1 - n^(1 - q))/(q - 1)
+            H_max <- H_max / log(log_base)
         }
 
         if (!is.na(H_max) && !is.nan(H_max) && H_max > 0 && is.finite(H_max)) {

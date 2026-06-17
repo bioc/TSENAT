@@ -181,7 +181,7 @@ test_that("Z-score standardization preserves ordering", {
     z_order <- order(z_vals[!is.na(z_vals)])
     
     expect_identical(raw_order, z_order,
-                     label = "Ordering should be preserved after z-score transformation")
+                     info = "Ordering should be preserved after z-score transformation")
 })
 
 test_that("Log-odds ratio standardization works correctly", {
@@ -273,7 +273,7 @@ test_that("Range standardization [0,1] remains valid", {
     
     # All values should be in [0, 1]
     expect_true(all(valid_range >= 0 & valid_range <= 1),
-                label = "Range standardization should produce values in [0,1]")
+                info = "Range standardization should produce values in [0,1]")
 })
 
 test_that("No standardization ('none') returns raw values", {
@@ -281,11 +281,11 @@ test_that("No standardization ('none') returns raw values", {
     
     # Should be valid SummarizedExperiment
     expect_true(inherits(none_se, "SummarizedExperiment"),
-                label = "Should return SummarizedExperiment with norm='none'")
+                info = "Should return SummarizedExperiment with norm='none'")
     
     # Assay should exist
     expect_true("diversity" %in% names(assays(none_se)),
-                label = "Diversity assay should be present")
+                info = "Diversity assay should be present")
 })
 
 test_that("Invalid normalization method raises error", {
@@ -363,11 +363,11 @@ test_that("Z-score standardization is symmetric around zero", {
     
     # Should have some valid values
     expect_true(length(valid_z) > 0,
-                label = "Should have non-NA z-scores")
+                info = "Should have non-NA z-scores")
     
     # Check that values exist and are finite
     expect_true(all(is.finite(valid_z)),
-                label = "All z-scores should be finite")
+                info = "All z-scores should be finite")
 })
 
 test_that("Log-odds ratio standardization detects high vs low diversity", {

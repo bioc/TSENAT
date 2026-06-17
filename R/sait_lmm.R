@@ -96,17 +96,11 @@
             df$group <- factor(df$group)
         }
 
-        if (verbose) {
-            fit0_ar1 <- nlme::lme(entropy ~ q + group, random = ~1 | subject, correlation = nlme::corAR1(form = ~time_idx |
-                subject), data = df, method = "ML")
-            fit1_ar1 <- nlme::lme(entropy ~ q * group, random = ~1 | subject, correlation = nlme::corAR1(form = ~time_idx |
-                subject), data = df, method = "ML")
-        } else {
-            fit0_ar1 <- nlme::lme(entropy ~ q + group, random = ~1 | subject, correlation = nlme::corAR1(form = ~time_idx |
-                subject), data = df, method = "ML")
-            fit1_ar1 <- nlme::lme(entropy ~ q * group, random = ~1 | subject, correlation = nlme::corAR1(form = ~time_idx |
-                subject), data = df, method = "ML")
-        }
+        # Fit models (verbose parameter only affects messaging, not model fitting)
+        fit0_ar1 <- nlme::lme(entropy ~ q + group, random = ~1 | subject, correlation = nlme::corAR1(form = ~time_idx |
+            subject), data = df, method = "ML")
+        fit1_ar1 <- nlme::lme(entropy ~ q * group, random = ~1 | subject, correlation = nlme::corAR1(form = ~time_idx |
+            subject), data = df, method = "ML")
 
         if (!inherits(fit0_ar1, "try-error") && !inherits(fit1_ar1, "try-error")) {
             if (verbose)
@@ -134,18 +128,21 @@
     }
 
     # Strategy 1: Try nlme::lme() - more stable than lme4 for some datasets
-    if (requireNamespace("nlme", quietly = TRUE)) {
-        if (verbose) {
-            fit0_nlme <- try(nlme::lme(entropy ~ q + group, random = ~1 | subject,
-                data = df, method = "ML"), silent = TRUE)
-            fit1_nlme <- try(nlme::lme(entropy ~ q * group, random = ~1 | subject,
-                data = df, method = "ML"), silent = TRUE)
-        } else {
-            fit0_nlme <- try(nlme::lme(entropy ~ q + group, random = ~1 | subject,
-                data = df, method = "ML"), silent = TRUE)
-            fit1_nlme <- try(nlme::lme(entropy ~ q * group, random = ~1 | subject,
-                data = df, method = "ML"), silent = TRUE)
+    # Ensure factor conversion for consistency with fallback strategies
+    if (requireNamespace("nlme", quietly = TRUE) && "subject" %in% names(df)) {
+        df_nlme <- df
+        # Explicitly convert to factor for consistent parametrization across strategies
+        if (!is.factor(df_nlme$subject)) {
+            df_nlme$subject <- factor(df_nlme$subject)
         }
+        if (!is.factor(df_nlme$group)) {
+            df_nlme$group <- factor(df_nlme$group)
+        }
+        # Fit models (verbose parameter only affects messaging, not model fitting)
+        fit0_nlme <- try(nlme::lme(entropy ~ q + group, random = ~1 | subject,
+            data = df_nlme, method = "ML"), silent = TRUE)
+        fit1_nlme <- try(nlme::lme(entropy ~ q * group, random = ~1 | subject,
+            data = df_nlme, method = "ML"), silent = TRUE)
         if (!inherits(fit0_nlme, "try-error") && !inherits(fit1_nlme, "try-error")) {
             if (verbose)
                 message("[.try_sait_fallbacks] Strategy 1 SUCCESS: nlme random intercept")
@@ -154,10 +151,19 @@
     }
 
     # Strategy 2: Try glmmTMB::glmmTMB() - newer, often more robust
-    if (requireNamespace("glmmTMB", quietly = TRUE)) {
-        fit0_tmb <- try(glmmTMB::glmmTMB(entropy ~ q + group + (1 | subject), data = df,
+    # Ensure factor conversion for consistency with fallback strategies
+    if (requireNamespace("glmmTMB", quietly = TRUE) && "subject" %in% names(df)) {
+        df_tmb <- df
+        # Explicitly convert to factor for consistent parametrization across strategies
+        if (!is.factor(df_tmb$subject)) {
+            df_tmb$subject <- factor(df_tmb$subject)
+        }
+        if (!is.factor(df_tmb$group)) {
+            df_tmb$group <- factor(df_tmb$group)
+        }
+        fit0_tmb <- try(glmmTMB::glmmTMB(entropy ~ q + group + (1 | subject), data = df_tmb,
             REML = FALSE, verbose = FALSE), silent = TRUE)
-        fit1_tmb <- try(glmmTMB::glmmTMB(entropy ~ q * group + (1 | subject), data = df,
+        fit1_tmb <- try(glmmTMB::glmmTMB(entropy ~ q * group + (1 | subject), data = df_tmb,
             REML = FALSE, verbose = FALSE), silent = TRUE)
         if (!inherits(fit0_tmb, "try-error") && !inherits(fit1_tmb, "try-error")) {
             # Check for model convergence for both fits
@@ -186,15 +192,26 @@
     # Strategy 3: Regularized regression model with subject as fixed effect (treated as factor)
     # Use factor() to ensure proper dummy variable coding, not raw numeric
     # Apply inverse-variance weights if available (Phase 1 weighting)
-    fit0_sait <- try(stats::lm(entropy ~ q + group + factor(subject), data = df, weights = if (!is.null(df$weight))
-        df$weight else NULL), silent = TRUE)
-    fit1_sait <- try(stats::lm(entropy ~ q * group + factor(subject), data = df, weights = if (!is.null(df$weight))
-        df$weight else NULL), silent = TRUE)
-    if (!inherits(fit0_sait, "try-error") && !inherits(fit1_sait, "try-error")) {
-        if (verbose) {
-            message("[.try_sait_fallbacks] Using fixed-effect sait with factor(subject)")
+    # Only try if subject column exists
+    if ("subject" %in% names(df)) {
+        df_lm <- df
+        # Ensure consistent factor encoding across strategies
+        if (!is.factor(df_lm$subject)) {
+            df_lm$subject <- factor(df_lm$subject)
         }
-        return(list(fit0 = fit0_sait, fit1 = fit1_sait, method = "sait_subject_fixed"))
+        if (!is.factor(df_lm$group)) {
+            df_lm$group <- factor(df_lm$group)
+        }
+        fit0_sait <- try(stats::lm(entropy ~ q + group + subject, data = df_lm, weights = if (!is.null(df_lm$weight))
+            df_lm$weight else NULL), silent = TRUE)
+        fit1_sait <- try(stats::lm(entropy ~ q * group + subject, data = df_lm, weights = if (!is.null(df_lm$weight))
+            df_lm$weight else NULL), silent = TRUE)
+        if (!inherits(fit0_sait, "try-error") && !inherits(fit1_sait, "try-error")) {
+            if (verbose) {
+                message("[.try_sait_fallbacks] Using fixed-effect sait with factor(subject)")
+            }
+            return(list(fit0 = fit0_sait, fit1 = fit1_sait, method = "sait_subject_fixed"))
+        }
     }
 
     # Strategy 4: Last resort - drop subject entirely

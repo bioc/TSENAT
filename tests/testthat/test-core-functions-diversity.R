@@ -2883,3 +2883,150 @@ test_that(".apply_diversity_post_hoc_norm handles norm='none'", {
   expect_is(result, "matrix")
   expect_identical(result, diversity_matrix)
 })
+
+# ============================================================================
+# BUG FIX #1: Species Richness (q=0) Formula Correction (May 2026)
+# ============================================================================
+# Reference: Rényi (1961), Hill (1973) - species richness is log(n), not log(n)-1
+# Bug: Previous code computed (log(n) - 1)/log(log_base)
+# Fix: Now correctly computes log(n)/log(log_base)
+
+test_that("[BUG #1] Species richness (q=0) correctly computes log(n), not log(n)-1", {
+  # Uniform distribution with 4 species
+  proportions <- c(0.25, 0.25, 0.25, 0.25)
+  
+  # Test with natural log
+  result_e <- .entropy_core(proportions, q = 0, log_base = exp(1))
+  expected_e <- log(4)  # Should equal log(4) ≈ 1.3863
+  expect_equal(result_e, expected_e, tolerance = 1e-6,
+               info = "Species richness with base e")
+  
+  # Test with log2
+  result_2 <- .entropy_core(proportions, q = 0, log_base = 2)
+  expected_2 <- log(4) / log(2)  # Should equal 2
+  expect_equal(result_2, expected_2, tolerance = 1e-6,
+               info = "Species richness with base 2")
+  
+  # Test with log10
+  result_10 <- .entropy_core(proportions, q = 0, log_base = 10)
+  expected_10 <- log(4) / log(10)
+  expect_equal(result_10, expected_10, tolerance = 1e-6,
+               info = "Species richness with base 10")
+  
+  # Verify q=0 increases with more species
+  proportions_8 <- rep(1/8, 8)
+  result_8 <- .entropy_core(proportions_8, q = 0, log_base = exp(1))
+  expect_gt(result_8, result_e)
+  expect_equal(result_8, log(8), tolerance = 1e-6)
+})
+
+# ============================================================================
+# BUG FIX #2: Tsallis Entropy log_base Consistency (May 2026)
+# ============================================================================
+# Reference: Tsallis (1993), Anastasiadis (2012)
+# Bug: Shannon (q=1) applied log_base, but Tsallis (q≠1) did not
+# Fix: Now applies log_base consistently to both for cross-study comparability
+
+test_that("[BUG #2] Tsallis log_base applied consistently for cross-study comparability", {
+  proportions <- c(0.5, 0.3, 0.2)
+  q <- 1.5
+  
+  # Calculate with different log bases
+  result_e <- .entropy_core(proportions, q = q, log_base = exp(1))
+  result_2 <- .entropy_core(proportions, q = q, log_base = 2)
+  
+  # When changing log bases: H_2 / H_e = log(e) / log(2) = 1 / log(2)
+  # because log_2(x) = log_e(x) / log_e(2), so entropy scales inversely
+  ratio <- result_2 / result_e
+  expected_ratio <- log(exp(1)) / log(2)  # = 1 / log(2) ≈ 1.44
+  expect_equal(ratio, expected_ratio, tolerance = 1e-6,
+               info = "Tsallis log_base scaling applied")
+  
+  # Shannon should show same pattern
+  result_shannon_e <- .entropy_core(proportions, q = 1.0, log_base = exp(1))
+  result_shannon_2 <- .entropy_core(proportions, q = 1.0, log_base = 2)
+  ratio_shannon <- result_shannon_2 / result_shannon_e
+  expect_equal(ratio_shannon, expected_ratio, tolerance = 1e-6,
+               info = "Shannon log_base scaling applied")
+})
+
+# ============================================================================
+# BUG FIX #5: Effective Length Zero Handling (May 2026)
+# ============================================================================
+# Reference: Patro et al. (2017) SALMON paper
+# Bug: Silently converted Inf to 0 when effective_length <= 0
+# Fix: Now raises error with clear message
+
+test_that("[BUG #5] Invalid effective_length raises error instead of silent conversion", {
+  x <- c(10, 20, 30, 40, 50)
+  q <- 1.0
+  
+  # Valid effective_length: all positive
+  valid_eff_len <- c(100, 101, 102, 103, 104)
+  expect_silent(
+    .calculate_tsallis_entropy(x, q, effective_length = valid_eff_len)
+  )
+  
+  # Invalid: contains zero
+  invalid_eff_len_zero <- c(100, 0, 102, 103, 104)
+  expect_error(
+    .calculate_tsallis_entropy(x, q, effective_length = invalid_eff_len_zero),
+    pattern = "invalid effective_length|unreliable"
+  )
+  
+  # Invalid: contains NA
+  invalid_eff_len_na <- c(100, 101, NA, 103, 104)
+  expect_error(
+    .calculate_tsallis_entropy(x, q, effective_length = invalid_eff_len_na),
+    pattern = "invalid effective_length"
+  )
+  
+  # Invalid: negative
+  invalid_eff_len_neg <- c(100, 101, -1, 103, 104)
+  expect_error(
+    .calculate_tsallis_entropy(x, q, effective_length = invalid_eff_len_neg),
+    pattern = "invalid effective_length"
+  )
+})
+
+# ============================================================================
+# EDGE CASES: Formula accuracy
+# ============================================================================
+
+test_that("Edge cases: Formula accuracy for q close to 0", {
+  proportions <- c(0.5, 0.3, 0.2)
+  
+  # Test q very close to 0
+  result_q_near_0 <- .entropy_core(proportions, q = 1e-7, log_base = exp(1))
+  expect_equal(result_q_near_0, log(3), tolerance = 1e-4)
+})
+
+test_that("Edge cases: Very skewed distributions", {
+  # Highly skewed distribution
+  proportions_skewed <- c(0.99, 0.005, 0.005)
+  result_skewed <- .entropy_core(proportions_skewed, q = 1.0, log_base = exp(1))
+  
+  expect_lt(result_skewed, log(3))
+  expect_gt(result_skewed, 0)
+})
+
+test_that("Edge cases: log_base consistency across scales", {
+  proportions <- c(0.4, 0.35, 0.25)
+  q <- 1.2
+  
+  # Test multiple log bases
+  bases <- c(2, exp(1), 10)
+  results <- sapply(bases, function(b) {
+    .entropy_core(proportions, q = q, log_base = b)
+  })
+  
+  # Verify ratios are consistent
+  # When converting log bases: H_new / H_old = log(old_base) / log(new_base)
+  # because log_new(x) = log_old(x) / log_old(new_base)
+  for (i in 1:(length(bases) - 1)) {
+    ratio <- results[i + 1] / results[i]
+    expected <- log(bases[i]) / log(bases[i + 1])
+    expect_equal(ratio, expected, tolerance = 1e-6,
+                 info = paste("Ratio consistent for bases", bases[i], "and", bases[i + 1]))
+  }
+})
