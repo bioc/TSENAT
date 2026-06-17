@@ -96,17 +96,11 @@
             df$group <- factor(df$group)
         }
 
-        if (verbose) {
-            fit0_ar1 <- nlme::lme(entropy ~ q + group, random = ~1 | subject, correlation = nlme::corAR1(form = ~time_idx |
-                subject), data = df, method = "ML")
-            fit1_ar1 <- nlme::lme(entropy ~ q * group, random = ~1 | subject, correlation = nlme::corAR1(form = ~time_idx |
-                subject), data = df, method = "ML")
-        } else {
-            fit0_ar1 <- nlme::lme(entropy ~ q + group, random = ~1 | subject, correlation = nlme::corAR1(form = ~time_idx |
-                subject), data = df, method = "ML")
-            fit1_ar1 <- nlme::lme(entropy ~ q * group, random = ~1 | subject, correlation = nlme::corAR1(form = ~time_idx |
-                subject), data = df, method = "ML")
-        }
+        # Fit models (verbose parameter only affects messaging, not model fitting)
+        fit0_ar1 <- nlme::lme(entropy ~ q + group, random = ~1 | subject, correlation = nlme::corAR1(form = ~time_idx |
+            subject), data = df, method = "ML")
+        fit1_ar1 <- nlme::lme(entropy ~ q * group, random = ~1 | subject, correlation = nlme::corAR1(form = ~time_idx |
+            subject), data = df, method = "ML")
 
         if (!inherits(fit0_ar1, "try-error") && !inherits(fit1_ar1, "try-error")) {
             if (verbose)
@@ -144,17 +138,11 @@
         if (!is.factor(df_nlme$group)) {
             df_nlme$group <- factor(df_nlme$group)
         }
-        if (verbose) {
-            fit0_nlme <- try(nlme::lme(entropy ~ q + group, random = ~1 | subject,
-                data = df_nlme, method = "ML"), silent = TRUE)
-            fit1_nlme <- try(nlme::lme(entropy ~ q * group, random = ~1 | subject,
-                data = df_nlme, method = "ML"), silent = TRUE)
-        } else {
-            fit0_nlme <- try(nlme::lme(entropy ~ q + group, random = ~1 | subject,
-                data = df_nlme, method = "ML"), silent = TRUE)
-            fit1_nlme <- try(nlme::lme(entropy ~ q * group, random = ~1 | subject,
-                data = df_nlme, method = "ML"), silent = TRUE)
-        }
+        # Fit models (verbose parameter only affects messaging, not model fitting)
+        fit0_nlme <- try(nlme::lme(entropy ~ q + group, random = ~1 | subject,
+            data = df_nlme, method = "ML"), silent = TRUE)
+        fit1_nlme <- try(nlme::lme(entropy ~ q * group, random = ~1 | subject,
+            data = df_nlme, method = "ML"), silent = TRUE)
         if (!inherits(fit0_nlme, "try-error") && !inherits(fit1_nlme, "try-error")) {
             if (verbose)
                 message("[.try_sait_fallbacks] Strategy 1 SUCCESS: nlme random intercept")

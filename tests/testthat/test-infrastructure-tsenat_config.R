@@ -130,3 +130,237 @@ test_that("TSENAT_config default parameters work correctly", {
     expect_is(config_default, "TSENATConfig")
     expect_is(config_explicit, "TSENATConfig")
 })
+
+# ============================================================================
+# Parameter Validation Function Tests
+# ============================================================================
+
+test_that(".validate_tsenat_config_params rejects NULL sample_col", {
+    skip_on_bioc()
+    
+    expect_error(
+        TSENAT:::.validate_tsenat_config_params(
+            sample_col = NULL,
+            condition_col = "condition",
+            q = 1.0,
+            divergence_ci = 0.95,
+            paired = FALSE,
+            subject_col = NULL,
+            control = NULL
+        ),
+        "'sample_col' is required"
+    )
+})
+
+test_that(".validate_tsenat_config_params rejects non-character sample_col", {
+    skip_on_bioc()
+    
+    expect_error(
+        TSENAT:::.validate_tsenat_config_params(
+            sample_col = 123,
+            condition_col = "condition",
+            q = 1.0,
+            divergence_ci = 0.95,
+            paired = FALSE,
+            subject_col = NULL,
+            control = NULL
+        ),
+        "'sample_col' is required"
+    )
+})
+
+test_that(".validate_tsenat_config_params rejects NULL condition_col", {
+    skip_on_bioc()
+    
+    expect_error(
+        TSENAT:::.validate_tsenat_config_params(
+            sample_col = "sample",
+            condition_col = NULL,
+            q = 1.0,
+            divergence_ci = 0.95,
+            paired = FALSE,
+            subject_col = NULL,
+            control = NULL
+        ),
+        "'condition_col' is required"
+    )
+})
+
+test_that(".validate_tsenat_config_params rejects NULL q", {
+    skip_on_bioc()
+    
+    expect_error(
+        TSENAT:::.validate_tsenat_config_params(
+            sample_col = "sample",
+            condition_col = "condition",
+            q = NULL,
+            divergence_ci = 0.95,
+            paired = FALSE,
+            subject_col = NULL,
+            control = NULL
+        ),
+        "'q' is required"
+    )
+})
+
+test_that(".validate_tsenat_config_params rejects out-of-range q values", {
+    skip_on_bioc()
+    
+    expect_error(
+        TSENAT:::.validate_tsenat_config_params(
+            sample_col = "sample",
+            condition_col = "condition",
+            q = c(-0.5, 1.0),
+            divergence_ci = 0.95,
+            paired = FALSE,
+            subject_col = NULL,
+            control = NULL
+        ),
+        "'q' must be numeric value"
+    )
+})
+
+test_that(".validate_tsenat_config_params rejects q > 2", {
+    skip_on_bioc()
+    
+    expect_error(
+        TSENAT:::.validate_tsenat_config_params(
+            sample_col = "sample",
+            condition_col = "condition",
+            q = 2.5,
+            divergence_ci = 0.95,
+            paired = FALSE,
+            subject_col = NULL,
+            control = NULL
+        ),
+        "'q' must be numeric value"
+    )
+})
+
+test_that(".validate_tsenat_config_params rejects invalid divergence_ci", {
+    skip_on_bioc()
+    
+    expect_error(
+        TSENAT:::.validate_tsenat_config_params(
+            sample_col = "sample",
+            condition_col = "condition",
+            q = 1.0,
+            divergence_ci = 1.5,
+            paired = FALSE,
+            subject_col = NULL,
+            control = NULL
+        ),
+        "'divergence_ci' must be a probability"
+    )
+})
+
+test_that(".validate_tsenat_config_params rejects divergence_ci = 0", {
+    skip_on_bioc()
+    
+    expect_error(
+        TSENAT:::.validate_tsenat_config_params(
+            sample_col = "sample",
+            condition_col = "condition",
+            q = 1.0,
+            divergence_ci = 0,
+            paired = FALSE,
+            subject_col = NULL,
+            control = NULL
+        ),
+        "'divergence_ci' must be a probability"
+    )
+})
+
+test_that(".validate_tsenat_config_params requires subject_col for paired=TRUE", {
+    skip_on_bioc()
+    
+    expect_error(
+        TSENAT:::.validate_tsenat_config_params(
+            sample_col = "sample",
+            condition_col = "condition",
+            q = 1.0,
+            divergence_ci = 0.95,
+            paired = TRUE,
+            subject_col = NULL,
+            control = "A"
+        ),
+        "Paired design.*requires"
+    )
+})
+
+test_that(".validate_tsenat_config_params requires control for paired=TRUE", {
+    skip_on_bioc()
+    
+    expect_error(
+        TSENAT:::.validate_tsenat_config_params(
+            sample_col = "sample",
+            condition_col = "condition",
+            q = 1.0,
+            divergence_ci = 0.95,
+            paired = TRUE,
+            subject_col = "subject",
+            control = NULL
+        ),
+        "Paired design.*requires"
+    )
+})
+
+test_that(".validate_tsenat_config_params accepts valid paired configuration", {
+    skip_on_bioc()
+    
+    expect_invisible(
+        TSENAT:::.validate_tsenat_config_params(
+            sample_col = "sample",
+            condition_col = "condition",
+            q = 1.0,
+            divergence_ci = 0.95,
+            paired = TRUE,
+            subject_col = "subject",
+            control = "A"
+        )
+    )
+})
+
+test_that("TSENAT_config with extra arguments", {
+    skip_on_bioc()
+    
+    cfg <- TSENAT_config(
+        q = 1.0,
+        custom_param = "custom_value"
+    )
+    
+    expect_true("custom_param" %in% names(cfg))
+    expect_equal(cfg$custom_param, "custom_value")
+})
+
+test_that("TSENAT_config warns about metadata in config", {
+    skip_on_bioc()
+    
+    expect_warning(
+        TSENAT_config(
+            q = 1.0,
+            metadata = list(some = "data")
+        ),
+        "metadata.*should not be in config"
+    )
+})
+
+test_that("TSENAT_config with multiple q-values", {
+    skip_on_bioc()
+    
+    cfg <- TSENAT_config(
+        q = c(0.5, 1.0, 1.5, 2.0)
+    )
+    
+    expect_equal(cfg$q, c(0.5, 1.0, 1.5, 2.0))
+})
+
+test_that("TSENAT_config with all numeric q boundary values", {
+    skip_on_bioc()
+    
+    cfg0 <- TSENAT_config(q = 0)
+    expect_equal(cfg0$q, 0)
+    
+    cfg2 <- TSENAT_config(q = 2)
+    expect_equal(cfg2$q, 2)
+})
