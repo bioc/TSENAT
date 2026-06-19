@@ -242,7 +242,7 @@ test_that("make_plot_for_genebuild_tx_long and aggregation pipeline works and er
         skip_if_not_installed("patchwork")
         skip_if_not_installed("ggplot2")
         # create an Rplots.pdf in the working directory.
-        # The function itself manages temporary graphics device to prevent Rplots.pdf creation.
+        # The function itself manages graphics device to prevent Rplots.pdf creation.
         rpf <- "Rplots.pdf"
         if (file.exists(rpf)) unlink(rpf)
         
