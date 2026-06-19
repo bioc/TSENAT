@@ -1392,7 +1392,7 @@ test_that("concurvity values are mathematically sound", {
     # x_collinear only has 11 columns, so subset x_collinear to use same q structure
     # or create proper collinear version with same dimensions
     # For now, test concurvity is computed (value may vary with data structure)
-    result_cor <- TSENAT:::.compute_concurvity_index(x_collinear, q_values = q_values[1:ncol(x_collinear)])
+    result_cor <- TSENAT:::.compute_concurvity_index(x_collinear, q_values = q_values[seq_len(ncol(x_collinear))])
     
     # Both should return valid numeric concurvity values
     expect_true(is.numeric(result_uncor$overall_concurvity) && !is.na(result_uncor$overall_concurvity))
