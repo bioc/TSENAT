@@ -2396,7 +2396,7 @@ test_that("divergence_bootstrap_flexible_cpp_wrapper with pseudocount vector", {
 test_that("block_bootstrap_compute_cpp_wrapper rejects empty input (line 31)", {
   expect_error(
     block_bootstrap_compute_cpp_wrapper(
-      x = c(),  # Empty vector
+      x = NULL,  # Empty/NULL vector
       q = 1.0,
       normalize = TRUE,
       nboot = 10L,
