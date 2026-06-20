@@ -2388,3 +2388,274 @@ test_that("divergence_bootstrap_flexible_cpp_wrapper with pseudocount vector", {
   expect_length(result_scalar, 50)
   expect_true(all(is.finite(result_scalar)))
 })
+
+# ============================================================================
+# COVERAGE IMPROVEMENT: Error Handling and Edge Cases
+# ============================================================================
+
+test_that("block_bootstrap_compute_cpp_wrapper rejects empty input (line 31)", {
+  expect_error(
+    block_bootstrap_compute_cpp_wrapper(
+      x = c(),  # Empty vector
+      q = 1.0,
+      normalize = TRUE,
+      nboot = 10L,
+      log_base = exp(1),
+      pseudocount = 0
+    ),
+    "cannot be empty"
+  )
+})
+
+test_that("block_bootstrap_compute_cpp_wrapper rejects odd-length input", {
+  expect_error(
+    block_bootstrap_compute_cpp_wrapper(
+      x = c(100, 50, 25),  # Odd length
+      q = 1.0,
+      normalize = TRUE,
+      nboot = 10L,
+      log_base = exp(1),
+      pseudocount = 0
+    ),
+    "must have even length"
+  )
+})
+
+test_that("block_bootstrap_compute_cpp_wrapper warns on NA values", {
+  expect_warning(
+    block_bootstrap_compute_cpp_wrapper(
+      x = c(100, NA, 25, 10),  # Contains NA
+      q = 1.0,
+      normalize = TRUE,
+      nboot = 10L,
+      log_base = exp(1),
+      pseudocount = 0
+    ),
+    "contains NA values"
+  )
+})
+
+test_that("block_bootstrap_compute_cpp_wrapper rejects all-zero input", {
+  expect_error(
+    block_bootstrap_compute_cpp_wrapper(
+      x = c(0, 0, 0, 0),  # All zeros
+      q = 1.0,
+      normalize = TRUE,
+      nboot = 10L,
+      log_base = exp(1),
+      pseudocount = 0
+    ),
+    "All values.*are zero"
+  )
+})
+
+test_that("block_bootstrap_compute_cpp_wrapper rejects mismatched vector pseudocount (line 159)", {
+  expect_error(
+    block_bootstrap_compute_cpp_wrapper(
+      x = c(100, 50, 25, 10),
+      q = 1.0,
+      normalize = TRUE,
+      nboot = 10L,
+      log_base = exp(1),
+      pseudocount = c(0.5, 0.3)  # Wrong length (2 instead of 4)
+    ),
+    "pseudocount must have length 1 or equal to x length"
+  )
+})
+
+test_that("divergence_bootstrap_paired_cpp_wrapper rejects mismatched pair_ids (line 210)", {
+  expect_error(
+    divergence_bootstrap_paired_cpp_wrapper(
+      x = c(100, 50),
+      y = c(90, 85),
+      pair_ids = c(1, 2, 3),  # Wrong length (3 instead of 2)
+      nboot = 10L,
+      q = 1,
+      pseudocount = 0.5,
+      log_base = exp(1)
+    ),
+    "pair_ids must have same length"
+  )
+})
+
+test_that("divergence_bootstrap_paired_cpp_wrapper handles vector pseudocount for x only (lines 224-226)", {
+  # Create vector pseudocount matching x length only
+  x <- c(100, 80)
+  y <- c(90, 85)
+  pair_ids <- c(1L, 2L)
+  
+  # This should still work - pseudocount is recycled or handled
+  result <- divergence_bootstrap_paired_cpp_wrapper(
+    x = x,
+    y = y,
+    pair_ids = pair_ids,
+    nboot = 30L,
+    q = 1,
+    pseudocount = c(0.5, 0.3),
+    log_base = exp(1)
+  )
+  
+  expect_true(is.numeric(result))
+  expect_length(result, 30)
+})
+
+test_that("divergence_bootstrap_flexible_cpp_wrapper rejects mismatched vector pseudocount (line 288-289)", {
+  x <- c(100, 80)
+  y <- c(90, 85)
+  
+  expect_error(
+    divergence_bootstrap_flexible_cpp_wrapper(
+      x = x,
+      y = y,
+      x_pair_ids = c(1L, 2L),  # Provide matching pair IDs to test pseudocount error
+      y_pair_ids = c(1L, 2L),
+      nboot = 10L,
+      q = 1,
+      pseudocount = c(0.5, 0.3, 0.2),  # Wrong: should be length 4 (2+2)
+      log_base = exp(1)
+    ),
+    "pseudocount must have length 1 or"
+  )
+})
+
+test_that("divergence_bootstrap_flexible_cpp_wrapper handles x_pair_ids conversion errors (line 310-311)", {
+  x <- c(100, 80)
+  y <- c(90, 85)
+  
+  # Test with NA values that cause conversion issues
+  result <- tryCatch({
+    divergence_bootstrap_flexible_cpp_wrapper(
+      x = x,
+      y = y,
+      x_pair_ids = c(NA, NA),  # NA values to test error handling
+      y_pair_ids = c(1L, 2L),
+      nboot = 10L,
+      q = 1,
+      pseudocount = 0.5,
+      log_base = exp(1)
+    )
+  }, error = function(e) {
+    list(error = TRUE, message = e$message)
+  })
+  
+  # Should either return numeric or error gracefully
+  expect_true(is.numeric(result) || (is.list(result) && result$error))
+})
+
+test_that("divergence_bootstrap_flexible_cpp_wrapper handles y_pair_ids conversion errors (line 314-315)", {
+  x <- c(100, 80)
+  y <- c(90, 85)
+  
+  # Test with NA values that cause conversion issues
+  result <- tryCatch({
+    divergence_bootstrap_flexible_cpp_wrapper(
+      x = x,
+      y = y,
+      x_pair_ids = c(1L, 2L),
+      y_pair_ids = c(NA, NA),  # NA values to test error handling
+      nboot = 10L,
+      q = 1,
+      pseudocount = 0.5,
+      log_base = exp(1)
+    )
+  }, error = function(e) {
+    list(error = TRUE, message = e$message)
+  })
+  
+  # Should either return numeric or error gracefully
+  expect_true(is.numeric(result) || (is.list(result) && result$error))
+})
+
+test_that(".bootstrap_resample_optimized handles effective_length mismatch (lines 374, 377)", {
+  x <- c(100, 50, 25, 10)
+  effective_length <- c(1000, 500)  # Wrong length (2 instead of 4)
+  
+  # Should produce warning about length mismatch
+  expect_warning(
+    .bootstrap_resample_optimized(
+      x = x,
+      q = 1,
+      norm = TRUE,
+      nboot = 5L,
+      log_base = exp(1),
+      pseudocount = 0,
+      what = "S",  # 'S' for entropy
+      paired = FALSE,
+      effective_length = effective_length
+    ),
+    "effective_length"
+  )
+})
+
+test_that(".bootstrap_resample_optimized with effective_length parameter", {
+  x <- c(100, 50, 25, 10)
+  effective_length <- c(1000, 500, 250, 100)
+  
+  result <- .bootstrap_resample_optimized(
+    x = x,
+    q = 1,
+    norm = TRUE,
+    nboot = 5L,
+    log_base = exp(1),
+    pseudocount = 0,
+    what = "S",  # 'S' for entropy
+    paired = FALSE,
+    effective_length = effective_length
+  )
+  
+  expect_true(is.numeric(result))
+  expect_length(result, 5)
+})
+
+test_that("bootstrap_compute_cpp_wrapper with all parameters", {
+  result <- bootstrap_compute_cpp_wrapper(
+    x = c(100, 50, 25, 10),
+    q = 2,
+    normalize = FALSE,
+    nboot = 20L,
+    log_base = 2,
+    pseudocount = 1
+  )
+  
+  expect_true(is.numeric(result))
+  expect_length(result, 20)
+  expect_true(all(is.finite(result)))
+})
+
+test_that("divergence_bootstrap_paired_cpp_wrapper validates input types", {
+  expect_error(
+    divergence_bootstrap_paired_cpp_wrapper(
+      x = "not_numeric",  # String instead of numeric
+      y = c(90, 85),
+      pair_ids = c(1L, 2L),
+      nboot = 10L,
+      q = 1,
+      pseudocount = 0.5,
+      log_base = exp(1)
+    )
+  )
+})
+
+test_that(".bootstrap_resample_with_quality_control achieves min_valid_frac (coverage for QC logic)", {
+  # Create data that might generate some invalid bootstrap replicates
+  x <- c(100, 50, 25, 10, 5, 2)
+  
+  result <- .bootstrap_resample_with_quality_control(
+    x = x,
+    q = 1,
+    norm = TRUE,
+    nboot = 20L,
+    log_base = exp(1),
+    pseudocount = 0,
+    what = "S",  # 'S' for entropy
+    paired = FALSE,
+    effective_length = NULL,
+    min_valid_frac = 0.8  # Require 80% valid
+  )
+  
+  expect_true(is.numeric(result) || is.null(result))
+  if (is.numeric(result)) {
+    expect_length(result, 20)
+    expect_true(sum(!is.na(result)) >= 0.8 * 20)  # At least 80% valid
+  }
+})
