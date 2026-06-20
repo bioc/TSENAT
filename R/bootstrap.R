@@ -211,7 +211,7 @@ divergence_bootstrap_paired_cpp_wrapper <- function(x, y, pair_ids, nboot = 1000
     }
 
     # Paired designs require even-length vectors for proper pairing
-    if (length(x)%%2 != 0) {
+    if (length(x) %% 2 != 0) {
         stop("x and y must have same length, with even number of elements for paired bootstrap")
     }
 
@@ -281,14 +281,16 @@ divergence_bootstrap_flexible_cpp_wrapper <- function(x, y, x_pair_ids, y_pair_i
         stop("y and y_pair_ids must have same length")
     }
 
-    # Handle vector pseudocount for x
+    # Handle vector pseudocount for x and y (combined length)
     if (length(pseudocount) > 1) {
-        if (length(pseudocount) != length(c(x, y))) {
-            stop("pseudocount must have length 1 or equal to combined x+y length")
+        expected_len <- length(x) + length(y)
+        if (length(pseudocount) != expected_len) {
+            stop("pseudocount must have length 1 or ", expected_len,
+                 " (combined x+y length), got ", length(pseudocount))
         }
-        # Split pseudocount: first part for x, second for y
-        x_pseudo <- pseudocount[seq_along(x)]
-        y_pseudo <- pseudocount[seq_along(y) + length(x)]
+        # Split pseudocount using safe indexing (seq_len instead of implicit)
+        x_pseudo <- pseudocount[seq_len(length(x))]
+        y_pseudo <- pseudocount[length(x) + seq_len(length(y))]
         x_adj <- x + x_pseudo
         y_adj <- y + y_pseudo
         pseudocount_scalar <- 0
@@ -298,12 +300,20 @@ divergence_bootstrap_flexible_cpp_wrapper <- function(x, y, x_pair_ids, y_pair_i
         pseudocount_scalar <- pseudocount
     }
 
-    # Convert pair_ids to integer for C++ (helper ensures no NAs exist) Create
-    # integer vectors directly to avoid coercion warning
-    x_pair_ids_int <- integer(length(x_pair_ids))
-    y_pair_ids_int <- integer(length(y_pair_ids))
-    x_pair_ids_int[] <- x_pair_ids
-    y_pair_ids_int[] <- y_pair_ids
+    # Convert pair_ids to integer for C++ with explicit type conversion
+    # Avoid silent truncation/corruption by using as.integer
+    x_pair_ids_int <- as.integer(x_pair_ids)
+    y_pair_ids_int <- as.integer(y_pair_ids)
+    
+    # Validate conversion succeeded (check for NAs from coercion)
+    if (any(is.na(x_pair_ids_int) & !is.na(x_pair_ids))) {
+        stop("Failed to convert x_pair_ids to integer. ",
+             "Check that pair_ids contain only whole numbers.")
+    }
+    if (any(is.na(y_pair_ids_int) & !is.na(y_pair_ids))) {
+        stop("Failed to convert y_pair_ids to integer. ",
+             "Check that pair_ids contain only whole numbers.")
+    }
 
     # Call C++ function
     .Call("_TSENAT_divergence_bootstrap_flexible_cpp", PACKAGE = "TSENAT", as.numeric(x_adj),
@@ -410,7 +420,21 @@ divergence_bootstrap_flexible_cpp_wrapper <- function(x, y, x_pair_ids, y_pair_i
         if (abs(q - 1) < 1e-06) {
             bootstrap_dist <- exp(bootstrap_dist)  # exp(H) for q=1
         } else {
-            bootstrap_dist <- (1 - (q - 1) * bootstrap_dist)^(1/(1 - q))
+            # Compute base: 1 - (q-1) * H
+            base <- 1 - (q - 1) * bootstrap_dist
+            
+            # Defensive: check for negative bases (indicates entropy outside valid range)
+            n_negative <- sum(base < 0, na.rm = TRUE)
+            if (n_negative > 0) {
+                warning("Hill number conversion produced ", n_negative, 
+                        " negative base values for q=", q, ". ",
+                        "This suggests entropy values exceed valid range. ",
+                        "Clamping to small positive value (1e-10).")
+                base <- pmax(base, 1e-10)
+            }
+            
+            # Apply Hill number transformation
+            bootstrap_dist <- base^(1/(1 - q))
         }
     } else {
         stop("Invalid 'what' parameter: must be 'S' (entropy) or 'D' (Hill numbers)")
@@ -752,12 +776,28 @@ divergence_bootstrap_flexible_cpp_wrapper <- function(x, y, x_pair_ids, y_pair_i
         attempt <- attempt + 1
     }
 
-    # If we exit the loop without meeting threshold, warn and return what we
-    # have
+    # If we exit the loop without meeting threshold, check severity and handle appropriately
     if (valid_frac < min_valid_frac) {
-        warning(sprintf("Bootstrap regeneration could not achieve min_valid_frac=%.0f%% (got %.1f%% after %d attempts, %d replicates regenerated). ",
-            min_valid_frac * 100, valid_frac * 100, max_attempts, regenerated_total),
-            "CI may be unreliable. Consider checking input data for all-zero counts or extreme sparsity.")
+        # Create informative warning with diagnostic information
+        warning_msg <- sprintf(
+            "Bootstrap regeneration could not achieve min_valid_frac=%.0f%% (got %.1f%% after %d attempts, %d replicates regenerated). ",
+            min_valid_frac * 100, valid_frac * 100, max_attempts, regenerated_total)
+        
+        # Escalate response based on severity
+        if (valid_frac < 0.5) {
+            # Critical: Less than 50% valid - data quality is severely compromised
+            stop(warning_msg, 
+                 "CRITICAL: Less than 50% valid bootstrap replicates. ",
+                 "This indicates severe data quality issues. Check for: ",
+                 "(1) All-zero counts, (2) Extreme sparsity, (3) Invalid effective_length values. ",
+                 "Consider filtering genes with adequate read depth.")
+        } else if (valid_frac < 0.75) {
+            # Warning: 50-75% valid - proceed with caution
+            warning(warning_msg,
+                   "CAUTION: CI may be unreliable with only ", 
+                   sprintf("%.1f%%", valid_frac*100), " valid replicates. ",
+                   "Consider reviewing data quality and results interpretation.")
+        }
     }
 
     bootstrap_dist
