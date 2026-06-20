@@ -96,7 +96,8 @@ test_that(".get_bpparam returns SerialParam for nthreads=1", {
 })
 
 test_that(".get_bpparam returns MulticoreParam for nthreads>1 on Unix", {
-    skip_if_not(identical(.Platform$OS.type, "unix"))
+    skip_if_not(.Platform$OS.type == "unix",
+                message = "Multicore parallelization requires Unix (uses mclapply)")
     bpparam <- TSENAT:::.get_bpparam(nthreads = 2)
     expect_is(bpparam, "MulticoreParam")
 })

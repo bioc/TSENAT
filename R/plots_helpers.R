@@ -4222,14 +4222,24 @@ plot_diversity_violin_density <- function(se, assay_name = "diversity", title = 
         grDevices::dev.off()
         invisible(NULL)
     } else {
-        # When no output file specified, create a temporary null device to
-        # capture graphics This prevents R from creating Rplots.pdf as a
-        # fallback when grid draws
-        tmp_png <- tempfile(fileext = ".png")
-        grDevices::png(tmp_png)
+        # When no output file specified, use explicit null device to
+        # suppress graphics output and prevent R from creating Rplots.pdf
+        # on Windows. On Windows, even explicit devices can produce fallback
+        # Rplots.pdf unless we write to disk.
+        tmp_file <- NULL
+        if (.Platform$OS.type == "windows") {
+            # Windows: write to temporary PDF to prevent Rplots.pdf fallback
+            tmp_file <- tempfile("TSENAT_grid_", fileext = ".pdf")
+            grDevices::pdf(tmp_file)
+        } else {
+            # Unix-like: use null device to suppress output entirely
+            grDevices::pdf(NULL)
+        }
         on.exit({
             try(grDevices::dev.off(), silent = TRUE)
-            if (file.exists(tmp_png)) unlink(tmp_png)
+            if (!is.null(tmp_file) && file.exists(tmp_file)) {
+                unlink(tmp_file)
+            }
         }, add = TRUE)
 
         .plot_transcript_grid_draw(grobs, agg_label_unique, legend_grob, ncol, heights)
