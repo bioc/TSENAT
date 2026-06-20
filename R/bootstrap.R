@@ -288,9 +288,9 @@ divergence_bootstrap_flexible_cpp_wrapper <- function(x, y, x_pair_ids, y_pair_i
             stop("pseudocount must have length 1 or ", expected_len,
                  " (combined x+y length), got ", length(pseudocount))
         }
-        # Split pseudocount using safe indexing (seq_len instead of implicit)
-        x_pseudo <- pseudocount[seq_len(length(x))]
-        y_pseudo <- pseudocount[length(x) + seq_len(length(y))]
+        # Split pseudocount using safe indexing (seq_along for efficiency)
+        x_pseudo <- pseudocount[seq_along(x)]
+        y_pseudo <- pseudocount[length(x) + seq_along(y)]
         x_adj <- x + x_pseudo
         y_adj <- y + y_pseudo
         pseudocount_scalar <- 0
