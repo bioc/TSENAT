@@ -248,7 +248,7 @@ calculate_divergence <- function(analysis, q = NULL, verbose = FALSE, nthreads =
 #' @noRd
 #' @noRd
 .build_divergence_args <- function(analysis, params, verbose, progress, ...) {
-    args <- list(se = analysis@se, q = params$q, verbose = verbose, progress = progress)
+    args <- list(se = analysis@se, q = params$q, progress = progress)
 
     if (!is.null(params$control_group)) {
         args$control_group <- params$control_group

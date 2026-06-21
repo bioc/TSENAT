@@ -1163,7 +1163,6 @@ test_all_normalization_modes <- function(
     group_col = "sample_type",
     control_group = "Control",
     bootstrap = FALSE,
-    verbose = FALSE,
     progress = FALSE
 ) {
   norm_modes <- c("none", "range", "zscore", "log_odds_ratio", "relative_reference")
@@ -1178,7 +1177,6 @@ test_all_normalization_modes <- function(
       q = q,
       norm = norm_mode,
       bootstrap = bootstrap,
-      verbose = verbose,
       progress = progress
     )
     

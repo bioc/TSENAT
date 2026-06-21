@@ -664,8 +664,7 @@ test_that("calculate_divergence handles per-q pattern classification", {
     group_col = "sample_type",
     control_group = "Control",
     q = c(0.5, 1.0, 2.0),
-    bootstrap = FALSE,
-    verbose = FALSE
+    bootstrap = FALSE
   )
   
   # Should have per_q_pattern column in rowData
@@ -689,7 +688,6 @@ test_that("calculate_divergence all normalization modes work correctly", {
     group_col = "sample_type",
     control_group = "Control",
     bootstrap = FALSE,
-    verbose = FALSE,
     progress = FALSE
   )
 })
@@ -705,7 +703,6 @@ test_that("calculate_divergence skips genes with NA estimates", {
     control_group = "Control",
     q = 1,
     bootstrap = FALSE,
-    verbose = FALSE,
     progress = TRUE
   )
   
@@ -724,8 +721,7 @@ test_that("calculate_divergence with paired samples", {
     control_group = "Control",
     q = 1,
     paired = TRUE,
-    bootstrap = FALSE,
-    verbose = FALSE
+    bootstrap = FALSE
   )
   
   expect_result_structure(result, "SummarizedExperiment", n_rows = 2)
@@ -743,8 +739,7 @@ test_that("calculate_divergence with unpaired bootstrapping", {
     control_group = "Control",
     q = 1,
     bootstrap = TRUE,
-    nboot = 10,
-    verbose = FALSE
+    nboot = 10
   )
   
   expect_result_structure(result, "SummarizedExperiment", n_rows = 2)
@@ -763,8 +758,7 @@ test_that("calculate_divergence with paired bootstrapping", {
     q = 1,
     paired = TRUE,
     bootstrap = TRUE,
-    nboot = 10,
-    verbose = FALSE
+    nboot = 10
   )
   
   expect_result_structure(result, "SummarizedExperiment", n_rows = 2)
@@ -782,8 +776,7 @@ test_that("calculate_divergence auto-selects nboot", {
     control_group = "Control",
     q = 1,
     bootstrap = TRUE,
-    nboot = "auto",
-    verbose = FALSE
+    nboot = "auto"
   )
   
   expect_result_structure(result, "SummarizedExperiment", n_rows = 2)
@@ -803,8 +796,7 @@ test_that("calculate_divergence uses different CI methods", {
     q = 1,
     bootstrap = TRUE,
     nboot = 10,
-    method = "percentile",
-    verbose = FALSE
+    method = "percentile"
   )
   
   expect_result_structure(result_percentile, "SummarizedExperiment", n_rows = 2)
@@ -823,8 +815,7 @@ test_that("calculate_divergence applies CI threshold", {
     q = 1,
     bootstrap = TRUE,
     nboot = 10,
-    ci = 0.90,
-    verbose = FALSE
+    ci = 0.90
   )
   
   expect_result_structure(result, "SummarizedExperiment", n_rows = 2)
@@ -842,8 +833,7 @@ test_that("calculate_divergence uses parallel processing", {
     control_group = "Control",
     q = 1,
     nthreads = 2,
-    bootstrap = FALSE,
-    verbose = FALSE
+    bootstrap = FALSE
   )
   
   expect_result_structure(result, "SummarizedExperiment", n_rows = 2)
@@ -861,8 +851,7 @@ test_that("calculate_divergence with log_base parameter", {
     control_group = "Control",
     q = 1,
     log_base = 2,
-    bootstrap = FALSE,
-    verbose = FALSE
+    bootstrap = FALSE
   )
   
   expect_result_structure(result, "SummarizedExperiment", n_rows = 2)
@@ -880,8 +869,7 @@ test_that("calculate_divergence with pseudocount parameter", {
     control_group = "Control",
     q = 1,
     pseudocount = 1.0,
-    bootstrap = FALSE,
-    verbose = FALSE
+    bootstrap = FALSE
   )
   
   expect_result_structure(result, "SummarizedExperiment", n_rows = 2)

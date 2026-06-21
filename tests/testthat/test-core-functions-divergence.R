@@ -290,7 +290,6 @@ test_that("calculate_divergence all normalization modes are supported", {
         group_col = "group",
         control_group = "Control",
         bootstrap = FALSE,
-        verbose = FALSE,
         progress = FALSE
     )
 })
@@ -395,7 +394,6 @@ test_that("calculate_divergence validates norm parameter", {
     q = 1,
     norm = TRUE,
     bootstrap = FALSE,
-    verbose = FALSE
   )
   
   # Should return a result (may be SummarizedExperiment or list)
@@ -418,7 +416,6 @@ test_that("calculate_divergence sorts q values in ascending order", {
     control_group = "Control",
     q = c(2, 0.5, 1),  # Unsorted
     bootstrap = FALSE,
-    verbose = FALSE
   )
   
   # Should return a result without error
@@ -442,7 +439,6 @@ test_that("calculate_divergence rejects non-positive q values", {
       control_group = "Control",
       q = c(-0.5, 1, 2),
       bootstrap = FALSE,
-      verbose = FALSE
     ),
     "q parameter must be >= 0"
   )
@@ -468,7 +464,6 @@ test_that("calculate_divergence auto-detects group column", {
     control_group = "Control",
     q = 1,
     bootstrap = FALSE,
-    verbose = FALSE,
     progress = TRUE
   )
   
@@ -493,7 +488,6 @@ test_that("calculate_divergence auto-detects control group", {
     group_col = "sample_type",
     q = 1,
     bootstrap = FALSE,
-    verbose = FALSE
   )
   
   # Should return result without error
@@ -517,7 +511,6 @@ test_that("calculate_divergence fails without gene identifiers", {
       group_col = "sample_type",
       control_group = "Control",
       bootstrap = FALSE,
-      verbose = FALSE
     ),
     "gene identifiers"
   )
@@ -589,7 +582,6 @@ test_that("calculate_effect_sizes requires data frame input", {
     .calculate_effect_sizes(
       sait_res = list(a = 1, b = 2),
       divergence_results_se = NULL,
-      verbose = FALSE
     ),
     "sait_res must be a data frame"
   )
@@ -603,7 +595,6 @@ test_that("calculate_effect_sizes requires required columns", {
     .calculate_effect_sizes(
       sait_res = sait_res,
       divergence_results_se = NULL,
-      verbose = FALSE
     ),
     "sait_res must have columns"
   )
@@ -628,7 +619,6 @@ test_that("calculate_divergence executes sequential processing (nthreads=1)", {
     q = c(0.5, 1, 2),
     nthreads = 1,  # Explicitly sequential
     bootstrap = FALSE,
-    verbose = FALSE
   )
   
   expect_true(methods::is(result, "SummarizedExperiment"))
@@ -649,7 +639,6 @@ test_that("calculate_divergence handles multiple q values", {
     control_group = "Control",
     q = c(0.5, 1, 1.5, 2),  # 4 q values
     bootstrap = FALSE,
-    verbose = FALSE
   )
   
   # Should have matrix with correct dimensions
@@ -673,7 +662,6 @@ test_that("calculate_divergence performs bootstrap with auto nboot", {
     control_group = "Control",
     bootstrap = TRUE,
     nboot = "auto",  # Auto-select nboot
-    verbose = FALSE,
     progress = FALSE
   )
   
@@ -696,7 +684,6 @@ test_that("calculate_divergence applies normalization (range)", {
     q = 1,
     norm = "range",  # Range normalization
     bootstrap = FALSE,
-    verbose = FALSE
   )
   
   expect_true(methods::is(result, "SummarizedExperiment"))
@@ -717,7 +704,6 @@ test_that("calculate_divergence applies normalization (zscore)", {
     q = 1,
     norm = "zscore",  # Z-score normalization
     bootstrap = FALSE,
-    verbose = FALSE
   )
   
   expect_true(methods::is(result, "SummarizedExperiment"))
@@ -738,7 +724,6 @@ test_that("calculate_divergence skips normalization with norm='none'", {
     q = 1,
     norm = "none",  # No normalization
     bootstrap = FALSE,
-    verbose = FALSE
   )
   
   expect_true(methods::is(result, "SummarizedExperiment"))
@@ -758,7 +743,6 @@ test_that("calculate_divergence classifies per-q patterns with multiple q", {
     control_group = "Control",
     q = c(0.5, 1, 2),  # Multiple q values
     bootstrap = FALSE,
-    verbose = FALSE
   )
   
   # Should have per_q_pattern column
@@ -779,7 +763,6 @@ test_that("calculate_divergence populates reference q columns", {
     control_group = "Control",
     q = c(0.5, 1, 2),  # q=1 included
     bootstrap = FALSE,
-    verbose = FALSE
   )
   
   rd <- SummarizedExperiment::rowData(result)
@@ -803,7 +786,6 @@ test_that("calculate_divergence handles single gene correctly", {
     group_col = "sample_type",
     control_group = "Control",
     bootstrap = FALSE,
-    verbose = FALSE
   )
   
   expect_equal(nrow(result), 1)
@@ -823,7 +805,6 @@ test_that("calculate_divergence rejects bootstrap=non-logical", {
       group_col = "sample_type",
       control_group = "Control",
       bootstrap = "TRUE",  # Should be logical, not character
-      verbose = FALSE
     ),
     "bootstrap must be a logical"
   )
@@ -842,7 +823,6 @@ test_that("calculate_divergence includes metadata in result", {
     group_col = "sample_type",
     control_group = "Control",
     bootstrap = FALSE,
-    verbose = FALSE
   )
   
   # Get metadata using the generic function (no namespace prefix)
@@ -867,7 +847,6 @@ test_that("calculate_divergence handles custom pseudocount", {
     control_group = "Control",
     pseudocount = 1.0,  # Custom pseudocount
     bootstrap = FALSE,
-    verbose = FALSE
   )
   
   expect_true(methods::is(result, "SummarizedExperiment"))
@@ -887,7 +866,6 @@ test_that("calculate_divergence handles custom log_base", {
     control_group = "Control",
     log_base = 2,  # Log base 2
     bootstrap = FALSE,
-    verbose = FALSE
   )
   
   expect_true(methods::is(result, "SummarizedExperiment"))
@@ -908,7 +886,6 @@ test_that("calculate_divergence handles bootstrap with bca method", {
     bootstrap = TRUE,
     nboot = 100,
     method = "bca",  # Bias-corrected accelerated method
-    verbose = FALSE,
     progress = FALSE
   )
   
@@ -932,7 +909,6 @@ test_that("calculate_divergence returns error results gracefully", {
     group_col = "sample_type",
     control_group = "Control",
     bootstrap = FALSE,
-    verbose = FALSE
   )
   
   expect_true(methods::is(result, "SummarizedExperiment"))
@@ -1303,7 +1279,6 @@ test_that(".apply_diversity_post_hoc_norm returns SE unchanged for default norma
     norm_method = "default",
     params = list(),
     q_val = 1.0,
-    verbose = FALSE
   )
   
   # Should return identical SE
@@ -1375,7 +1350,6 @@ test_that(".apply_diversity_post_hoc_norm ignores normalization for non-SE input
     norm_method = "zscore",
     params = list(),
     q_val = 1.0,
-    verbose = FALSE
   )
   
   expect_identical(result, result_df)

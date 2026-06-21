@@ -968,7 +968,7 @@ test_that(".build_divergence_args builds minimal args correctly", {
   
   expect_true("se" %in% names(args))
   expect_true("q" %in% names(args))
-  expect_true("verbose" %in% names(args))
+  expect_true("progress" %in% names(args))
 })
 
 test_that(".build_divergence_args includes bootstrap params when bootstrap=TRUE", {

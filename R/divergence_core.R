@@ -195,8 +195,7 @@
 #'   result <- .calculate_divergence(se, q=1, nboot=100, nthreads=2)
 .calculate_divergence <- function(se, group_col = NULL, control_group = NULL, q = 1,
     paired = FALSE, bootstrap = FALSE, nboot = "auto", ci = 0.95, method = "percentile",
-    norm = TRUE, log_base = exp(1), pseudocount = 0.5, nthreads = 1, progress = FALSE,
-    verbose = TRUE) {
+    norm = TRUE, log_base = exp(1), pseudocount = 0.5, nthreads = 1, progress = FALSE) {
 
     # =========================================================================
     # INPUT VALIDATION - Must be done BEFORE implementation Following
@@ -232,7 +231,7 @@
 
     # Call implementation directly - errors will propagate clearly
     .calculate_divergence_impl(se, group_col, control_group, q, paired, bootstrap,
-        nboot, ci, method, norm, log_base, pseudocount, nthreads, progress, verbose)
+        nboot, ci, method, norm, log_base, pseudocount, nthreads, progress)
 }
 
 # ========================================================================= NEW
@@ -479,8 +478,7 @@
 #' @noRd
 .calculate_divergence_impl <- function(se, group_col = NULL, control_group = NULL,
     q = 1, paired = FALSE, bootstrap = FALSE, nboot = "auto", ci = 0.95, method = "percentile",
-    norm = TRUE, log_base = exp(1), pseudocount = 0.5, nthreads = 1, progress = FALSE,
-    verbose = TRUE) {
+    norm = TRUE, log_base = exp(1), pseudocount = 0.5, nthreads = 1, progress = FALSE) {
 
     # =========================================================================
     # =========================================================================
@@ -1082,35 +1080,21 @@
 #' Consolidates logic shared between sequential and parallel processing
 #' @noRd
 .process_single_gene_div <- function(gene_idx, all_gene_names, se, gene_col, rd,
-    group_col, control_group, q, nboot, ci, method, log_base, pseudocount, pair_ids,
-    groups_cached = NULL, transcript_map_cache = NULL) {
+    group_col, control_group, q, nboot, ci, method, log_base, pseudocount, pair_ids) {
     target_gene <- all_gene_names[gene_idx]
     gene_name <- target_gene
     gene_start <- Sys.time()
 
     tryCatch({
-        # OPTIMIZATION (March 2026): Use cached transcript map for O(1) lookup
-        # Falls back to original method if cache not provided
-        if (!is.null(transcript_map_cache) && target_gene %in% names(transcript_map_cache)) {
-            # Fast path: Use pre-computed mapping (1.5-2x faster)
-            transcript_indices <- transcript_map_cache[[target_gene]]
-            counts_gene <- rowSums(assay(se, "counts")[transcript_indices, , drop = FALSE])
-        } else {
-            # Fallback to original method
-            counts_gene <- .compute_aggregate_counts(se, target_gene, gene_col, rd)
-        }
+        # Aggregate transcript-level counts to gene-level
+        counts_gene <- .compute_aggregate_counts(se, target_gene, gene_col, rd)
 
         if (is.null(counts_gene) || length(counts_gene) == 0) {
             return(.make_error_result(gene_name, q, "No transcripts found for gene"))
         }
 
-        # OPTIMIZATION (March 2026): Use cached group vector (1.2-1.5x faster)
-        # Avoids se[[group_col]] extraction in each worker
-        if (!is.null(groups_cached)) {
-            groups <- groups_cached  # Direct assignment (fast)
-        } else {
-            groups <- se[[group_col]]  # Fallback extraction
-        }
+        # Extract group vector for sample grouping
+        groups <- se[[group_col]]
 
         group_counts <- .extract_group_counts_gene(counts_gene, groups, control_group)
         x <- group_counts$control
