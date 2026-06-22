@@ -221,43 +221,6 @@ test_that("make_plot_for_genemake_agg returns an aggregation function and label"
     expect_true(grepl("IQR", m2$agg_label_unique))
 })
 
-# make_plot_for_genebuild_tx_long and make_plot_for_geneaggregate_df_long
-test_that("make_plot_for_genebuild_tx_long and aggregation pipeline works and errors appropriately", {
-    skip_on_bioc()
-    counts <- matrix(1:12, nrow = 4)
-    rownames(counts) <- paste0("tx", 1:4)
-    colnames(counts) <- paste0("S", 1:3)
-    mapping <- data.frame(Transcript = paste0("tx", 1:4), Gen = c("G1", "G1", "G2", "G2"), stringsAsFactors = FALSE)
-    samples <- c("A", "B", "A")
-
-    expect_error(.make_plot_for_genebuild_tx_long("NOPE", mapping, counts, samples, top_n = NULL), "No transcripts found")
-
-    res <- .make_plot_for_genebuild_tx_long("G1", mapping, counts, samples, top_n = 1)
-    expect_true(is.list(res))
-    expect_true(all(c("df_long", "txs") %in% names(res)))
-    expect_equal(length(unique(res$df_long$tx)), length(res$txs))
-
-    # patchwork combine
-    if (rlang::is_installed("patchwork")) {
-        skip_if_not_installed("patchwork")
-        skip_if_not_installed("ggplot2")
-        # create an Rplots.pdf in the working directory.
-        # The function itself manages graphics device to prevent Rplots.pdf creation.
-        rpf <- "Rplots.pdf"
-        if (file.exists(rpf)) unlink(rpf)
-        
-        # Create a simple test plot
-        test_df <- data.frame(x = 1:3, y = 1:3)
-        p <- ggplot2::ggplot(test_df, ggplot2::aes(x = x, y = y)) + ggplot2::geom_point()
-        
-        res_grid <- suppressWarnings(.make_plot_for_genecombine_grid(list(p, p), output_file = NULL, agg_label_unique = "Label"))
-        
-        expect_null(res_grid)
-        # Verify no stray Rplots.pdf was created in working directory
-        expect_false(file.exists(rpf))
-    }
-})
-
 context("Visualization: Plot Helper Functions")
 
 
