@@ -405,3 +405,14 @@ test_that("Mixed index types are converted correctly", {
   expect_equal(nrow(se(subset_obj)), 5)
   expect_equal(ncol(se(subset_obj)), 5)
 })
+
+# ============================================================================
+# BUG FIX 5: Verify pairwise_results slot removed from TSENATAnalysis
+# ============================================================================
+
+test_that("BUG 5: TSENATAnalysis does not have pairwise_results slot", {
+  # The pairwise_results slot was removed as it was never read or written
+  slot_names <- methods::slotNames("TSENATAnalysis")
+  expect_false("pairwise_results" %in% slot_names,
+               info = "pairwise_results slot should have been removed from S4 class")
+})

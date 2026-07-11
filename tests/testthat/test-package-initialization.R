@@ -250,3 +250,21 @@ test_that("Package loading initializes correctly", {
 test_that("TSENAT package is properly attached", {
   expect_true("package:TSENAT" %in% search())
 })
+
+# ============================================================================
+# BUG FIX 6: LazyData is set to true
+# ============================================================================
+
+test_that("BUG 6: DESCRIPTION has LazyData=true", {
+  # Read source DESCRIPTION file
+  desc_path <- file.path(system.file(package = "TSENAT"), "..", "DESCRIPTION")
+  if (!file.exists(desc_path)) {
+    desc_path <- file.path(getwd(), "..", "DESCRIPTION")
+  }
+  skip_if_not(file.exists(desc_path), "DESCRIPTION file not found")
+  
+  desc <- read.dcf(desc_path)
+  lazy_val <- desc[1, "LazyData"]
+  expect_equal(unname(lazy_val), "true",
+               info = "LazyData should be 'true' for proper data loading")
+})

@@ -429,3 +429,22 @@ test_that("calculate_concordance() respects rank_method parameter", {
 
     expect_equal(result@metadata$method_concordance$rank_method, "rank_test")
 })
+
+# ============================================================================
+# BUG FIX 7: Warning when adjusted p-values are missing
+# ============================================================================
+
+test_that("BUG 7: calculate_concordance warns when adjusted p-values missing", {
+  analysis_sait <- test_analysis_concordance
+  analysis_rank <- test_analysis_concordance
+
+  analysis_sait@sait_results$sait_interaction <- 
+    data.frame(gene = paste0("GENE_", 1:5), p_interaction = runif(5))
+  analysis_rank@rank_test_results$rank_test <- 
+    data.frame(gene = paste0("GENE_", 1:5), p_value = runif(5))
+
+  expect_warning(
+    TSENAT::calculate_concordance(analysis_sait, analysis_rank, verbose = FALSE),
+    "Cannot compute Spearman correlation"
+  )
+})

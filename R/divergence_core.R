@@ -182,8 +182,7 @@
 #'   approaches for effect size comparability (S197 - DESeq2 independent filtering)
 #' - Bootstrap methodology (optional CIs): Papers Ramsay (2005), Springer Series in Statistics, S018, S030 validate
 #'   percentile and BCa bootstrap for entropy/divergence estimates with confidence level >= 0.95
-#' @noRd
-#' @details
+#' 
 #' **Reproducibility and RNG (Bioconductor-compliant):**
 #' For reproducible results with bootstrap CIs, use `set.seed()` before calling
 #' this function, following Bioconductor guidelines for RNG control.

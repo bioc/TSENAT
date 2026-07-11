@@ -22,6 +22,26 @@ test_that("Lazy-loading infrastructure exists", {
   expect_true(exists(".viz_status"))
 })
 
+# ============================================================================
+# BUG FIX 3: Verify no duplicate @noRd tags in lazy_load.R
+# ============================================================================
+
+test_that("BUG 3: lazy_load functions load without duplicate tag errors", {
+  # Functions should be properly registered in the namespace
+  # Duplicate @noRd tags in roxygen2 cause documentation build issues
+  expect_true(exists(".load_visualization_deps", where = asNamespace("TSENAT")))
+  expect_true(exists(".viz_available", where = asNamespace("TSENAT")))
+  
+  # Verify they are callable and return expected values
+  expect_true(is.function(get(".load_visualization_deps", envir = asNamespace("TSENAT"))))
+  expect_true(is.function(get(".viz_available", envir = asNamespace("TSENAT"))))
+  
+  # Test .viz_available returns logical
+  result <- .viz_available()
+  expect_is(result, "logical")
+  expect_true(length(result) == 1)
+})
+
 test_that(".viz_available reports lazy-loading state", {
   # Function should exist and be callable
   result <- TSENAT:::.viz_available()

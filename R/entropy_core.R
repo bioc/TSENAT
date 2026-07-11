@@ -56,9 +56,12 @@
         H <- -sum(p * log(p))/log(log_base)
     } else {
         # Tsallis entropy: (1 - sum(p^q)) / (q-1)
-        # Apply log_base transformation consistently with Shannon for cross-study comparability
+        # NOTE: log_base is NOT applied to Tsallis entropy, consistent with
+        # .entropy_single() and the standard mathematical definition.
+        # The Tsallis formula (1 - Σp^q)/(q-1) is scale-invariant and does
+        # not use a logarithm base. Only Shannon entropy (q→1 limit) uses
+        # log_base for cross-study comparability.
         H <- (1 - sum(p^q))/(q - 1)
-        H <- H / log(log_base)
     }
 
     # Normalize by maximum entropy if requested
@@ -69,9 +72,9 @@
         } else if (abs(q - 1) < q_tol) {
             H_max <- log(n)/log(log_base)
         } else {
-            # Tsallis: max entropy with log_base applied consistently
+            # Tsallis: max entropy (no log_base applied, consistent with
+            # .entropy_single() and standard Tsallis definition)
             H_max <- (1 - n^(1 - q))/(q - 1)
-            H_max <- H_max / log(log_base)
         }
 
         if (!is.na(H_max) && !is.nan(H_max) && H_max > 0 && is.finite(H_max)) {
@@ -184,7 +187,11 @@
     n <- length(p)
 
     # Calculate entropy using standardized core logic
-    if (abs(q - 1) < q_tol) {
+    if (q < q_tol) {
+        # Species richness (q=0): count species
+        p_nonzero <- p[p > 0]
+        entropy <- log(length(p_nonzero))/log(log_base)
+    } else if (abs(q - 1) < q_tol) {
         # Shannon entropy as q -> 1
         p_nonzero <- p[p > 0]
         if (length(p_nonzero) > 0) {

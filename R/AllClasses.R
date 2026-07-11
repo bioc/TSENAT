@@ -30,9 +30,6 @@
 #'     \item{\code{divergence_difference}}{Differential divergence comparison}
 #'   }
 #'
-#' @slot pairwise_results \code{list}. Pairwise group comparison results.
-#'   Results from running statistical tests for group comparisons.
-#'
 #' @slot rank_test_results \code{list}. Scheirer-Ray-Hare rank-based statistical
 #'   test results. Names correspond to q-values (e.g., 'q_0.5', 'q_1.0').
 #'   Computed by \code{calculate_srh()} as a non-parametric alternative
@@ -78,10 +75,10 @@
 #' @importFrom S4Vectors metadata
 #'
 setClass("TSENATAnalysis", slots = list(se = "SummarizedExperiment", config = "list",
-    diversity_results = "list", sait_results = "list", pairwise_results = "list", rank_test_results = "list",
+    diversity_results = "list", sait_results = "list", rank_test_results = "list",
     jackknife_results = "list", divergence_results = "list", plots = "list", metadata = "list"),
     prototype = list(config = list(), diversity_results = list(), sait_results = list(),
-        pairwise_results = list(), rank_test_results = list(), jackknife_results = list(),
+        rank_test_results = list(), jackknife_results = list(),
         divergence_results = list(), plots = list(), metadata = list(function_calls = character(0),
             function_timestamps = character(0))), validity = function(object) {
         # Check @se is SummarizedExperiment

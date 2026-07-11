@@ -922,3 +922,37 @@ test_that(".entropy_max computes Tsallis maximum correctly", {
   expected <- (1 - 2^-1) / 1
   expect_equal(H_max, expected, tolerance = 1e-10)
 })
+
+# ============================================================================
+# BUG FIX 8: Log base consistency between .entropy_core() and .entropy_single()
+# ============================================================================
+
+test_that("BUG 8: entropy_core and entropy_single return identical Tsallis values", {
+  counts <- c(5, 3, 2, 1)
+  log_base <- 10
+  
+  h_core <- TSENAT:::.entropy_core(counts / sum(counts), q = 2, norm = FALSE, log_base = log_base)
+  h_single <- TSENAT:::.entropy_single(counts, q = 2, norm = FALSE, log_base = log_base)
+  
+  expect_equal(h_core, h_single, tolerance = 1e-10)
+})
+
+test_that("BUG 8: entropy_core and entropy_single return identical Shannon values", {
+  counts <- c(5, 3, 2, 1)
+  log_base <- 10
+  
+  h_core <- TSENAT:::.entropy_core(counts / sum(counts), q = 1, norm = FALSE, log_base = log_base)
+  h_single <- TSENAT:::.entropy_single(counts, q = 1, norm = FALSE, log_base = log_base)
+  
+  expect_equal(h_core, h_single, tolerance = 1e-10)
+})
+
+test_that("BUG 8: entropy_core and entropy_single return identical species richness", {
+  counts <- c(5, 3, 2, 1)
+  log_base <- 2
+  
+  h_core <- TSENAT:::.entropy_core(counts / sum(counts), q = 0, norm = FALSE, log_base = log_base)
+  h_single <- TSENAT:::.entropy_single(counts, q = 0, norm = FALSE, log_base = log_base)
+  
+  expect_equal(h_core, h_single, tolerance = 1e-10)
+})
