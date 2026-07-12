@@ -155,20 +155,18 @@ test_that(".onLoad() registers all expected S3 print methods", {
     # print.tsenat_bootstrap_ci, print.tsenat_bootstrap_ci_list,
     # print.tsenat_divergence_bootstrap_ci, print.tsenat_jackknife,
     # print.tsenat_jackknife_list, print.rank_assumptions,
-    # print.rank_correlation_ci, print.gtable
-    
+    # print.rank_correlation_ci
+
     # Verify that these are registered
     expect_is(getS3method("print", "tsenat_bootstrap_ci"), "function")
     expect_is(getS3method("print", "tsenat_bootstrap_ci_list"), "function")
     expect_is(getS3method("print", "tsenat_divergence_bootstrap_ci"), "function")
     expect_is(getS3method("print", "tsenat_jackknife"), "function")
     expect_is(getS3method("print", "rank_assumptions"), "function")
-    expect_is(getS3method("print", "gtable"), "function")
-})
+    expect_is(getS3method("print", "rank_correlation_ci"), "function")
 
-test_that(".onLoad() registers summary methods for bootstrap CI objects", {
-    # The .onLoad() function should register these summary methods:
-    # summary.tsenat_bootstrap_ci, summary.tsenat_divergence_bootstrap_ci
+    # Ensure package does not export gtable print globally
+    expect_false("print.gtable" %in% getNamespaceExports("TSENAT"))
     
     expect_is(getS3method("summary", "tsenat_bootstrap_ci"), "function")
     expect_is(getS3method("summary", "tsenat_divergence_bootstrap_ci"), "function")

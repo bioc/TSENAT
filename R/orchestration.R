@@ -271,7 +271,7 @@ TSENAT <- function(analysis, output_dir = "tsenat_outputs", save_output = TRUE, 
 
 #' @noRd
 `%||%` <- function(x, y) {
-    if (is.null(x))
+    if (is.null(x) || (length(x) == 1 && is.na(x)))
         y else x
 }
 

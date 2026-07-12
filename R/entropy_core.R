@@ -45,9 +45,9 @@
     # Normalize to sum to 1 (handle numerical errors)
     p <- p_nonzero/sum(p_nonzero)
 
-    # Species richness (q=0): just count species
+    # Species richness (q=0): count species directly
     if (q < q_tol) {
-        H <- log(length(p))/log(log_base)
+        H <- length(p)
         return(H)
     }
 
@@ -140,8 +140,8 @@
         return(NA_real_)
 
     if (q < q_tol) {
-        # Species richness max: log(n)
-        H_max <- (log(n_species) - 1)/log(log_base)
+        # Species richness max: total number of species
+        H_max <- n_species
     } else if (abs(q - 1) < q_tol) {
         # Shannon max: log(n)
         H_max <- log(n_species)/log(log_base)
@@ -188,9 +188,9 @@
 
     # Calculate entropy using standardized core logic
     if (q < q_tol) {
-        # Species richness (q=0): count species
+        # Species richness (q=0): count species directly
         p_nonzero <- p[p > 0]
-        entropy <- log(length(p_nonzero))/log(log_base)
+        entropy <- length(p_nonzero)
     } else if (abs(q - 1) < q_tol) {
         # Shannon entropy as q -> 1
         p_nonzero <- p[p > 0]

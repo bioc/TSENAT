@@ -735,12 +735,14 @@
 .prepare_diversity_metadata <- function(x, result, original_x, genes, q, gene_names = NULL) {
     # Get gene IDs from first column of result
     gene_ids <- as.character(result[, 1])
-    row_ids <- if (!is.null(gene_names))
+    gene_names_final <- if (!is.null(gene_names) && length(gene_names) == length(gene_ids))
+        gene_names else rep(NA_character_, length(gene_ids))
+    row_ids <- if (!is.null(gene_names) && length(gene_names) == length(gene_ids))
         gene_names else gene_ids
 
     # Create rowData with row_ids as rownames (not gene_ids)
     result_rowData <- data.frame(gene_id = gene_ids, row.names = row_ids)
-    result_rowData$gene_name <- gene_names
+    result_rowData$gene_name <- gene_names_final
 
     if (length(q) > 1) {
         col_split <- do.call(rbind, strsplit(colnames(result)[-1], "_q="))

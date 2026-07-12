@@ -96,8 +96,7 @@
 
 
 #' @noRd
-#' @exportS3Method
-print.gtable <- function(x, ...) {
+.tsenaT_print_gtable <- function(x, ...) {
     grid::grid.draw(x)
     invisible(x)
 }

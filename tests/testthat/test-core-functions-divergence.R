@@ -669,6 +669,28 @@ test_that("calculate_divergence performs bootstrap with auto nboot", {
   expect_true(methods::is(result, "SummarizedExperiment"))
 })
 
+test_that("calculate_divergence does not include CI assays when bootstrap is FALSE", {
+  se <- create_test_se_simple(
+    n_genes = 2,
+    n_samples = 8,
+    control_n = 3,
+    group_col_name = "sample_type"
+  )
+
+  result <- .calculate_divergence(
+    se,
+    group_col = "sample_type",
+    control_group = "Control",
+    q = c(0.5, 1),
+    bootstrap = FALSE,
+    progress = FALSE
+  )
+
+  expect_true(methods::is(result, "SummarizedExperiment"))
+  expect_false("ci_lower" %in% SummarizedExperiment::assayNames(result))
+  expect_false("ci_upper" %in% SummarizedExperiment::assayNames(result))
+})
+
 test_that("calculate_divergence applies normalization (range)", {
   se <- create_test_se_simple(
     n_genes = 2,

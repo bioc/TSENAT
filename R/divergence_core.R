@@ -587,7 +587,8 @@
 
     result_se <- .construct_result_se(assay_matrix = assay_matrix, row_data_df = row_data_df,
         q_vals = q, elapsed = elapsed, nboot = nboot, ci = ci, method = method, norm = norm,
-        use_parallel = use_parallel, num_genes = num_genes, num_errors = num_errors)
+        use_parallel = use_parallel, num_genes = num_genes, num_errors = num_errors,
+        bootstrap = bootstrap)
 
     return(result_se)
 }
@@ -1027,12 +1028,12 @@
 #' Builds SE with assays, rowData, colData, and metadata
 #' @noRd
 .construct_result_se <- function(assay_matrix, row_data_df, q_vals, elapsed, nboot,
-    ci, method, norm, use_parallel, num_genes, num_errors) {
+    ci, method, norm, use_parallel, num_genes, num_errors, bootstrap = FALSE) {
     assays_list <- list(divergence = assay_matrix)
 
     # Extract bootstrap CI bounds if available (stored in rowData) When
     # bootstrap was used, CI bounds are in columns: lower_ci_q*, upper_ci_q*
-    if (identical(nboot, "auto") || (is.numeric(nboot) && nboot > 0)) {
+    if (isTRUE(bootstrap) && (identical(nboot, "auto") || (is.numeric(nboot) && nboot > 0))) {
         # Initialize CI assay matrices
         ci_lower_matrix <- matrix(NA_real_, nrow = nrow(assay_matrix), ncol = ncol(assay_matrix),
             dimnames = dimnames(assay_matrix))

@@ -2887,37 +2887,36 @@ test_that(".apply_diversity_post_hoc_norm handles norm='none'", {
 # ============================================================================
 # BUG FIX #1: Species Richness (q=0) Formula Correction (May 2026)
 # ============================================================================
-# Reference: Rényi (1961), Hill (1973) - species richness is log(n), not log(n)-1
-# Bug: Previous code computed (log(n) - 1)/log(log_base)
-# Fix: Now correctly computes log(n)/log(log_base)
+# Reference: Hill (1973), I018/I019 - species richness at q=0 is the total number
+# of species in the sample, not a logarithmic transform.
+# Bug: Previous code computed log-scaled species richness.
+# Fix: Now correctly returns the raw species count.
 
-test_that("[BUG #1] Species richness (q=0) correctly computes log(n), not log(n)-1", {
+test_that("[BUG #1] Species richness (q=0) returns the total species count", {
   # Uniform distribution with 4 species
   proportions <- c(0.25, 0.25, 0.25, 0.25)
+  expected_n <- 4
   
-  # Test with natural log
+  # Test with natural log base (should be ignored for q=0)
   result_e <- .entropy_core(proportions, q = 0, log_base = exp(1))
-  expected_e <- log(4)  # Should equal log(4) ≈ 1.3863
-  expect_equal(result_e, expected_e, tolerance = 1e-6,
+  expect_equal(result_e, expected_n,
                info = "Species richness with base e")
   
-  # Test with log2
+  # Test with log2 base (base should not affect q=0 richness)
   result_2 <- .entropy_core(proportions, q = 0, log_base = 2)
-  expected_2 <- log(4) / log(2)  # Should equal 2
-  expect_equal(result_2, expected_2, tolerance = 1e-6,
+  expect_equal(result_2, expected_n,
                info = "Species richness with base 2")
   
-  # Test with log10
+  # Test with log10 base
   result_10 <- .entropy_core(proportions, q = 0, log_base = 10)
-  expected_10 <- log(4) / log(10)
-  expect_equal(result_10, expected_10, tolerance = 1e-6,
+  expect_equal(result_10, expected_n,
                info = "Species richness with base 10")
   
   # Verify q=0 increases with more species
   proportions_8 <- rep(1/8, 8)
   result_8 <- .entropy_core(proportions_8, q = 0, log_base = exp(1))
   expect_gt(result_8, result_e)
-  expect_equal(result_8, log(8), tolerance = 1e-6)
+  expect_equal(result_8, 8)
 })
 
 # ============================================================================
@@ -2993,12 +2992,12 @@ test_that("[BUG #5] Invalid effective_length raises error instead of silent conv
 # EDGE CASES: Formula accuracy
 # ============================================================================
 
-test_that("Edge cases: Formula accuracy for q close to 0", {
+test_that("Edge cases: q very close to 0 returns species richness", {
   proportions <- c(0.5, 0.3, 0.2)
   
-  # Test q very close to 0
+  # q below the q_tol threshold should be treated as q=0 species richness
   result_q_near_0 <- .entropy_core(proportions, q = 1e-7, log_base = exp(1))
-  expect_equal(result_q_near_0, log(3), tolerance = 1e-4)
+  expect_equal(result_q_near_0, 3, tolerance = 1e-4)
 })
 
 test_that("Edge cases: Very skewed distributions", {
