@@ -16,7 +16,7 @@ library(SummarizedExperiment)
 # TEST SUITE 1: print.gtable() - Grid table printing
 # ============================================================================
 
-test_that("print.gtable() renders gtable object", {
+test_that("TSENAT internal gtable helper renders gtable object", {
     skip_if_not_installed("gtable")
     skip_if_not_installed("grid")
     
@@ -26,16 +26,16 @@ test_that("print.gtable() renders gtable object", {
     gt <- gtable::gtable_add_grob(gt, grid::textGrob("A"), t=1, l=1)
     gt <- gtable::gtable_add_grob(gt, grid::textGrob("B"), t=2, l=1)
     
-    # Test that print returns invisibly
+    # Test that helper returns gtable invisibly
     output <- capture.output(
-        result <- print(gt)
+        result <- TSENAT:::.print_gtable(gt)
     )
     
     # Should return gtable invisibly
     expect_identical(result, gt)
 })
 
-test_that("print.gtable() handles NULL grobs gracefully", {
+test_that("TSENAT internal gtable helper handles NULL grobs gracefully", {
     skip_if_not_installed("gtable")
     
     # Create empty gtable
@@ -46,11 +46,11 @@ test_that("print.gtable() handles NULL grobs gracefully", {
     
     # Should not error
     expect_silent(
-        capture.output(print(gt))
+        capture.output(TSENAT:::.print_gtable(gt))
     )
 })
 
-test_that("print.gtable() accepts ellipsis arguments", {
+test_that("TSENAT internal gtable helper accepts ellipsis arguments", {
     skip_if_not_installed("gtable")
     
     gt <- gtable::gtable(widths = grid::unit(1, "cm"),
@@ -59,7 +59,7 @@ test_that("print.gtable() accepts ellipsis arguments", {
     
     # Should accept ... without error
     output <- capture.output(
-        result <- print(gt, some_arg = "ignored")
+        result <- TSENAT:::.print_gtable(gt, some_arg = "ignored")
     )
     
     expect_identical(result, gt)
@@ -253,22 +253,28 @@ test_that("viz_rcpp_status() has correct format for output", {
 # TEST SUITE 5: Integration tests for print methods
 # ============================================================================
 
-test_that("All S3 print methods are registered", {
-    # These methods should be available through S3 dispatch
-    expect_is(getS3method("print", "gtable"), "function")
+test_that("Internal gtable helper is available", {
+    # The package should include an internal helper for gtable rendering,
+    # but it should not export a global print.gtable method.
+    expect_true(exists(".print_gtable", where = asNamespace("TSENAT"), inherits = FALSE))
+    expect_is(get(".print_gtable", envir = asNamespace("TSENAT")), "function")
+    expect_false("print.gtable" %in% getNamespaceExports("TSENAT"))
     expect_is(getS3method("print", "assumptions_text"), "function")
     expect_is(getS3method("print", "concordance_text"), "function")
 })
 
-test_that("S3 methods dispatch correctly", {
-    # Test that S3 dispatch works for each type
-    
-    # gtable dispatch
+test_that("Internal gtable helper works correctly", {
+    skip_if_not_installed("gtable")
+    skip_if_not_installed("grid")
+
     gt <- gtable::gtable(widths = grid::unit(1, "cm"),
                          heights = grid::unit(1, "cm"))
     gt <- gtable::gtable_add_grob(gt, grid::textGrob("Test"), t=1, l=1)
-    expect_identical(print(gt), gt)
-    
+
+    expect_identical(TSENAT:::.print_gtable(gt), gt)
+})
+
+test_that("S3 methods dispatch correctly", {
     # assumptions_text dispatch
     assume_text <- "Assumptions OK"
     class(assume_text) <- c("assumptions_text", "character")

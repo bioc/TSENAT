@@ -148,8 +148,8 @@ test_that("estimate_pseudocount scales appropriately with sequencing depth", {
 
 context("Diversity Normalization: Standardized Metrics (Feature #7)")
 
-# Load test data
-load(system.file("data", "readcounts.RData", package = "TSENAT"))
+ # Load test data
+data("readcounts", package = "TSENAT")
 rc <- as.matrix(readcounts[1:50, , drop = FALSE])
 mode(rc) <- "numeric"
 gs <- rownames(rc)

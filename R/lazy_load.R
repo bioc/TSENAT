@@ -39,7 +39,6 @@
 #' operation.
 #'
 #' @noRd
-#' @noRd
 .load_visualization_deps <- function(strict = TRUE, verbose = FALSE) {
     # Check if already loaded using package options (safer than namespace
     # binding)
@@ -74,7 +73,6 @@
 #'
 #' @return logical. TRUE if visualization packages are loaded, FALSE otherwise.
 #'
-#' @noRd
 #' @noRd
 .viz_available <- function() {
     isTRUE(getOption("tsenat.viz_deps_loaded", default = FALSE))

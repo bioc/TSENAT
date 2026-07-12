@@ -2887,65 +2887,64 @@ test_that(".apply_diversity_post_hoc_norm handles norm='none'", {
 # ============================================================================
 # BUG FIX #1: Species Richness (q=0) Formula Correction (May 2026)
 # ============================================================================
-# Reference: Rényi (1961), Hill (1973) - species richness is log(n), not log(n)-1
-# Bug: Previous code computed (log(n) - 1)/log(log_base)
-# Fix: Now correctly computes log(n)/log(log_base)
+# Reference: Hill (1973), I018/I019 - species richness at q=0 is the total number
+# of species in the sample, not a logarithmic transform.
+# Bug: Previous code computed log-scaled species richness.
+# Fix: Now correctly returns the raw species count.
 
-test_that("[BUG #1] Species richness (q=0) correctly computes log(n), not log(n)-1", {
+test_that("[BUG #1] Species richness (q=0) returns the total species count", {
   # Uniform distribution with 4 species
   proportions <- c(0.25, 0.25, 0.25, 0.25)
+  expected_n <- 4
   
-  # Test with natural log
+  # Test with natural log base (should be ignored for q=0)
   result_e <- .entropy_core(proportions, q = 0, log_base = exp(1))
-  expected_e <- log(4)  # Should equal log(4) ≈ 1.3863
-  expect_equal(result_e, expected_e, tolerance = 1e-6,
+  expect_equal(result_e, expected_n,
                info = "Species richness with base e")
   
-  # Test with log2
+  # Test with log2 base (base should not affect q=0 richness)
   result_2 <- .entropy_core(proportions, q = 0, log_base = 2)
-  expected_2 <- log(4) / log(2)  # Should equal 2
-  expect_equal(result_2, expected_2, tolerance = 1e-6,
+  expect_equal(result_2, expected_n,
                info = "Species richness with base 2")
   
-  # Test with log10
+  # Test with log10 base
   result_10 <- .entropy_core(proportions, q = 0, log_base = 10)
-  expected_10 <- log(4) / log(10)
-  expect_equal(result_10, expected_10, tolerance = 1e-6,
+  expect_equal(result_10, expected_n,
                info = "Species richness with base 10")
   
   # Verify q=0 increases with more species
   proportions_8 <- rep(1/8, 8)
   result_8 <- .entropy_core(proportions_8, q = 0, log_base = exp(1))
   expect_gt(result_8, result_e)
-  expect_equal(result_8, log(8), tolerance = 1e-6)
+  expect_equal(result_8, 8)
 })
 
 # ============================================================================
 # BUG FIX #2: Tsallis Entropy log_base Consistency (May 2026)
 # ============================================================================
 # Reference: Tsallis (1993), Anastasiadis (2012)
-# Bug: Shannon (q=1) applied log_base, but Tsallis (q≠1) did not
-# Fix: Now applies log_base consistently to both for cross-study comparability
+# Bug: Shannon (q=1) applied log_base, but Tsallis (q≠1) is scale-invariant
+# Fix: Tsallis entropy remains independent of log_base for q != 1
 
-test_that("[BUG #2] Tsallis log_base applied consistently for cross-study comparability", {
+test_that("[BUG #2] Tsallis entropy is independent of log_base for q != 1", {
   proportions <- c(0.5, 0.3, 0.2)
   q <- 1.5
-  
+
   # Calculate with different log bases
   result_e <- .entropy_core(proportions, q = q, log_base = exp(1))
   result_2 <- .entropy_core(proportions, q = q, log_base = 2)
-  
-  # When changing log bases: H_2 / H_e = log(e) / log(2) = 1 / log(2)
-  # because log_2(x) = log_e(x) / log_e(2), so entropy scales inversely
-  ratio <- result_2 / result_e
-  expected_ratio <- log(exp(1)) / log(2)  # = 1 / log(2) ≈ 1.44
-  expect_equal(ratio, expected_ratio, tolerance = 1e-6,
-               info = "Tsallis log_base scaling applied")
-  
-  # Shannon should show same pattern
+  result_10 <- .entropy_core(proportions, q = q, log_base = 10)
+
+  expect_equal(result_2, result_e, tolerance = 1e-12,
+               info = "Tsallis entropy should be independent of log_base for q != 1")
+  expect_equal(result_10, result_e, tolerance = 1e-12,
+               info = "Tsallis entropy should be independent of log_base for q != 1")
+
+  # Shannon should still show log_base scaling
   result_shannon_e <- .entropy_core(proportions, q = 1.0, log_base = exp(1))
   result_shannon_2 <- .entropy_core(proportions, q = 1.0, log_base = 2)
   ratio_shannon <- result_shannon_2 / result_shannon_e
+  expected_ratio <- log(exp(1)) / log(2)
   expect_equal(ratio_shannon, expected_ratio, tolerance = 1e-6,
                info = "Shannon log_base scaling applied")
 })
@@ -2993,12 +2992,12 @@ test_that("[BUG #5] Invalid effective_length raises error instead of silent conv
 # EDGE CASES: Formula accuracy
 # ============================================================================
 
-test_that("Edge cases: Formula accuracy for q close to 0", {
+test_that("Edge cases: q very close to 0 returns species richness", {
   proportions <- c(0.5, 0.3, 0.2)
   
-  # Test q very close to 0
+  # q below the q_tol threshold should be treated as q=0 species richness
   result_q_near_0 <- .entropy_core(proportions, q = 1e-7, log_base = exp(1))
-  expect_equal(result_q_near_0, log(3), tolerance = 1e-4)
+  expect_equal(result_q_near_0, 3, tolerance = 1e-4)
 })
 
 test_that("Edge cases: Very skewed distributions", {
@@ -3020,13 +3019,10 @@ test_that("Edge cases: log_base consistency across scales", {
     .entropy_core(proportions, q = q, log_base = b)
   })
   
-  # Verify ratios are consistent
-  # When converting log bases: H_new / H_old = log(old_base) / log(new_base)
-  # because log_new(x) = log_old(x) / log_old(new_base)
-  for (i in 1:(length(bases) - 1)) {
-    ratio <- results[i + 1] / results[i]
-    expected <- log(bases[i]) / log(bases[i + 1])
-    expect_equal(ratio, expected, tolerance = 1e-6,
-                 info = paste("Ratio consistent for bases", bases[i], "and", bases[i + 1]))
-  }
+  # Verify ratios are consistent for Shannon only
+  # Tsallis entropy is independent of log base when q != 1
+  expect_equal(results[1], results[2], tolerance = 1e-12,
+               info = paste("Tsallis entropy should be independent of log_base for q != 1 (bases", bases[1], "and", bases[2], ")"))
+  expect_equal(results[2], results[3], tolerance = 1e-12,
+               info = paste("Tsallis entropy should be independent of log_base for q != 1 (bases", bases[2], "and", bases[3], ")"))
 })

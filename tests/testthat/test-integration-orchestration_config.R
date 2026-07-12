@@ -1623,7 +1623,6 @@ test_that("S3 method registration is complete per NAMESPACE", {
     expected_s3methods <- c(
         "print,assumptions_text",
         "print,concordance_text",
-        "print,gtable",
         "print,rank_assumptions",
         "print,rank_correlation_ci",
         "print,tsenat_bootstrap_ci",

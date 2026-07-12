@@ -198,15 +198,10 @@ setGeneric("setConfigValue", function(object, key, value) standardGeneric("setCo
 #' @export
 setGeneric("se", function(object) standardGeneric("se"))
 
-#' @noRd
-if (!isGeneric("metadata")) {
-    setGeneric("metadata", function(x, key = NULL) standardGeneric("metadata"))
-}
-
 #' Set metadata for TSENATAnalysis object
 #'
-# metadata<- replacement method for TSENATAnalysis 
-# Uses the S4Vectors generic (no need to define our own)
+#' metadata<- replacement method for TSENATAnalysis 
+#' Uses the S4Vectors generic (no need to define our own)
 #' @param x TSENATAnalysis object
 #' @param value Replacement value for metadata (typically a list)
 #' @return TSENATAnalysis object with updated metadata

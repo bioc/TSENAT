@@ -18,7 +18,6 @@ NULL
     registerS3method("print", "tsenat_jackknife_list", print.tsenat_jackknife_list)
     registerS3method("print", "rank_assumptions", print.rank_assumptions)
     registerS3method("print", "rank_correlation_ci", print.rank_correlation_ci)
-    registerS3method("print", "gtable", print.gtable)
     registerS3method("summary", "tsenat_bootstrap_ci", summary.tsenat_bootstrap_ci)
     registerS3method("summary", "tsenat_divergence_bootstrap_ci", summary.tsenat_divergence_bootstrap_ci)
 
