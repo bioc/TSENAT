@@ -28,7 +28,7 @@ test_that("TSENAT internal gtable helper renders gtable object", {
     
     # Test that helper returns gtable invisibly
     output <- capture.output(
-        result <- TSENAT:::.tsenaT_print_gtable(gt)
+        result <- TSENAT:::.print_gtable(gt)
     )
     
     # Should return gtable invisibly
@@ -46,7 +46,7 @@ test_that("TSENAT internal gtable helper handles NULL grobs gracefully", {
     
     # Should not error
     expect_silent(
-        capture.output(TSENAT:::.tsenaT_print_gtable(gt))
+        capture.output(TSENAT:::.print_gtable(gt))
     )
 })
 
@@ -59,7 +59,7 @@ test_that("TSENAT internal gtable helper accepts ellipsis arguments", {
     
     # Should accept ... without error
     output <- capture.output(
-        result <- TSENAT:::.tsenaT_print_gtable(gt, some_arg = "ignored")
+        result <- TSENAT:::.print_gtable(gt, some_arg = "ignored")
     )
     
     expect_identical(result, gt)
@@ -256,8 +256,8 @@ test_that("viz_rcpp_status() has correct format for output", {
 test_that("Internal gtable helper is available", {
     # The package should include an internal helper for gtable rendering,
     # but it should not export a global print.gtable method.
-    expect_true(exists(".tsenaT_print_gtable", where = asNamespace("TSENAT"), inherits = FALSE))
-    expect_is(get(".tsenaT_print_gtable", envir = asNamespace("TSENAT")), "function")
+    expect_true(exists(".print_gtable", where = asNamespace("TSENAT"), inherits = FALSE))
+    expect_is(get(".print_gtable", envir = asNamespace("TSENAT")), "function")
     expect_false("print.gtable" %in% getNamespaceExports("TSENAT"))
     expect_is(getS3method("print", "assumptions_text"), "function")
     expect_is(getS3method("print", "concordance_text"), "function")
@@ -271,7 +271,7 @@ test_that("Internal gtable helper works correctly", {
                          heights = grid::unit(1, "cm"))
     gt <- gtable::gtable_add_grob(gt, grid::textGrob("Test"), t=1, l=1)
 
-    expect_identical(TSENAT:::.tsenaT_print_gtable(gt), gt)
+    expect_identical(TSENAT:::.print_gtable(gt), gt)
 })
 
 test_that("S3 methods dispatch correctly", {

@@ -96,7 +96,7 @@
 
 
 #' @noRd
-.tsenaT_print_gtable <- function(x, ...) {
+.print_gtable <- function(x, ...) {
     grid::grid.draw(x)
     invisible(x)
 }
