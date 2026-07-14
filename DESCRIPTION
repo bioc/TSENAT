@@ -1,7 +1,7 @@
 Package: TSENAT
 Type: Package
 Title: Tsallis Entropy Analysis Toolbox
-Version: 0.99.26
+Version: 0.99.27
 Authors@R: person(given = "Cristóbal", family = "Gallardo Alba", role = c("aut", "cre"), email = "gallardoalba@pm.me", comment=c(ORCID="0000-0002-5752-2155"))
 Description: Quantifies and models isoform-usage complexity in RNA-seq data using 
     Tsallis entropy, a scale-dependent diversity measure. By tuning the entropic index 
@@ -12,7 +12,7 @@ Description: Quantifies and models isoform-usage complexity in RNA-seq data usin
     scale-dependent complexity via q-curves.
 License: GPL (>= 3) + file LICENSE
 Encoding: UTF-8
-LazyData: true
+LazyData: false
 Depends: R (>= 4.5.0)
 Imports: SummarizedExperiment, methods, stats, ggplot2, withr, BiocParallel, matrixStats, mgcv, geepack, pheatmap, cowplot, dplyr, tidyr, S4Vectors, rlang, Rcpp, memoise, digest, readr
 LinkingTo: Rcpp, RcppArmadillo
