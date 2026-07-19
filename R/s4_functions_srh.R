@@ -11,7 +11,7 @@
 #'   by condition (main discovery goal)
 #' - **Multi-q Analysis**: Combines diversity results for multiple q-values into
 #'   a single SummarizedExperiment for joint hypothesis testing
-#' - **Rank-Based Statistics**: Scheirer-Ray-Hare test (two-way ANOVA on ranked data,
+#' - **Rank-Based Statistics**: Scheirer-Ray-Hare test (two-way ANOVA on ranked data)
 #' - **Scheirer-Ray-Hare Test**: Two-way non-parametric ANOVA on ranks
 #' - **Multiple Testing Correction**: Hochberg, Benjamini-Yekutieli, or permutation
 #'   (Westfall-Young) procedures
@@ -91,12 +91,11 @@
 #'  when wy_randomizations='auto' (default: 10000).
 #' @param ... Additional arguments passed to the base \code{.calculate_srh()} function.
 #'
-#' @return Modified TSENATAnalysis with interaction results in @sait_results.
+#' @return Modified TSENATAnalysis with interaction results in @rank_test_results.
 #'
 #' @details
 #' Analyzes how gene interactions change across q-value spectrum using
-#' rank-based
-#' (Scheirer-Ray-Hare) or parametric (GAM) statistical tests.
+#' rank-based (Scheirer-Ray-Hare) statistical tests.
 #'
 #' **Parameter resolution priority** (explicit > @config > default/auto-detect):
 #' \itemize{
@@ -107,8 +106,6 @@
 #'   \item \code{multicorr}:
 #'  explicit arg > \code{@config$multicorr} > 'hochberg'
 #'   \item \code{nthreads}: explicit arg > \code{@config$nthreads} > 1 (default)
-#'   \item \code{test}:
-#'  explicit arg > \code{@config$test} > 'auto' (auto-selection)
 #'   \item \code{nperm_mode}:
 #'  explicit arg > \code{@config$nperm_mode} > 'standard'
 #' }
@@ -208,7 +205,8 @@ calculate_srh <- function(analysis, condition_col, output_file = NULL, paired = 
 
     # condition_col is REQUIRED for Q x Condition interaction testing (Q main effect support removed March 2026)
     if (missing(condition_col) || is.null(condition_col)) {
-        if (!is.null(analysis@config) && "condition_col" %in% names(analysis@config)) {
+        if (!is.null(analysis@config) && "condition_col" %in% names(analysis@config) &&
+            !is.null(analysis@config$condition_col)) {
             condition_col <- analysis@config$condition_col
             if (verbose)
                 message("Using condition_col='", condition_col, "' from @config")

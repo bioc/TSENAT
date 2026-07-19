@@ -99,7 +99,7 @@ Default:  FALSE.}
 \item{...}{Additional arguments passed to the base \code{.calculate_srh()} function.}
 }
 \value{
-Modified TSENATAnalysis with interaction results in @sait_results.
+Modified TSENATAnalysis with interaction results in @rank_test_results.
 }
 \description{
 Wrapper around [.calculate_srh()] that manages TSENATAnalysis object.
@@ -114,7 +114,7 @@ This detects disease-relevant or condition-specific isoform switching patterns.
   by condition (main discovery goal)
 - **Multi-q Analysis**: Combines diversity results for multiple q-values into
   a single SummarizedExperiment for joint hypothesis testing
-- **Rank-Based Statistics**: Scheirer-Ray-Hare test (two-way ANOVA on ranked data,
+- **Rank-Based Statistics**: Scheirer-Ray-Hare test (two-way ANOVA on ranked data)
 - **Scheirer-Ray-Hare Test**: Two-way non-parametric ANOVA on ranks
 - **Multiple Testing Correction**: Hochberg, Benjamini-Yekutieli, or permutation
   (Westfall-Young) procedures
@@ -145,8 +145,7 @@ For condition-specific q-dependent genes:
 
 
 Analyzes how gene interactions change across q-value spectrum using
-rank-based
-(Scheirer-Ray-Hare) or parametric (GAM) statistical tests.
+rank-based (Scheirer-Ray-Hare) statistical tests.
 
 **Parameter resolution priority** (explicit > @config > default/auto-detect):
 \itemize{
@@ -157,8 +156,6 @@ rank-based
   \item \code{multicorr}:
  explicit arg > \code{@config$multicorr} > 'hochberg'
   \item \code{nthreads}: explicit arg > \code{@config$nthreads} > 1 (default)
-  \item \code{test}:
- explicit arg > \code{@config$test} > 'auto' (auto-selection)
   \item \code{nperm_mode}:
  explicit arg > \code{@config$nperm_mode} > 'standard'
 }
