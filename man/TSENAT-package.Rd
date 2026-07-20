@@ -179,11 +179,11 @@ or accessor methods \code{\link{se}}, \code{\link[S4Vectors]{metadata<-}}, and \
 \code{\link{build_analysis}} for creating TSENATAnalysis objects.
 }
 \author{
-\strong{Maintainer}: Cristóbal Gallardo \email{gallardoalba@pm.me} (\href{https://orcid.org/0000-0002-5752-2155}{ORCID})
+\strong{Maintainer}: Cristóbal Gallardo Alba \email{gallardoalba@pm.me} (\href{https://orcid.org/0000-0002-5752-2155}{ORCID})
 
 Authors:
 \itemize{
-  \item Cristóbal Gallardo \email{gallardoalba@pm.me} (\href{https://orcid.org/0000-0002-5752-2155}{ORCID})
+  \item Cristóbal Gallardo Alba \email{gallardoalba@pm.me} (\href{https://orcid.org/0000-0002-5752-2155}{ORCID})
 }
 
 }

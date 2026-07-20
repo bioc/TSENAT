@@ -258,13 +258,22 @@ test_that("calculate_srh auto-selects appropriate test method", {
 test_that("calculate_srh requires condition_col argument", {
     analysis <- setup_rank_test_analysis(n_genes = 10, n_samples = 8)
     
-    # Calling without condition_col should not error (defaults to "condition")
-    # but should work if condition column exists in metadata
+    # Calling without condition_col should use condition_col from @config
     result <- calculate_srh(analysis)
     expect_is(result, "TSENATAnalysis")
     
     # Invalid condition_col should error
     expect_error(calculate_srh(analysis, condition_col = "nonexistent"))
+})
+
+test_that("calculate_srh errors when condition_col is missing and not configured", {
+    analysis <- setup_rank_test_analysis(n_genes = 10, n_samples = 8)
+    analysis@config$condition_col <- NULL
+
+    expect_error(
+        calculate_srh(analysis),
+        "condition_col.*REQUIRED|Specify condition_col argument or set analysis@config\\$condition_col"
+    )
 })
 
 # ============================================================================
