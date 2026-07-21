@@ -147,13 +147,21 @@ auto_detect_column <- function(available_cols, config_list = NULL, config_key = 
         }
     }
 
-    # Fallback: return default_fallback
+    # Fallback: return default_fallback if it is present in available columns
     if (!is.null(default_fallback)) {
-        if (verbose && !is.null(param_name)) {
-            message(sprintf("[auto_detect_column] Using fallback for %s = %s", param_name,
-                default_fallback))
+        if (default_fallback %in% available_cols) {
+            if (verbose && !is.null(param_name)) {
+                message(sprintf("[auto_detect_column] Using fallback for %s = %s", param_name,
+                  default_fallback))
+            }
+            return(default_fallback)
         }
-        return(default_fallback)
+
+        if (verbose && !is.null(param_name)) {
+            message(sprintf("[auto_detect_column] default_fallback '%s' for %s is not available; returning NULL",
+                default_fallback, param_name))
+        }
+        return(NULL)
     }
 
     return(NULL)

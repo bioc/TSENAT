@@ -454,6 +454,17 @@ test_that("auto_detect_column ignores config value not in available_cols", {
     expect_equal(result, "group")  # Config ignored, uses priority candidates
 })
 
+test_that("auto_detect_column ignores default_fallback not in available_cols", {
+    available_cols <- c("sample_id", "group")
+    result <- auto_detect_column(
+        available_cols = available_cols,
+        priority_candidates = c("condition"),
+        default_fallback = "foo"
+    )
+    
+    expect_null(result)
+})
+
 test_that("auto_detect_column sends verbose messages", {
     available_cols <- c("condition", "group")
     priority_candidates <- c("condition")

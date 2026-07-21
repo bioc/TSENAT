@@ -263,7 +263,7 @@ calculate_sait <- function(analysis, fdr_threshold = NULL, formula = NULL, condi
         cd_cols <- colnames(colData(analysis@se))
         condition_col <- auto_detect_column(cd_cols, config_list = analysis@config,
             config_key = "condition_col", priority_candidates = c("condition", "sample_type",
-                "group", "treatment"), default_fallback = NULL, verbose = FALSE,
+                "group", "treatment"), default_fallback = NULL, verbose = verbose,
             param_name = "condition_col")
     }
 
@@ -279,15 +279,14 @@ calculate_sait <- function(analysis, fdr_threshold = NULL, formula = NULL, condi
     # Note: 'paired' is already resolved by calling function (calculate_sait) to
     # avoid duplicate resolution. Use as-is.
 
-    # Log condition_col info
+    # Fail fast if condition_col was not found
     if (is.null(condition_col)) {
         cd_cols <- colnames(colData(analysis@se))
-        if (length(cd_cols) > 0) {
-            message("condition_col not specified. Available columns: ", paste(cd_cols,
-                collapse = ", "))
-        } else {
-            message("condition_col not specified and colData is empty. ", "Will be determined by .calculate_sait().")
-        }
+        stop("[calculate_sait] condition_col is required for SAIT interaction analysis. ",
+            "Could not auto-detect a valid condition column from colData. Available columns: ",
+            paste(cd_cols, collapse = ", "),
+            ".\n\nSOLUTION: Set @config$condition_col or pass explicit condition_col= parameter.",
+            call. = FALSE)
     }
 
     list(condition_col = condition_col, method = method, subject_col = subject_col,

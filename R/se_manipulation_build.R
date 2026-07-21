@@ -203,7 +203,7 @@
 #' @title Get Gene IDs from SummarizedExperiment rowData
 #'
 #' @description Internal helper function to safely access gene ID information
-#' from a SummarizedExperiment's rowData.
+#' from a SummarizedExperiment's rowData or tx2gene metadata.
 #'
 #' @param se A SummarizedExperiment object
 #'
@@ -211,29 +211,42 @@
 #'   or NULL if no gene ID column is found.
 #'
 #' @details
-#' Searches rowData in this priority order:
-#' 1. 'gene_id' (standard column from build_se)
-#' 2. 'gene_name' (fallback for GFF3-derived names)
+#' Searches rowData and metadata in this priority order:
+#' 1. 'gene_id' column in rowData
+#' 2. 'gene_name' column in rowData
+#' 3. tx2gene mapping in metadata (first two columns used as transcript and gene IDs)
 #'
 
 #' @noRd
 .get_gene_ids <- function(se) {
     rd <- SummarizedExperiment::rowData(se)
-    if (is.null(rd)) {
-        return(NULL)
+    if (!is.null(rd) && nrow(rd) > 0) {
+        if ("gene_id" %in% colnames(rd)) {
+            return(as.character(rd$gene_id))
+        }
+        if ("gene_name" %in% colnames(rd)) {
+            return(as.character(rd$gene_name))
+        }
     }
 
-    # Try gene_id column first
-    if ("gene_id" %in% colnames(rd)) {
-        return(as.character(rd$gene_id))
+    md <- S4Vectors::metadata(se)
+    if (!is.null(md$tx2gene) && is.data.frame(md$tx2gene) && nrow(md$tx2gene) > 0) {
+        tx2gene <- md$tx2gene
+        if (ncol(tx2gene) >= 2) {
+            txcol <- colnames(tx2gene)[1]
+            genecol <- colnames(tx2gene)[2]
+            tx_names <- rownames(se)
+            if (!is.null(tx_names) && length(tx_names) > 0) {
+                match_idx <- match(tx_names, tx2gene[[txcol]])
+                matched_genes <- tx2gene[[genecol]][match_idx]
+                if (any(!is.na(matched_genes))) {
+                    return(as.character(matched_genes))
+                }
+            }
+        }
     }
 
-    # Fall back to gene_name if available
-    if ("gene_name" %in% colnames(rd)) {
-        return(as.character(rd$gene_name))
-    }
-
-    return(NULL)
+    NULL
 }
 
 ## Helper: Extract BOTH tx2gene mapping AND gene names in single GFF3 file pass

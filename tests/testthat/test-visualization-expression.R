@@ -154,6 +154,27 @@ test_that("plot_expression() auto-detects condition_col when NULL", {
     expect_true(!is.null(plot_obj) || TRUE)
 })
 
+test_that("plot_expression() fails when condition_col cannot be auto-detected", {
+    skip_on_bioc()
+    analysis <- test_analysis_plot
+    cd <- SummarizedExperiment::colData(analysis@se)
+    SummarizedExperiment::colData(analysis@se) <- S4Vectors::DataFrame(
+        sample_id = cd$sample_id,
+        row.names = rownames(cd)
+    )
+    analysis@config$condition_col <- NULL
+
+    expect_error(
+        TSENAT::plot_expression(
+            analysis,
+            gene = test_gene_single,
+            condition_col = NULL,
+            verbose = FALSE
+        ),
+        "Cannot auto-detect condition_col"
+    )
+})
+
 test_that("plot_expression() respects metric parameter", {
     skip_on_bioc()
     for (metric in c("median", "mean", "variance", "iqr")) {
