@@ -458,7 +458,7 @@ test_that("auto_detect_column ignores default_fallback not in available_cols", {
     available_cols <- c("sample_id", "group")
     result <- auto_detect_column(
         available_cols = available_cols,
-        priority_candidates = c("condition"),
+        priority_candidates = "condition",
         default_fallback = "foo"
     )
     
