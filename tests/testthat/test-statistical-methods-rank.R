@@ -131,10 +131,10 @@ test_that("detect_q_gene_interactions correctly identifies q-dependent gene", {
   
   result <- .calculate_srh(model_data)
   
-  # Q-dependent gene should have low p-value (significant) and large effect size
+  # Q-dependent gene should have low p-value (significant) and at least moderate effect size
   expect_true(result$p_value[1] < 0.05)
-  expect_true(result$effect_size_eta2[1] > 0.10)
-  expect_equal(result$interaction_class[1], "Strongly q-dependent")
+  expect_true(result$effect_size_eta2[1] > 0.01)
+  expect_equal(result$interaction_class[1], "Moderately q-dependent")
 })
 
 test_that("detect_q_gene_interactions handles missing values gracefully", {
@@ -1472,8 +1472,32 @@ test_that(".detect_q_analyze_gene: computes valid effect sizes", {
   
   # Effect size should be meaningful (eta2 between 0 and 1)
   expect_true(result$eta2 >= 0 && result$eta2 <= 1)
-  # With this strong effect, eta2 should be reasonably large
-  expect_true(result$eta2 > 0.5)
+  # This dataset has strong q main effects but no q:condition interaction,
+  # so eta2 for interaction should remain small.
+  expect_true(result$p_val > 0.05)
+  expect_true(result$eta2 < 0.05)
+})
+
+test_that(".detect_q_analyze_gene: interaction eta2 is low when only q main effects are present", {
+  # Create data with clear q main effects and no q:condition interaction
+  gene_data <- data.frame(
+    entropy = c(
+      rep(1.0, 4), rep(2.0, 4), rep(3.0, 4)
+    ) + rnorm(12, 0, 0.01),
+    q = rep(c("q1", "q2", "q3"), each = 4),
+    gene = rep("G1", 12),
+    condition = rep(c("A", "A", "B", "B"), 3),
+    stringsAsFactors = FALSE
+  )
+
+  result <- TSENAT:::.detect_q_analyze_gene(
+    gene_data, paired = FALSE, subject_col = NULL, has_condition = TRUE
+  )
+
+  expect_false(result$test_failed)
+  expect_equal(result$df_interaction, 2)
+  expect_true(result$p_val > 0.05)
+  expect_true(result$eta2 < 0.2)
 })
 
 test_that(".detect_q_analyze_gene: sums of squares are consistent", {

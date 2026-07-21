@@ -26,9 +26,9 @@
 #'   Interpretation: Reference group mean=1, >1 higher than reference
 #' @param assayno Integer assay index to use when `x` is a SummarizedExperiment.
 #' @param verbose Logical; print diagnostic messages when TRUE (default: TRUE).
-#' @param q Numeric scalar or vector of Tsallis q values to evaluate (q > 0).
+#' @param q Numeric scalar or vector of Tsallis q values to evaluate (q >= 0).
 #' If length(q) > 1, the result will contain separate columns per sample and
-#' q.
+#' q. q = 0 is supported and represents species richness.
 #' @param what Which quantity to return: 'S' for Tsallis entropy or 'D' for Hill
 #' numbers.
 #' @param nthreads Number of threads for parallel processing (default: 1).

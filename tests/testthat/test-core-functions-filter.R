@@ -3652,6 +3652,13 @@ test_that(".resolve_assay_index errors on invalid input type", {
   expect_error(.resolve_assay_index(list(a = 1), assay_names), "Assay")
 })
 
+test_that(".resolve_assay_index errors when assay_names are missing or invalid", {
+  expect_error(.resolve_assay_index("counts", character(0)),
+               "Assay lookup failed: available assay names are missing or invalid")
+  expect_error(.resolve_assay_index("counts", list("counts", "tpm")),
+               "Assay lookup failed: available assay names are missing or invalid")
+})
+
 # ============================================================================
 # SECTION: Sample Selection and Balancing Functions
 # ============================================================================

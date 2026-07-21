@@ -636,6 +636,7 @@
     return(list(data = data, has_condition = TRUE))
 }
 
+
 #' Internal: Analyze single gene for q-effects
 
 #' @noRd
@@ -653,21 +654,21 @@
     if (is.null(test_result))
         return(list(test_failed = TRUE, class = "Test failed", method = "failed"))
 
-    # Compute effect size
-    overall_mean <- mean(gene_data$entropy, na.rm = TRUE)
-    ss_total <- sum((gene_data$entropy - overall_mean)^2, na.rm = TRUE)
-
-    # Calculate per-q means and counts using tapply
-    q_means <- tapply(gene_data$entropy, gene_data$q, function(x) mean(x, na.rm = TRUE),
-        simplify = TRUE)
-    q_counts <- tapply(gene_data$entropy, gene_data$q, function(x) length(x), simplify = TRUE)
-
-    ss_q <- sum(q_counts * (q_means - overall_mean)^2, na.rm = TRUE)
-    ss_residual <- ss_total - ss_q
+    # Compute total rank sum of squares to normalize effect size to the ranked analysis.
+    rank_data <- gene_data
+    if (paired && !is.null(subject_col)) {
+        rank_data$ranks <- ave(rank_data$entropy, rank_data[[subject_col]], FUN = function(x) rank(x,
+            na.last = "keep"))
+    } else {
+        rank_data$ranks <- rank(rank_data$entropy, na.last = "keep")
+    }
+    overall_rank_mean <- mean(rank_data$ranks, na.rm = TRUE)
+    ss_total <- sum((rank_data$ranks - overall_rank_mean)^2, na.rm = TRUE)
 
     list(test_failed = FALSE, f_stat = as.numeric(test_result$statistic), p_val = as.numeric(test_result$p_value),
-        n_q = length(q_levels), df_interaction = length(q_levels) - 1, ss_interaction = ss_q,
-        ss_residual = ss_residual, eta2 = if (ss_total > 0) ss_q/ss_total else 0,
+        n_q = length(q_levels), df_interaction = test_result$df_interaction,
+        ss_interaction = test_result$ss_interaction, ss_residual = test_result$ss_residual,
+        eta2 = if (ss_total > 0) test_result$ss_interaction/ss_total else 0,
         test_type = test_result$test_type, characteristics = test_result$characteristics)
 }
 

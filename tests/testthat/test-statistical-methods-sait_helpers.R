@@ -1890,8 +1890,24 @@ test_that(".validate_sait_interaction_input rejects invalid wy_randomizations", 
             paired = FALSE, subject_col = NULL,
             se = se, verbose = FALSE
         ),
-        "wy_randomizations must be numeric and >= 1"
+        "wy_randomizations must be numeric, 'auto', or NULL"
     )
+})
+
+test_that(".validate_sait_interaction_input accepts wy_randomizations='auto'", {
+    data(readcounts, package = "TSENAT", envir = environment())
+    se <- readcounts
+
+    result <- TSENAT:::.validate_sait_interaction_input(
+        method = "gam", pvalue = "absolute", corstr = "exchangeable",
+        regularization = "none", multicorr = "westfall-young", pcorr = "none",
+        storey = FALSE, wy_randomizations = "auto",
+        paired = FALSE, subject_col = NULL,
+        se = se, verbose = FALSE
+    )
+
+    expect_equal(result$wy_randomizations, "auto")
+    expect_equal(result$multicorr, "westfall-young")
 })
 
 test_that(".validate_sait_interaction_input warns on low wy_randomizations", {

@@ -281,13 +281,37 @@
     
     validated <- .validate_sait_interaction_input(method = method, pvalue = pvalue,
         corstr = corstr, regularization = regularization, multicorr = multicorr,
-        pcorr = pcorr, storey = storey, wy_randomizations = wy_randomizations, 
+        pcorr = pcorr, storey = storey, wy_randomizations = wy_randomizations,
         paired = paired, subject_col = subject_col, se = se, verbose = verbose)
     
     subject_col <- validated$subject_col
-    
-    .validate_sait_data_structure(se, condition_col, assay_name)
-    
+    wy_randomizations <- validated$wy_randomizations
+
+    if (identical(wy_randomizations, "auto")) {
+        if (multicorr != "westfall-young") {
+            stop("wy_randomizations='auto' is only supported when multicorr='westfall-young'", call. = FALSE)
+        }
+
+        metadata <- .parse_sample_metadata(se = se, condition_col = condition_col,
+            assay_name = assay_name, verbose = verbose)
+        mat <- SummarizedExperiment::assay(se, assay_name)
+        gene_ids <- rownames(mat)
+        if (is.null(gene_ids)) {
+            gene_ids <- paste0("gene", seq_len(nrow(mat)))
+        }
+
+        perm_df <- do.call(rbind, lapply(seq_len(nrow(mat)), function(i) {
+            data.frame(entropy = mat[i, ], q = metadata$q_vals, gene = gene_ids[i],
+                stringsAsFactors = FALSE)
+        }))
+
+        wy_randomizations <- .estimate_nperm(perm_df, entropy_col = "entropy", q_col = "q",
+            gene_col = "gene", mode = "standard", min_nperm = 100, max_nperm = 10000)
+        if (verbose) {
+            message(sprintf("[calculate_sait_interaction] Estimated %d permutations for Westfall-Young adjustment", wy_randomizations))
+        }
+    }
+
     # ========================================================================
     # STAGE 3: DATA PREPARATION & FITTING
     # ========================================================================

@@ -877,6 +877,60 @@ test_that("calculate_jis fails when condition_col cannot be auto-detected", {
   )
 })
 
+test_that("calculate_jis fails when gene_col cannot be auto-detected", {
+  analysis <- make_test_analysis_jis()
+  analysis@diversity_results <- list(q_1_00 = list(q = 1.0))
+  analysis@config$gene_col <- NULL
+  analysis@config$isoform_col <- "transcript_id"
+
+  rd <- SummarizedExperiment::rowData(analysis@se)
+  SummarizedExperiment::rowData(analysis@se) <- S4Vectors::DataFrame(
+    foo = rd$gene_id,
+    transcript_id = rd$transcript_id,
+    row.names = rownames(rd)
+  )
+
+  expect_error(
+    TSENAT::calculate_jis(
+      analysis = analysis,
+      condition_col = "condition",
+      gene_col = NULL,
+      isoform_col = "transcript_id",
+      q = 1.0,
+      nboot = 100,
+      verbose = FALSE
+    ),
+    "Cannot auto-detect gene_col from rowData"
+  )
+})
+
+test_that("calculate_jis fails when isoform_col cannot be auto-detected", {
+  analysis <- make_test_analysis_jis()
+  analysis@diversity_results <- list(q_1_00 = list(q = 1.0))
+  analysis@config$isoform_col <- NULL
+  analysis@config$gene_col <- "gene_id"
+
+  rd <- SummarizedExperiment::rowData(analysis@se)
+  SummarizedExperiment::rowData(analysis@se) <- S4Vectors::DataFrame(
+    gene_id = rd$gene_id,
+    foo = rd$transcript_id,
+    row.names = rownames(rd)
+  )
+
+  expect_error(
+    TSENAT::calculate_jis(
+      analysis = analysis,
+      condition_col = "condition",
+      gene_col = "gene_id",
+      isoform_col = NULL,
+      q = 1.0,
+      nboot = 100,
+      verbose = FALSE
+    ),
+    "Cannot auto-detect isoform_col from rowData"
+  )
+})
+
 test_that("Verbose mode produces informative messages", {
   analysis <- make_test_analysis_jis()
   analysis@diversity_results <- list(q_1_00 = list(q = 1.0))

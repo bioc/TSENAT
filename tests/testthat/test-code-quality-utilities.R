@@ -480,6 +480,21 @@ test_that("auto_detect_column sends verbose messages", {
     )
 })
 
+test_that("auto_detect_column logs unavailable fallback in verbose mode", {
+    available_cols <- c("sample_id", "value")
+
+    expect_message(
+        auto_detect_column(
+            available_cols = available_cols,
+            priority_candidates = c("condition", "group"),
+            default_fallback = "foo",
+            verbose = TRUE,
+            param_name = "test_param"
+        ),
+        "default_fallback 'foo' for test_param is not available; returning NULL"
+    )
+})
+
 
 
 test_that("save_analysis_output saves data.frame to CSV", {
