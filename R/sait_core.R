@@ -300,23 +300,12 @@
     if (verbose)
         message("[.calculate_sait] Starting .fit_all_genes() for ", nrow(mat), " genes")
     
-    # Wrap fitting in try-error to catch any errors during fitting
-    res <- try(.fit_all_genes(mat = mat, se = se, metadata = metadata, method = method,
+    # Run fitting directly so genuine model-fitting failures surface as hard
+    # errors instead of being downgraded to an empty data frame.
+    res <- .fit_all_genes(mat = mat, se = se, metadata = metadata, method = method,
         pvalue = pvalue, subject_col = subject_col, paired = paired, min_obs = min_obs,
         nthreads = nthreads, verbose = verbose, bias_correction = bias_correction,
-        regularization = regularization, corstr = corstr, adaptive_knots = adaptive_knots),
-        silent = FALSE)
-    
-    if (inherits(res, "try-error")) {
-        error_msg <- if (!is.null(attr(res, "condition"))) {
-            conditionMessage(attr(res, "condition"))
-        } else {
-            as.character(res)
-        }
-        warning("[.calculate_sait] .fit_all_genes() failed with: ", error_msg, 
-            "\n[Returning empty results]", call. = FALSE)
-        res <- data.frame()
-    }
+        regularization = regularization, corstr = corstr, adaptive_knots = adaptive_knots)
     
     if (verbose && nrow(res) > 0)
         message("[.calculate_sait] .fit_all_genes() completed successfully with ",

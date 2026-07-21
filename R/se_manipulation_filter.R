@@ -145,20 +145,28 @@
 }
 
 # ============================================================================
-# HELPER: Resolve assay by name/index with fallback logic OPTIMIZATION:
-# Consolidated from 3 duplicate implementations @noRd
+# HELPER: Resolve assay by name/index with strict validation @noRd
 .resolve_assay_index <- function(assay_ref, assay_names) {
+    if (!is.character(assay_names) || length(assay_names) == 0L) {
+        stop("Assay lookup failed: available assay names are missing or invalid.", call. = FALSE)
+    }
+
     if (is.character(assay_ref)) {
         idx <- which(assay_names == assay_ref)
-        if (length(idx) == 1)
+        if (length(idx) == 1L)
             return(idx)
-        return(1)  # Fallback to first
-    } else if (is.numeric(assay_ref)) {
-        if (assay_ref >= 1 && assay_ref <= length(assay_names))
-            return(assay_ref)
-        return(1)  # Fallback to first
+        stop(sprintf("Assay '%s' not found. Available assays: %s", assay_ref,
+            paste(assay_names, collapse = ", ")), call. = FALSE)
     }
-    1  # Default to first
+
+    if (is.numeric(assay_ref) && length(assay_ref) == 1L && is.finite(assay_ref)) {
+        if (assay_ref >= 1 && assay_ref <= length(assay_names)) {
+            return(as.integer(assay_ref))
+        }
+    }
+
+    stop(sprintf("Assay reference %s is invalid. Available assays: %s", paste(deparse(assay_ref), collapse = ""),
+        paste(assay_names, collapse = ", ")), call. = FALSE)
 }
 
 # ============================================================================

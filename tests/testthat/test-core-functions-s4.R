@@ -30,6 +30,18 @@ make_test_analysis <- function() {
 # Tests for .prepare_diversity_params()
 # ===========================================================================
 
+test_that("TSENATAnalysis does not mutate the caller's colData", {
+  se <- make_test_se()
+  original_coldata <- SummarizedExperiment::colData(se)
+  original_sample_id <- original_coldata$sample_id
+
+  analysis <- TSENAT::TSENATAnalysis(se, config = list())
+
+  expect_true(is.null(original_sample_id))
+  expect_false("sample_id" %in% colnames(SummarizedExperiment::colData(se)))
+  expect_true("sample_id" %in% colnames(SummarizedExperiment::colData(analysis@se)))
+})
+
 test_that(".prepare_diversity_params extracts q values from config", {
   analysis <- make_test_analysis()
   

@@ -669,7 +669,7 @@ TSENAT_config <- function(q = 1, condition_col = "condition", subject_col = NULL
             nboot = nboot, output_file = output_file, verbose = FALSE, show_messages = should_show_messages)
         if (verbose)
             message(sprintf("          [OK] %d q-values processed", length(q_vals)))
-    }, error = function(e) warning("Diversity calculation failed:\n", e$message,
+    }, error = function(e) stop("Diversity calculation failed:\n", conditionMessage(e),
         call. = FALSE))
     analysis
 }
@@ -724,7 +724,7 @@ TSENAT_config <- function(q = 1, condition_col = "condition", subject_col = NULL
             pcorr = sait_pcorr, output_file = output_file)
         if (verbose)
             message("          [OK] SAIT interaction analysis complete")
-    }, error = function(e) warning("SAIT interaction analysis failed:\n", e$message,
+    }, error = function(e) stop("SAIT interaction analysis failed:\n", conditionMessage(e),
         call. = FALSE))
     analysis
 }
@@ -820,8 +820,7 @@ TSENAT_config <- function(q = 1, condition_col = "condition", subject_col = NULL
         if (verbose)
             message("          [OK] Divergence computed")
     }, error = function(e) {
-        if (verbose)
-            warning("Divergence failed: ", e$message, call. = FALSE)
+        stop("Divergence failed: ", conditionMessage(e), call. = FALSE)
     })
     analysis
 }

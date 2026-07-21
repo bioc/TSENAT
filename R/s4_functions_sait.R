@@ -201,15 +201,9 @@ calculate_sait <- function(analysis, fdr_threshold = NULL, formula = NULL, condi
     args <- .build_sait_args(diversity_combined, params, return_model_data = return_model_data,
         verbose = verbose, ...)
 
-    # Run SAIT analysis Phase 15: Catch errors gracefully - return empty results
-    # instead of crashing
-    result <- tryCatch({
-        do.call(.calculate_sait, args)
-    }, error = function(e) {
-        # Return empty data.frame on error instead of stopping workflow
-        warning("sait_interaction calculation failed:\n", conditionMessage(e), call. = FALSE)
-        data.frame()
-    })
+    # Run SAIT analysis directly; propagate real errors so the caller sees a
+    # genuine failure instead of a silently empty result object.
+    result <- do.call(.calculate_sait, args)
 
     # Validate and extract results
     extracted <- .validate_and_extract_sait_result(result)

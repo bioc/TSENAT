@@ -112,6 +112,16 @@ test_that("Helper: .extract_sait_params extracts and resolves parameters", {
   expect_equal(params$paired, FALSE)
 })
 
+test_that("S4 wrapper: calculate_sait fails fast on invalid method arguments", {
+  analysis <- .create_test_analysis()
+
+  expect_error(
+    calculate_sait(analysis, method = "definitely_not_a_real_method", verbose = FALSE),
+    "should be one of|not found|Available columns",
+    fixed = FALSE
+  )
+})
+
 test_that("Helper: .extract_sait_params resolves from config", {
   analysis <- .create_test_analysis()
   analysis@config$method <- "lmm"
