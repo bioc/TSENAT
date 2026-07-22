@@ -201,16 +201,17 @@ test_that(".detect_q_analyze_gene: computes test statistics for valid data", {
 
 test_that(".detect_q_analyze_gene: computes valid effect sizes", {
   set.seed(456)
-  # Create data with strong q-effect
+  # Create data with strong q * condition interaction and mild noise
   gene_data <- data.frame(
     entropy = c(
-      rnorm(4, mean = 1, sd = 0.1),   # q1
-      rnorm(4, mean = 2, sd = 0.1),   # q2
-      rnorm(4, mean = 3, sd = 0.1)    # q3
+      rnorm(2, mean = 1.0, sd = 0.05), rnorm(2, mean = 4.0, sd = 0.05),   # q1: A low, B high
+      rnorm(2, mean = 1.2, sd = 0.05), rnorm(2, mean = 3.8, sd = 0.05),   # q2: A low, B high
+      rnorm(2, mean = 4.0, sd = 0.05), rnorm(2, mean = 1.0, sd = 0.05)    # q3: A high, B low
     ),
-    q = rep(c("q1", "q2", "q3"), each = 4),
+    q = rep(c("q1", "q1", "q1", "q1", "q2", "q2", "q2", "q2", "q3", "q3", "q3", "q3"),
+      each = 1),
     gene = rep("G1", 12),
-    condition = rep(c("A", "B"), 6),
+    condition = rep(c("A", "A", "B", "B"), 3),
     stringsAsFactors = FALSE
   )
   
@@ -220,7 +221,7 @@ test_that(".detect_q_analyze_gene: computes valid effect sizes", {
   
   # Effect size should be meaningful (eta2 between 0 and 1)
   expect_true(result$eta2 >= 0 && result$eta2 <= 1)
-  # With this strong effect, eta2 should be reasonably large
+  # With this strong interaction, eta2 should be reasonably large
   expect_true(result$eta2 > 0.5)
 })
 
