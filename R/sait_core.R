@@ -281,13 +281,37 @@
     
     validated <- .validate_sait_interaction_input(method = method, pvalue = pvalue,
         corstr = corstr, regularization = regularization, multicorr = multicorr,
-        pcorr = pcorr, storey = storey, wy_randomizations = wy_randomizations, 
+        pcorr = pcorr, storey = storey, wy_randomizations = wy_randomizations,
         paired = paired, subject_col = subject_col, se = se, verbose = verbose)
     
     subject_col <- validated$subject_col
-    
-    .validate_sait_data_structure(se, condition_col, assay_name)
-    
+    wy_randomizations <- validated$wy_randomizations
+
+    if (identical(wy_randomizations, "auto")) {
+        if (multicorr != "westfall-young") {
+            stop("wy_randomizations='auto' is only supported when multicorr='westfall-young'", call. = FALSE)
+        }
+
+        metadata <- .parse_sample_metadata(se = se, condition_col = condition_col,
+            assay_name = assay_name, verbose = verbose)
+        mat <- SummarizedExperiment::assay(se, assay_name)
+        gene_ids <- rownames(mat)
+        if (is.null(gene_ids)) {
+            gene_ids <- paste0("gene", seq_len(nrow(mat)))
+        }
+
+        perm_df <- do.call(rbind, lapply(seq_len(nrow(mat)), function(i) {
+            data.frame(entropy = mat[i, ], q = metadata$q_vals, gene = gene_ids[i],
+                stringsAsFactors = FALSE)
+        }))
+
+        wy_randomizations <- .estimate_nperm(perm_df, entropy_col = "entropy", q_col = "q",
+            gene_col = "gene", mode = "standard", min_nperm = 100, max_nperm = 10000)
+        if (verbose) {
+            message(sprintf("[calculate_sait_interaction] Estimated %d permutations for Westfall-Young adjustment", wy_randomizations))
+        }
+    }
+
     # ========================================================================
     # STAGE 3: DATA PREPARATION & FITTING
     # ========================================================================
@@ -300,23 +324,12 @@
     if (verbose)
         message("[.calculate_sait] Starting .fit_all_genes() for ", nrow(mat), " genes")
     
-    # Wrap fitting in try-error to catch any errors during fitting
-    res <- try(.fit_all_genes(mat = mat, se = se, metadata = metadata, method = method,
+    # Run fitting directly so genuine model-fitting failures surface as hard
+    # errors instead of being downgraded to an empty data frame.
+    res <- .fit_all_genes(mat = mat, se = se, metadata = metadata, method = method,
         pvalue = pvalue, subject_col = subject_col, paired = paired, min_obs = min_obs,
         nthreads = nthreads, verbose = verbose, bias_correction = bias_correction,
-        regularization = regularization, corstr = corstr, adaptive_knots = adaptive_knots),
-        silent = FALSE)
-    
-    if (inherits(res, "try-error")) {
-        error_msg <- if (!is.null(attr(res, "condition"))) {
-            conditionMessage(attr(res, "condition"))
-        } else {
-            as.character(res)
-        }
-        warning("[.calculate_sait] .fit_all_genes() failed with: ", error_msg, 
-            "\n[Returning empty results]", call. = FALSE)
-        res <- data.frame()
-    }
+        regularization = regularization, corstr = corstr, adaptive_knots = adaptive_knots)
     
     if (verbose && nrow(res) > 0)
         message("[.calculate_sait] .fit_all_genes() completed successfully with ",

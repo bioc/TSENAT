@@ -424,10 +424,15 @@
         interaction_row <- nrow(anova_result) - 1
         f_stat <- anova_result$`F value`[interaction_row]
         p_val <- anova_result$`Pr(>F)`[interaction_row]
+        ss_interaction <- anova_result$`Sum Sq`[interaction_row]
+        df_interaction <- as.integer(anova_result$Df[interaction_row])
+        ss_residual <- anova_result$`Sum Sq`[nrow(anova_result)]
+        df_residual <- as.integer(anova_result$Df[nrow(anova_result)])
 
         if (is.na(f_stat) || is.na(p_val)) {
             return(list(statistic = NA_real_, p_value = NA_real_, method = "Scheirer-Ray-Hare (computation failed)",
-                test_type = "srh_failed"))
+                test_type = "srh_failed", ss_interaction = NA_real_, df_interaction = NA_integer_,
+                ss_residual = NA_real_, df_residual = NA_integer_))
         }
 
         test_type_label <- if (paired)
@@ -435,10 +440,13 @@
         method_label <- if (paired)
             "Scheirer-Ray-Hare Test (paired design, within-subject ranks; REVISED March 2026)" else "Scheirer-Ray-Hare Test (non-parametric 2-way ANOVA)"
 
-        return(list(statistic = f_stat, p_value = p_val, method = method_label, test_type = test_type_label))
+        return(list(statistic = f_stat, p_value = p_val, method = method_label, test_type = test_type_label,
+            ss_interaction = ss_interaction, df_interaction = df_interaction,
+            ss_residual = ss_residual, df_residual = df_residual))
     }, error = function(e) {
         return(list(statistic = NA_real_, p_value = NA_real_, method = paste("Scheirer-Ray-Hare (error):",
-            e$message), test_type = "srh_error"))
+            e$message), test_type = "srh_error", ss_interaction = NA_real_, df_interaction = NA_integer_,
+            ss_residual = NA_real_, df_residual = NA_integer_))
     })
 }
 

@@ -3,23 +3,38 @@
 # Skip entire test file on Bioconductor due to long runtime (10.37s)
 skip_on_bioc()
 
-# Setup: Local helper to create test analysis with optional diversity results
+# Setup: Local helper to create test analysis with optional diversity and SAIT results
 .create_test_analysis <- function(
     precompute_diversity = TRUE, 
     q_values = c(0.5, 0.75, 1.0, 1.5, 2.0),
-    include_divergence = TRUE) {
-  set.seed(42)
+    include_divergence = TRUE,
+    include_sait_results = FALSE,
+    seed = 42,
+    verbose = FALSE) {
+  set.seed(seed)
   
   # Always create base analysis with diversity first
   analysis <- create_test_analysis(
     q_values = q_values,
     include_divergence = include_divergence,
-    include_sait_results = FALSE
+    include_sait_results = FALSE,
+    seed = seed,
+    verbose = verbose
   )
   
   # If precompute_diversity = FALSE, clear the diversity results
   if (!precompute_diversity) {
     analysis@diversity_results <- list()
+  }
+
+  if (include_sait_results) {
+    analysis@sait_results <- list(
+      sait_interaction = data.frame(
+        gene = character(0),
+        adj_p_interaction = numeric(0),
+        stringsAsFactors = FALSE
+      )
+    )
   }
   
   return(analysis)
@@ -112,6 +127,16 @@ test_that("Helper: .extract_sait_params extracts and resolves parameters", {
   expect_equal(params$paired, FALSE)
 })
 
+test_that("S4 wrapper: calculate_sait fails fast on invalid method arguments", {
+  analysis <- .create_test_analysis()
+
+  expect_error(
+    calculate_sait(analysis, method = "definitely_not_a_real_method", verbose = FALSE),
+    "should be one of|not found|Available columns",
+    fixed = FALSE
+  )
+})
+
 test_that("Helper: .extract_sait_params resolves from config", {
   analysis <- .create_test_analysis()
   analysis@config$method <- "lmm"
@@ -129,6 +154,32 @@ test_that("Helper: .extract_sait_params resolves from config", {
   expect_is(params, "list")
   expect_equal(params$method, "lmm")
   expect_equal(params$pcorr, "Hochberg")
+})
+
+test_that("calculate_sait fails when condition_col cannot be auto-detected", {
+  analysis <- .create_test_analysis(include_sait_results = TRUE)
+  analysis@config$condition_col <- NULL
+
+  cd <- SummarizedExperiment::colData(analysis@se)
+  empty_cd <- S4Vectors::DataFrame(
+    sample_id = cd$sample_id,
+    row.names = rownames(cd)
+  )
+  SummarizedExperiment::colData(analysis@se) <- empty_cd
+
+  # Ensure the diversity results also do not supply a condition column after sync
+  for (i in seq_along(analysis@diversity_results)) {
+    se_q <- analysis@diversity_results[[i]]
+    if (is(se_q, "SummarizedExperiment")) {
+      SummarizedExperiment::colData(se_q) <- empty_cd
+      analysis@diversity_results[[i]] <- se_q
+    }
+  }
+
+  expect_error(
+    calculate_sait(analysis, verbose = FALSE),
+    "condition_col is required for SAIT interaction analysis"
+  )
 })
 
 # Tests for .combine_diversity_results_for_sait helper

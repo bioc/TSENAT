@@ -69,13 +69,21 @@ TSENATAnalysis <- function(se, config = list()) {
         }
     }
 
-    # Ensure sample_id column exists in colData (required by validator)
-    if (!"sample_id" %in% colnames(SummarizedExperiment::colData(se))) {
-        SummarizedExperiment::colData(se)$sample_id <- colnames(se)
+    # Ensure sample_id column exists in colData without mutating the caller's object
+    cd <- as.data.frame(SummarizedExperiment::colData(se))
+    if (!"sample_id" %in% colnames(cd)) {
+        cd$sample_id <- colnames(se)
     }
 
+    se_obj <- SummarizedExperiment::SummarizedExperiment(
+        assays = SummarizedExperiment::assays(se),
+        rowData = SummarizedExperiment::rowData(se),
+        colData = S4Vectors::DataFrame(cd),
+        metadata = S4Vectors::metadata(se)
+    )
+
     # Create new object with all slots initialized
-    new("TSENATAnalysis", se = se, config = if (length(config) > 0)
+    new("TSENATAnalysis", se = se_obj, config = if (length(config) > 0)
         config else list(), diversity_results = list(), sait_results = list(), jackknife_results = list(),
         divergence_results = list(), plots = list(), metadata = list(created_at = Sys.time(),
             package_version = as.character(utils::packageVersion("TSENAT")), function_calls = character()))

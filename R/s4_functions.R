@@ -1096,6 +1096,13 @@ plot_expression <- function(analysis, gene = NULL, condition_col = NULL, top_n =
             param_name = "condition_col")
     }
 
+    if (is.null(condition_col)) {
+        stop("[plot_expression] Cannot auto-detect condition_col. ",
+            "Available colData columns: ", paste(colnames(colData(se)), collapse = ", "),
+            ".\n\nSOLUTION: Set @config$condition_col or pass explicit condition_col= parameter.",
+            call. = FALSE)
+    }
+
     # =========================================================================
     # EXTRACT LM RESULTS (for gene ranking if not specified)
     # =========================================================================
@@ -1653,6 +1660,13 @@ plot_sait <- function(analysis, n_top = 6, genes = NULL, condition_col = NULL, s
         condition_col <- auto_detect_column(cd_cols, analysis@config, "condition_col",
             c("condition", "sample_type", "group", "treatment"), verbose = verbose,
             param_name = "condition_col")
+    }
+
+    if (is.null(condition_col)) {
+        stop("[plot_sait] Cannot auto-detect condition_col. ",
+            "Available colData columns: ", paste(colnames(colData(analysis@se)), collapse = ", "),
+            ".\n\nSOLUTION: Set @config$condition_col or pass explicit condition_col= parameter.",
+            call. = FALSE)
     }
 
     # Validate that condition_col exists in colData

@@ -1027,7 +1027,9 @@ if (getOption("TSENAT.memoization", TRUE)) {
 #' @param multicorr Character; multi-q correction method
 #' @param pcorr Character; legacy p-value correction method
 #' @param storey Logical; whether to apply Storey correction
-#' @param wy_randomizations Integer; number of permutations
+#' @param wy_randomizations Integer or character; number of permutations
+#'   for Westfall-Young correction. Use 'auto' to estimate a suitable
+#'   permutation count from the data.
 #' @param paired Logical; whether design is paired
 #' @param subject_col Character or NULL; subject column name
 #' @param se SummarizedExperiment object
@@ -1042,6 +1044,7 @@ if (getOption("TSENAT.memoization", TRUE)) {
 #'     \item multicorr: Validated multicorr method
 #'     \item pcorr: Validated legacy pcorr
 #'     \item subject_col: Auto-detected or user-provided subject column
+#'     \item wy_randomizations: Validated permutation count or 'auto'
 #'   }
 #'
 
@@ -1054,12 +1057,20 @@ if (getOption("TSENAT.memoization", TRUE)) {
     }
 
     # Validate wy_randomizations
-    if (!is.numeric(wy_randomizations) || wy_randomizations < 1) {
+    if (is.character(wy_randomizations) && tolower(wy_randomizations) == "auto") {
+        wy_randomizations <- "auto"
+    } else if (is.null(wy_randomizations)) {
+        wy_randomizations <- 1000
+    } else if (is.numeric(wy_randomizations) && wy_randomizations < 1) {
         stop("wy_randomizations must be numeric and >= 1", call. = FALSE)
-    }
-    if (wy_randomizations < 100) {
-        warning("wy_randomizations < 100 may give unreliable p-values; ", "recommend >= 100",
-            call. = FALSE)
+    } else if (!is.numeric(wy_randomizations)) {
+        stop("wy_randomizations must be numeric, 'auto', or NULL", call. = FALSE)
+    } else {
+        wy_randomizations <- as.integer(wy_randomizations)
+        if (wy_randomizations < 100) {
+            warning("wy_randomizations < 100 may give unreliable p-values; ", "recommend >= 100",
+                call. = FALSE)
+        }
     }
 
     # Auto-detect subject_col from colData if paired=TRUE and subject_col=NULL
@@ -1087,7 +1098,8 @@ if (getOption("TSENAT.memoization", TRUE)) {
     }
 
     return(list(method = method, pvalue = pvalue, corstr = corstr, regularization = regularization,
-        multicorr = multicorr, pcorr = pcorr, subject_col = subject_col))
+        multicorr = multicorr, pcorr = pcorr, subject_col = subject_col,
+        wy_randomizations = wy_randomizations))
 }
 
 #' @title Parse Sample Metadata from SummarizedExperiment

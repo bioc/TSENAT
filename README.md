@@ -223,11 +223,11 @@ salmon_output/
 Expected TSV file format:
 
 ```
-sample        condition    paired_samples
-SRR14800481   normal       A
-SRR14800480   normal       B
-SRR14800479   tumor        A
-SRR14800478   tumor        B
+sample      condition    paired_samples
+Sample_1    normal            A
+Sample_2    normal            B
+Sample_3    tumor             A
+Sample_4    tumor             B
 ```
 
 Key requirements:

@@ -3616,12 +3616,13 @@ test_that(".resolve_assay_index resolves character assay name", {
   expect_equal(result, 1)
 })
 
-test_that(".resolve_assay_index falls back to 1 for invalid character name", {
+test_that(".resolve_assay_index errors on invalid character name", {
   assay_names <- c("counts", "tpm", "quantile_normalized")
   
-  # Invalid name should fall back to 1
-  result <- .resolve_assay_index("nonexistent", assay_names)
-  expect_equal(result, 1)
+  expect_error(
+    .resolve_assay_index("nonexistent", assay_names),
+    "Assay.*not found"
+  )
 })
 
 test_that(".resolve_assay_index resolves numeric assay index", {
@@ -3636,31 +3637,26 @@ test_that(".resolve_assay_index resolves numeric assay index", {
   expect_equal(result, 1)
 })
 
-test_that(".resolve_assay_index falls back to 1 for invalid numeric index", {
+test_that(".resolve_assay_index errors on invalid numeric index", {
   assay_names <- c("counts", "tpm", "quantile_normalized")
   
-  # Out of bounds index (too large)
-  result <- .resolve_assay_index(10, assay_names)
-  expect_equal(result, 1)
-  
-  # Out of bounds index (zero or negative)
-  result <- .resolve_assay_index(0, assay_names)
-  expect_equal(result, 1)
-  
-  result <- .resolve_assay_index(-1, assay_names)
-  expect_equal(result, 1)
+  expect_error(.resolve_assay_index(10, assay_names), "Assay")
+  expect_error(.resolve_assay_index(0, assay_names), "Assay")
+  expect_error(.resolve_assay_index(-1, assay_names), "Assay")
 })
 
-test_that(".resolve_assay_index defaults to 1 for invalid input type", {
+test_that(".resolve_assay_index errors on invalid input type", {
   assay_names <- c("counts", "tpm", "quantile_normalized")
   
-  # NULL input
-  result <- .resolve_assay_index(NULL, assay_names)
-  expect_equal(result, 1)
-  
-  # List input
-  result <- .resolve_assay_index(list(a = 1), assay_names)
-  expect_equal(result, 1)
+  expect_error(.resolve_assay_index(NULL, assay_names), "Assay")
+  expect_error(.resolve_assay_index(list(a = 1), assay_names), "Assay")
+})
+
+test_that(".resolve_assay_index errors when assay_names are missing or invalid", {
+  expect_error(.resolve_assay_index("counts", character(0)),
+               "Assay lookup failed: available assay names are missing or invalid")
+  expect_error(.resolve_assay_index("counts", list("counts", "tpm")),
+               "Assay lookup failed: available assay names are missing or invalid")
 })
 
 # ============================================================================

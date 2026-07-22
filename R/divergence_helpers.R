@@ -44,9 +44,11 @@
     cd <- SummarizedExperiment::colData(se)
     cd_colnames <- colnames(cd)
 
-    # Candidate column names (in priority order) for group/condition
-    group_col_candidates <- c("sample_type", "group", "condition", "treatment", "phenotype",
-        "batch", "category")
+    # Candidate column names (in priority order) for group/condition.
+    # We intentionally restrict this list to likely biological/experimental
+    # grouping variables, not technical factors such as batch identifiers.
+    group_col_candidates <- c("sample_type", "group", "condition", "treatment",
+        "phenotype")
 
     group_col <- NA_character_
 
@@ -83,11 +85,12 @@
         }
     }
 
-    # If no match found, use heuristics: 1. Select group with fewer samples
-    # (typical case-control design) 2. Fallback to first alphabetically
+    # If no standard control label is found, use a conservative heuristic.
+    # This is only a fallback: it chooses the smallest group by sample count,
+    # which is typical for case/control designs but may be wrong for imbalanced
+    # or non-case-control datasets.
     if (is.na(control_group)) {
         if (length(unique_groups) >= 2) {
-            # Find group with minimum samples (typically control)
             min_samples_group <- names(group_counts)[which.min(group_counts)]
             control_group <- min_samples_group
         } else if (length(unique_groups) == 1) {

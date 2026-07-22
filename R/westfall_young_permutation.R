@@ -295,28 +295,22 @@
     m <- length(pvalues_clean)
 
     # Rank p-values: smallest = rank 1
-    rank_p <- rank(pvalues_clean)
-
-    # Compute Storey q-values: π₀ * (rank / m)
-    qvalues_raw <- pi0 * (rank_p/m)
-
-    # Robust floor: cap at 1
-    if (robust) {
-        qvalues_raw <- pmin(qvalues_raw, 1)
-        # Ensure q-value >= raw p-value (monotonicity with raw)
-        qvalues_raw <- pmax(qvalues_raw, pvalues_clean)
-    }
-
-    # Enforce monotonicity: if p_i < p_j then q_i <= q_j This is critical: sort
-    # in order of p-values, enforce non-decreasing
     order_p <- order(pvalues_clean)
-    qvalues_sorted <- qvalues_raw[order_p]
+    sorted_p <- pvalues_clean[order_p]
 
-    # Apply monotonicity constraint (reverse loop to avoid propagating errors)
-    for (i in (m - 1):1) {
-        if (qvalues_sorted[i + 1] < qvalues_sorted[i]) {
-            qvalues_sorted[i] <- qvalues_sorted[i + 1]
-        }
+    # Compute Storey q-values using the standard formula:
+    # q_i = pi0 * p_i * m / rank_i
+    # Then enforce monotonicity by taking the cumulative minimum from the largest
+    # p-values to the smallest.
+    qvalues_sorted <- pi0 * sorted_p * m/seq_len(m)
+    qvalues_sorted <- pmin(qvalues_sorted, 1)
+
+    # Enforce monotonicity: q-values must be non-decreasing for increasing p
+    qvalues_sorted <- rev(cummin(rev(qvalues_sorted)))
+
+    # Robust floor: ensure q-value is never smaller than raw p-value
+    if (robust) {
+        qvalues_sorted <- pmax(qvalues_sorted, sorted_p)
     }
 
     # Reconstruct original order

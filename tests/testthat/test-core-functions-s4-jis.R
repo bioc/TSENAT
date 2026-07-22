@@ -2,6 +2,8 @@
 # =====================================================================
 # Tests for refactored helper functions and main wrapper in s4_functions_jis.R
 
+library(SummarizedExperiment)
+
 # ============================================================================
 # FIXTURE FUNCTIONS - Minimal test data
 # ============================================================================
@@ -160,7 +162,10 @@ test_that(".detect_jis_columns returns error when condition_col cannot be detect
   analysis <- make_test_analysis_jis()
   analysis@config <- list()  # Empty config
   se <- analysis@se
-  colData(se) <- NULL  # Remove colData
+  se <- SummarizedExperiment::SummarizedExperiment(
+    assays = SummarizedExperiment::assays(se),
+    rowData = SummarizedExperiment::rowData(se)
+  )
   
   expect_error(
     TSENAT:::.detect_jis_columns(
@@ -844,6 +849,85 @@ test_that("Error handling: invalid column names propagate correctly", {
       nboot = 100,
       verbose = FALSE
     )
+  )
+})
+
+test_that("calculate_jis fails when condition_col cannot be auto-detected", {
+  analysis <- make_test_analysis_jis()
+  analysis@diversity_results <- list(q_1_00 = list(q = 1.0))
+  analysis@config$condition_col <- NULL
+
+  cd <- SummarizedExperiment::colData(analysis@se)
+  SummarizedExperiment::colData(analysis@se) <- S4Vectors::DataFrame(
+    sample_id = cd$sample_id,
+    row.names = rownames(cd)
+  )
+
+  expect_error(
+    TSENAT::calculate_jis(
+      analysis = analysis,
+      condition_col = NULL,
+      gene_col = "gene_id",
+      isoform_col = "transcript_id",
+      q = 1.0,
+      nboot = 100,
+      verbose = FALSE
+    ),
+    "Cannot auto-detect condition_col"
+  )
+})
+
+test_that("calculate_jis fails when gene_col cannot be auto-detected", {
+  analysis <- make_test_analysis_jis()
+  analysis@diversity_results <- list(q_1_00 = list(q = 1.0))
+  analysis@config$gene_col <- NULL
+  analysis@config$isoform_col <- "transcript_id"
+
+  rd <- SummarizedExperiment::rowData(analysis@se)
+  SummarizedExperiment::rowData(analysis@se) <- S4Vectors::DataFrame(
+    foo = rd$gene_id,
+    transcript_id = rd$transcript_id,
+    row.names = rownames(rd)
+  )
+
+  expect_error(
+    TSENAT::calculate_jis(
+      analysis = analysis,
+      condition_col = "condition",
+      gene_col = NULL,
+      isoform_col = "transcript_id",
+      q = 1.0,
+      nboot = 100,
+      verbose = FALSE
+    ),
+    "Cannot auto-detect gene_col from rowData"
+  )
+})
+
+test_that("calculate_jis fails when isoform_col cannot be auto-detected", {
+  analysis <- make_test_analysis_jis()
+  analysis@diversity_results <- list(q_1_00 = list(q = 1.0))
+  analysis@config$isoform_col <- NULL
+  analysis@config$gene_col <- "gene_id"
+
+  rd <- SummarizedExperiment::rowData(analysis@se)
+  SummarizedExperiment::rowData(analysis@se) <- S4Vectors::DataFrame(
+    gene_id = rd$gene_id,
+    foo = rd$transcript_id,
+    row.names = rownames(rd)
+  )
+
+  expect_error(
+    TSENAT::calculate_jis(
+      analysis = analysis,
+      condition_col = "condition",
+      gene_col = "gene_id",
+      isoform_col = NULL,
+      q = 1.0,
+      nboot = 100,
+      verbose = FALSE
+    ),
+    "Cannot auto-detect isoform_col from rowData"
   )
 })
 

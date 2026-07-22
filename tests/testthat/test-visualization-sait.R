@@ -87,6 +87,43 @@ test_that("plot_sait: auto-detects condition column", {
   expect_true(is.null(result) || inherits(result, "ggplot") || is.list(result))
 })
 
+test_that("plot_sait: fails when condition_col cannot be auto-detected", {
+  skip_if_not_installed("SummarizedExperiment")
+
+  set.seed(127)
+
+  analysis <- .create_test_analysis(
+    n_genes = 5,
+    n_samples_per_group = 2,
+    q_values = c(0.5, 1.0),
+    include_divergence = TRUE,
+    include_sait_results = TRUE,
+    seed = 127,
+    verbose = FALSE
+  )
+
+  analysis@config$condition_col <- NULL
+  cd <- SummarizedExperiment::colData(analysis@se)
+  SummarizedExperiment::colData(analysis@se) <- S4Vectors::DataFrame(
+    sample_id = cd$sample_id,
+    row.names = rownames(cd)
+  )
+
+  # Provide a minimal valid SAIT results data.frame so auto-detection is reached
+  analysis@sait_results <- list(
+    sait_interaction = data.frame(
+      gene = character(0),
+      adj_p_interaction = numeric(0),
+      stringsAsFactors = FALSE
+    )
+  )
+
+  expect_error(
+    TSENAT::plot_sait(analysis),
+    "Cannot auto-detect condition_col"
+  )
+})
+
 test_that("plot_sait: handles n_top parameter", {
   skip_if_not_installed("SummarizedExperiment")
   

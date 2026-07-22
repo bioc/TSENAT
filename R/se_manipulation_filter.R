@@ -145,20 +145,28 @@
 }
 
 # ============================================================================
-# HELPER: Resolve assay by name/index with fallback logic OPTIMIZATION:
-# Consolidated from 3 duplicate implementations @noRd
+# HELPER: Resolve assay by name/index with strict validation @noRd
 .resolve_assay_index <- function(assay_ref, assay_names) {
+    if (!is.character(assay_names) || length(assay_names) == 0L) {
+        stop("Assay lookup failed: available assay names are missing or invalid.", call. = FALSE)
+    }
+
     if (is.character(assay_ref)) {
         idx <- which(assay_names == assay_ref)
-        if (length(idx) == 1)
+        if (length(idx) == 1L)
             return(idx)
-        return(1)  # Fallback to first
-    } else if (is.numeric(assay_ref)) {
-        if (assay_ref >= 1 && assay_ref <= length(assay_names))
-            return(assay_ref)
-        return(1)  # Fallback to first
+        stop(sprintf("Assay '%s' not found. Available assays: %s", assay_ref,
+            paste(assay_names, collapse = ", ")), call. = FALSE)
     }
-    1  # Default to first
+
+    if (is.numeric(assay_ref) && length(assay_ref) == 1L && is.finite(assay_ref)) {
+        if (assay_ref >= 1 && assay_ref <= length(assay_names)) {
+            return(as.integer(assay_ref))
+        }
+    }
+
+    stop(sprintf("Assay reference %s is invalid. Available assays: %s", paste(deparse(assay_ref), collapse = ""),
+        paste(assay_names, collapse = ", ")), call. = FALSE)
 }
 
 # ============================================================================
@@ -189,40 +197,6 @@
 
     # No TPM found - error
     return(NULL)
-}
-
-# ============================================================================
-# HELPER: Get gene IDs from rowData or tx2gene mapping Returns NULL if no gene
-# mapping available @noRd
-.get_gene_ids <- function(se) {
-    # Try rowData first
-    rd <- SummarizedExperiment::rowData(se)
-    if (!is.null(rd) && nrow(rd) > 0 && "gene_id" %in% colnames(rd)) {
-        return(rd$gene_id)
-    }
-
-    # Try tx2gene mapping from metadata
-    md <- S4Vectors::metadata(se)
-    if (!is.null(md$tx2gene) && is.data.frame(md$tx2gene) && nrow(md$tx2gene) > 0) {
-        tx2gene <- md$tx2gene
-        # Assume first column is transcript ID, second is gene ID
-        if (ncol(tx2gene) >= 2) {
-            txcol <- colnames(tx2gene)[1]
-            genecol <- colnames(tx2gene)[2]
-            # Match rownames to transcript column and return gene IDs in
-            # correct order
-            tx_names <- rownames(se)
-            if (length(tx_names) > 0) {
-                match_idx <- match(tx_names, tx2gene[[txcol]])
-                matched_genes <- tx2gene[[genecol]][match_idx]
-                if (any(!is.na(matched_genes))) {
-                  return(matched_genes)
-                }
-            }
-        }
-    }
-
-    NULL
 }
 
 # ============================================================================

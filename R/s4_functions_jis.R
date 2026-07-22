@@ -265,9 +265,8 @@ calculate_jis <- function(analysis, condition_col = NULL, subject_col = NULL, ge
     if (is.null(condition_col)) {
         condition_col <- auto_detect_column(cd_cols, config_list = analysis@config,
             config_key = "condition_col", priority_candidates = c("sample_type",
-                "condition", "group", "sample_group"), default_fallback = if (length(cd_cols) >
-                0)
-                cd_cols[1] else NULL, verbose = FALSE, param_name = "condition_col")
+                "condition", "group", "sample_group"), default_fallback = NULL,
+            verbose = verbose, param_name = "condition_col")
     } else {
         # Validate explicit condition_col exists
         if (!condition_col %in% cd_cols) {
@@ -291,7 +290,7 @@ calculate_jis <- function(analysis, condition_col = NULL, subject_col = NULL, ge
     # Use explicit gene_col if provided, otherwise auto-detect
     if (is.null(gene_col)) {
         gene_col <- auto_detect_column(rd_cols, config_list = analysis@config, config_key = "gene_col",
-            priority_candidates = c("gene_id", "gene", "Gene", "gene_name"), default_fallback = "gene",
+            priority_candidates = c("gene_id", "gene", "Gene", "gene_name"), default_fallback = NULL,
             verbose = verbose, param_name = "gene_col")
     } else {
         # Validate explicit gene_col exists if rowData is present
@@ -301,11 +300,17 @@ calculate_jis <- function(analysis, condition_col = NULL, subject_col = NULL, ge
         }
     }
 
+    if (is.null(gene_col)) {
+        stop("[calculate_jis] Cannot auto-detect gene_col from rowData. ",
+            "Available rowData columns: ", paste(rd_cols, collapse = ", "),
+            "\n\nSOLUTION: Set @config$gene_col or pass explicit parameter", call. = FALSE)
+    }
+
     # Use explicit isoform_col if provided, otherwise auto-detect
     if (is.null(isoform_col)) {
         isoform_col <- auto_detect_column(rd_cols, config_list = analysis@config,
             config_key = "isoform_col", priority_candidates = c("transcript_id",
-                "transcript", "isoform", "Isoform", "tx_id"), default_fallback = "transcript",
+                "transcript", "isoform", "Isoform", "tx_id"), default_fallback = NULL,
             verbose = verbose, param_name = "isoform_col")
     } else {
         # Validate explicit isoform_col exists if rowData is present
@@ -313,6 +318,12 @@ calculate_jis <- function(analysis, condition_col = NULL, subject_col = NULL, ge
             stop("[calculate_jis] isoform_col '", isoform_col, "' not found in rowData.\n",
                 "  Available columns: ", paste(rd_cols, collapse = ", "), call. = FALSE)
         }
+    }
+
+    if (is.null(isoform_col)) {
+        stop("[calculate_jis] Cannot auto-detect isoform_col from rowData. ",
+            "Available rowData columns: ", paste(rd_cols, collapse = ", "),
+            "\n\nSOLUTION: Set @config$isoform_col or pass explicit parameter", call. = FALSE)
     }
 
     list(condition_col = condition_col, gene_col = gene_col, isoform_col = isoform_col)
