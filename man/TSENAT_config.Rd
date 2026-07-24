@@ -30,7 +30,7 @@ TSENAT_config(
   sait_pcorr = c("BH", "bonferroni", "hochberg", "holm"),
   jis_use_sait_fdr = TRUE,
   divergence_ci = 0.95,
-  assumptions_checks = c("rank", "gam", "all"),
+  assumptions_checks = c("all", "rank", "gam"),
   ...
 )
 }
@@ -122,7 +122,7 @@ cfg <- TSENAT_config(
   control = 'untreated'
 )
 
-# For Scheirer-Ray-Hare rank tests (multiple q-values)
+# For Conover-Iman Rank Transform tests (multiple q-values)
 cfg <- TSENAT_config(
   q = seq(0, 2, by = 0.5),          # Multiple q-values for spectrum or advanced testing
   condition_col = 'treatment',

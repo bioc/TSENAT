@@ -1,6 +1,6 @@
 ---
-title: "Appendix B: Non-Parametric Validation of Scale-Adaptive Interaction Test Results via GAMM and Rank-Based Methods"
-author: "Cristobal Gallardo <gallardoalba@pm.me>"
+title: "Appendix B: Non-Parametric Validation of Scale-Adaptive Interaction Test Results via GAMM and Aligned Rank Transform (ART)"
+author: "Cristobal Gallardo Alba <gallardoalba@pm.me>"
 date: "`r Sys.Date()`"
 output:
   BiocStyle::html_document:
@@ -50,26 +50,27 @@ The primary goal of this vignette is to validate that discoveries of scale-depen
 - Paired design structure: Uses random intercepts by subject (~1|subject) with AR(1) correlation structure to accommodate repeated entropy measurements across q-values within each subject. This hierarchical approach preserves paired sample structure while modeling autocorrelation in q-ordered measurements.
 - Distributional assumption: Uses Gaussian residuals (standard for mixed-effects models); automatically detects bounded support [0,1] entropy but applies Gaussian family due to `mgcv::gamm()` limitations with extended families in paired designs.
 - Treatment of entropic structure: Treats q-values as time-like ordered measurements within each subject, applies ARIMA(1,1,0) first-differencing to remove monotone trend and ensure stationarity; AR(1) correlation structure captured through nlme::corAR1() specification.
-- Heteroscedasticity handling: Automatically detects variance heterogeneity (Breusch-Pagan test); ; however, heteroscedasticity-based variance weights are not applied in paired designs due to `mgcv::gamm()` limitations.
+- Heteroscedasticity handling: Automatically detects variance heterogeneity (Breusch-Pagan test); however, heteroscedasticity-based variance weights are not applied in paired designs due to `mgcv::gamm()` limitations.
 - Key advantage: Captures smooth nonlinear q × condition interactions while accommodating paired sample correlation structure through random intercepts and AR(1) correlation modeling; includes small-sample bias correction for n < 20. 
 
-**Method 2: Rank-Based Scheirer-Ray-Hare Test (SRH)** with Hochberg Step-Up Correction.
+**Method 2: Aligned Rank Transform (ART)** — State-of-the-art non-parametric interaction testing, with Hochberg Step-Up Correction. Falls back to Conover-Iman Rank Transform via `method='rt'` if needed.
 
-- Framework: Pure non-parametric method; zero parametric or distributional assumptions.
-- Distributional assumption: None; operates entirely on ranks (1, 2, ..., n), equivalent to two-way ANOVA on ordinal data.
-- Treatment of q-ordering: Two-way SRH test on ranks, treating q-values as within-subject paired measurements; decomposes ranked data via ANOVA and computes F-statistic.
-- Heteroscedasticity handling: Rank transformation inherently robust to heteroscedasticity (variance differences do not affect relative ordering); Hochberg step-up correction controls FWER across multiple tests.
-- Key advantage: Maximally robust to outliers and any distributional violations; valid under any continuous distribution and correlation structure.
+- Framework: Pure non-parametric method via the ARTool package [@S273]. Strips main effects before ranking ("alignment") to preserve interaction structure [@S271; @S272]. Zero parametric or distributional assumptions.
+- Distributional assumption: None; operates entirely on aligned ranks. Valid under any continuous distribution and correlation structure.
+- Treatment of q-ordering: Two-way ART on raw entropy values, treating q-values as ordered factors; aligned ranks decomposed via ANOVA with proper F-test for interactions.
+- Heteroscedasticity handling: ART inherently robust to heteroscedasticity through alignment and ranking; Hochberg step-up correction controls FWER across multiple tests.
+- Key advantage: State-of-the-art for non-parametric interaction testing. Properly handles factorial interactions by removing main effects before ranking. More reliable Type I error control than classical rank-transform methods for interaction terms.
 
 
 ## Why Two Methods for One Question?
 
 Statistical testing in transcriptomics faces a fundamental challenge: no single method is universally optimal. Different approaches trade-off power for robustness:
 
-| Aspect | Parametric (GAMM) | Non-Parametric (Rank-Based) |
-|--------|------------------|----------------------------|
-| Assumptions | Normality, homoscedasticity | Ranks only; fully non-parametric |
+| Aspect | Parametric (GAMM) | Non-Parametric (ART) |
+|--------|------------------|----------------------|
+| Assumptions | Normality, homoscedasticity | None; aligned ranks, fully non-parametric |
 | Power | Highest (if assumptions hold) | Good; reduced but robust to violations |
+| Interaction testing | Standard ANOVA-type | Proper interaction tests via alignment [@S271] |
 | Robustness | Moderate | Highest |
 | Outlier sensitivity | Moderate potential for bias | Minimal; inherently resistant |
 
@@ -83,7 +84,6 @@ This section initializes the analysis environment by loading required packages, 
 
 ```{r load-packages, message=FALSE}
 suppressPackageStartupMessages({
-    library(TSENAT)
     library(ggplot2)
     library(SummarizedExperiment)
     library(dplyr)
@@ -91,6 +91,16 @@ suppressPackageStartupMessages({
 })
 
 set.seed(42)
+
+if (!requireNamespace("devtools", quietly = TRUE)) {
+    stop("Please install devtools to run this vignette against the local package source.")
+}
+if ("package:TSENAT" %in% search()) {
+    detach("package:TSENAT", unload = TRUE, character.only = TRUE)
+}
+
+pkg_root <- normalizePath("..", mustWork = FALSE)
+devtools::load_all(pkg_root)
 
 # Load preprocessed dataset
 data(readcounts)
@@ -135,7 +145,7 @@ analysis <- filter_analysis(
 
 ## Computing Tsallis Entropy with Pseudocount Regularization
 
-Pseudocounts are critical for statistical robustness when applying rank-based tests to sparse RNA-seq count data. RNA-seq experiments typically contain many zero or near-zero counts, which creates two problems for rank-based nonparametric methods:
+Pseudocounts are critical for statistical robustness when applying non-parametric tests to sparse RNA-seq count data. RNA-seq experiments typically contain many zero or near-zero counts, which creates two problems for rank-based methods:
 
 1. **Ties in rankings:** Sparse counts produce many tied values (especially zeros), which reduces the discriminatory power of rank tests. Rank-based statistics depend on unique orderings; when many observations are identical, the test statistic contains less information, reducing statistical power.
 
@@ -157,9 +167,9 @@ analysis <- calculate_diversity(
 )
 ```
 
-# Rank-Based Approach (SRH)
+# Aligned Rank Transform (ART)
 
-The SRH test is a two-way non-parametric ANOVA that operates on ranks rather than raw values. It is particularly well-suited for Tsallis entropy analysis for three fundamental reasons:
+TSENAT uses the **Aligned Rank Transform (ART)** as the default non-parametric method for testing Q×Condition interactions. ART is the state-of-the-art for non-parametric factorial analysis, implemented via the ARTool R package [@S273; @S272]. The classical Conover-Iman Rank Transform remains available via `method='rt'` as a fallback [@S270].
 
 1. **Robustness to Distribution Violations**
 
@@ -169,13 +179,13 @@ Tsallis entropy values exhibit inherent distributional properties that often vio
 - Heteroscedasticity: Variance in entropy estimates varies systematically across q-values. Low q-values (emphasizing rare transcripts) produce volatile entropy estimates with high variance; high q-values (emphasizing abundant transcripts) produce stable estimates with lower variance.
 - Outlier sensitivity: Rare isoforms and count variability can produce extreme entropy values that heavily influence parametric tests.
 
-The SRH test avoids these issues by replacing raw entropy values with their ranks (1, 2, 3, ..., n). Ranks are **uniformly distributed and contain no outliers**, making the method valid for ANY continuous distribution—normal, skewed, bimodal, or otherwise. Critically, rank ordering is unaffected by normalization choice; whether entropy is normalized, log-transformed, or left raw, the test produces identical results [@S270; @S271].
+ART avoids these issues through alignment and ranking — stripping main effects before ranking preserves interaction structure while eliminating distributional dependence. The aligned ranks are uniformly distributed and contain no outliers, making the method valid for ANY continuous distribution [@S271; @S272]. Critically, rank ordering is unaffected by normalization choice; whether entropy is normalized, log-transformed, or left raw, the test produces identical results [@S270].
 
 2. **Paired Design for Ordered q-Value Structure**
 
 Tsallis entropy has a fundamental sequential property: entropy curves are smooth functions of q. As q increases from 0 (rare-species-emphasizing) to ∞ (common-species-emphasizing), entropy values change systematically. This ordered structure is critical to interpreting q-dependent patterns and exhibits **AR(1) autocorrelation**: consecutive q-values produce correlated entropy estimates.
 
-The SRH test handles this structure by treating measurements as paired/repeated within genes across ordered q-values, capturing the sequential nature while maintaining exchangeability of samples. Autocorrelation in the original entropy values does NOT affect rank ordering or the validity of inference—this property, known as the *exchangeability property* of rank-based tests, ensures that rank-based inference is valid under any correlation pattern [@S019; @C018]. Within-subject ranking preserves pairing structure while removing the influence of AR(1) dependence through rank transformation [@S030; @K003].
+ART handles this structure through its alignment step: within-subject ranking after stripping main effects preserves the pairing structure while removing the influence of AR(1) dependence [@S271; @S272]. Autocorrelation in the original entropy values does NOT affect aligned rank ordering or the validity of inference — this property, known as the *exchangeability property* of rank-based tests, ensures that rank-based inference is valid under any correlation pattern [@S019; @C018].
 
 3. **Interaction Testing: Testing q × Condition Effects**
 
@@ -191,13 +201,13 @@ where:
 - $MS_{\text{residual}}$ = residual sum of squares / residual degrees of freedom
 - $F$-statistic follows $F$-distribution under null hypothesis of no interaction
 
-This directly tests the core biological question: "Does entropy q-dependence differ between groups?" The rank-transformed two-way ANOVA is mathematically equivalent to the original SRH test statistic but computationally more stable and easier to interpret. Modern extensions of rank-based testing demonstrate the validity of permutation procedures for testing interactions even under complex dependence structures [@S166].
+This directly tests the core biological question: "Does entropy q-dependence differ between groups?" The aligned rank ANOVA is the modern state-of-the-art approach for non-parametric interaction testing, validated across balanced and unbalanced designs [@S272].
 
 ## Assumption Validation
 
 To ensure valid statistical inference, we verify key data assumptions across multiple dimensions.
 
-```{r validate-srh-assumptions, message=FALSE, results='hide'}
+```{r validate-rank-transform-assumptions, message=FALSE, results='hide'}
 # Validate statistical assumptions (including GAMM diagnostics)
 analysis <- calculate_assumptions(
     analysis,
@@ -219,41 +229,41 @@ if (!is.null(check_results) && !is.null(check_results$assumptions_table)) {
   
   knitr::kable(
     assumptions_df,
-    caption = "**Supplementary Table 14 | Assumption Checks for Scheirer-Ray-Hare Test.** Evaluates homogeneity of variance and normality for rank-based interaction test validity."
+    caption = "**Supplementary Table 14 | Assumption Checks for Aligned Rank Transform (ART).** Evaluates homogeneity of variance and normality for rank-based interaction test validity."
   )
 }
 ```
 
 
-**Interpretation of Results:** The exchangeability test, the unique assumption of the SRH test, detects strong serial correlation (p ≈ 0), indicating that consecutive samples are more correlated than expected by chance. This violation of exchangeability is **not problematic** for SRH because rank-based inference satisfies the *exchangeability property*—a principle ensuring that rank statistics depend only on value ordering, not on correlations in the original data [@S270; @S271; @K003]. The three reasons outlined above (robustness to distribution violations, paired design for ordered structure, and interaction testing) together uniquely suit SRH for multi-q entropy validation without requiring strong distributional assumptions.
+**Interpretation of Results:** The exchangeability test detects strong serial correlation (p ≈ 0), indicating that consecutive samples are more correlated than expected by chance. This violation is **not problematic** for the Aligned Rank Transform because ART's alignment step removes main effects before ranking, and rank-based inference satisfies the *exchangeability property* — a principle ensuring that rank statistics depend only on value ordering, not on correlations in the original data [@S270; @S271; @K003]. The three reasons outlined above (distributional robustness, paired ordered structure handling, and proper interaction testing via alignment) together make ART ideally suited for multi-q entropy validation without requiring strong distributional assumptions.
 
-## SRH Test: Testing q x Condition Interactions
+## Aligned Rank Transform (ART): Testing q × Condition Interactions
 
-Now we will use the SRH test to evaluate whether entropy patterns across entropic indices (q-values) differ between normal and tumor samples.
+Now we use the **Aligned Rank Transform (ART, default)** — the state-of-the-art non-parametric method for interaction testing — combined with Hochberg step-up correction for multiple testing across genes. ART properly handles factorial interactions by stripping main effects before ranking, providing more reliable Type I error control than classical rank-transform methods.
 
-```{r srh-rank-test-analysis, message=FALSE, results='hide'}
-# IMPORTANT: Create a copy of analysis before running SRH
+```{r rank-transform-test-analysis, message=FALSE, results='hide'}
+# Run Aligned Rank Transform (ART, default method)
 # This preserves the GAMM results in 'analysis' for later concordance comparison
 
-# Run SRH test for q * condition INTERACTION on the copy
-analysis <- calculate_srh(
+# Run ART for q × condition interaction
+analysis_rank <- calculate_rank_transform(
     analysis,
     multicorr = "hochberg"
 )
 
 # Extract ALL results (no filtering) for summary statistics
-srh_results_all <- results(analysis, type = "rank_test", rankBy = "pvalue")
+rank_transform_results_all <- results(analysis_rank, type = "rank_test", rankBy = "pvalue")
 
 # Extract top significant genes for display
-srh_results <- results(analysis, type = "rank_test", rankBy = "pvalue", n = 20, filterFDR = 0.05)
-print(head(srh_results, n = 10))
+rank_transform_results <- results(analysis_rank, type = "rank_test", rankBy = "pvalue", n = 20, filterFDR = 0.05)
+print(head(rank_transform_results, n = 10))
 ```
 
-```{r srh-results-summary, message=FALSE, echo=FALSE}
+```{r rank-transform-results-summary, message=FALSE, echo=FALSE}
 # Create summary statistics table with additional metrics using ALL tested genes
 # Handle NA and NaN values properly
-mean_effect <- mean(srh_results_all$effect_size_eta2, na.rm = TRUE)
-median_effect <- median(srh_results_all$effect_size_eta2, na.rm = TRUE)
+mean_effect <- mean(rank_transform_results_all$effect_size_eta2, na.rm = TRUE)
+median_effect <- median(rank_transform_results_all$effect_size_eta2, na.rm = TRUE)
 
 rank_summary_stats <- data.frame(
   Metric = c(
@@ -266,20 +276,20 @@ rank_summary_stats <- data.frame(
     "Strong effect genes ($\\eta^2$ > 10%)"
   ),
   Value = c(
-    nrow(srh_results_all),
-    sum(srh_results_all$p_value < 0.05, na.rm = TRUE),
-    sum(srh_results_all$adj_p_value < 0.05, na.rm = TRUE),
-    sum(is.na(srh_results_all$p_value)),
+    nrow(rank_transform_results_all),
+    sum(rank_transform_results_all$p_value < 0.05, na.rm = TRUE),
+    sum(rank_transform_results_all$adj_p_value < 0.05, na.rm = TRUE),
+    sum(is.na(rank_transform_results_all$p_value)),
     if (is.na(mean_effect) || !is.finite(mean_effect)) "Not available" else sprintf("%.1f%%", mean_effect * 100),
     if (is.na(median_effect) || !is.finite(median_effect)) "Not available" else sprintf("%.1f%%", median_effect * 100),
-    sum(srh_results_all$p_value < 0.05 & srh_results_all$effect_size_eta2 > 0.10, na.rm = TRUE)
+    sum(rank_transform_results_all$p_value < 0.05 & rank_transform_results_all$effect_size_eta2 > 0.10, na.rm = TRUE)
   )
 )
 
-knitr::kable(rank_summary_stats, caption = "**Supplementary Table 15 | Scheirer-Ray-Hare Test Results Summary.** Rank-based nonparametric test of *q* × condition interactions. Compare with GAMM results (main vignette Table 3) to assess parametric vs. nonparametric method concordance.", label = "tab:srh-test-summary", align = c("l", "r"))
+knitr::kable(rank_summary_stats, caption = "**Supplementary Table 15 | Aligned Rank Transform (ART) Results Summary.** Non-parametric test of *q* × condition interactions via ART. Compare with GAMM results (main vignette Table 3) to assess parametric vs. non-parametric method concordance.", label = "rank-transform-test-summary", align = c("l", "r"))
 
 # Show top genes results
-rank_sig <- srh_results_all[!is.na(srh_results_all$p_value), ]
+rank_sig <- rank_transform_results_all[!is.na(rank_transform_results_all$p_value), ]
 if (nrow(rank_sig) > 0) {
   rank_sig <- rank_sig[order(rank_sig$adj_p_value), ]
   rank_sig <- rank_sig[1:min(10, nrow(rank_sig)), ]
@@ -307,7 +317,7 @@ if (nrow(rank_sig) > 0) {
     # Replace test method name for clarity (removed - column no longer included)
     # if ("test_method" %in% colnames(rank_display)) {
     #   rank_display$test_method <- sapply(rank_display$test_method, function(x) {
-    #     if (is.na(x)) "NA" else if (x == "srh_paired") "Scheirer-Ray-Hare (paired)" else x
+    #     if (is.na(x)) "NA" else if (x == "rt_paired") "Conover-Iman Rank Transform (paired)" else x
     #   })
     # }
     
@@ -325,7 +335,7 @@ if (nrow(rank_sig) > 0) {
     }
     
     knitr::kable(rank_display, 
-                 caption = "**Supplementary Table 16 | Top genes identified by Scheirer-Ray-Hare rank-based test.** Ranked by adjusted p-value; comparison with GAMM (main vignette Table 3) reveals method-specific sensitivities.",
+                 caption = "**Supplementary Table 16 | Top genes identified by Aligned Rank Transform (ART).** Ranked by adjusted p-value; comparison with GAMM (main vignette Table 3) reveals method-specific sensitivities.",
                  col.names = c("Gene", "P-value", "Adj. P-value", "F-Statistic", 
                                "Effect Size (η²)", "Interaction Class")[1:ncol(rank_display)])
   }
@@ -334,10 +344,10 @@ if (nrow(rank_sig) > 0) {
 
 Visualize q-curves for top genes:
 
-```{r extended-fig-1-srh-q-curves, fig.width=12, fig.height=8, message=FALSE, out.width="98%", fig.pos="H", fig.cap="**Supplementary Figure 1 | SRH rank test results for scale-dependent isoform switching.** Q-curves for top genes identified by Scheirer-Ray-Hare rank-based test; compare visual patterns with GAMM results (main vignette Figure 2) to assess method agreement."}
-# Plot top genes from SRH test (using all genes, not just significant ones)
+```{r extended-fig-1-rank-transform-q-curves, fig.width=12, fig.height=8, message=FALSE, out.width="98%", fig.pos="H", fig.cap="**Supplementary Figure 1 | Aligned Rank Transform (ART) results for scale-dependent isoform switching.** Q-curves for top genes identified by ART; compare visual patterns with GAMM results (main vignette Figure 2) to assess method agreement."}
+# Plot top genes from Aligned Rank Transform (ART) (using all genes, not just significant ones)
 # This ensures the plot displays n_top genes regardless of significance threshold
-top_genes_plot <- plot_diversity_spectrum(analysis, sait_res = srh_results_all, n_top = 4)
+top_genes_plot <- plot_diversity_spectrum(analysis, sait_res = rank_transform_results_all, n_top = 4)
 print(top_genes_plot)
 ```
 
@@ -388,7 +398,7 @@ summary_stats <- data.frame(
   )
 )
 
-knitr::kable(summary_stats, caption = "**Supplementary Table 17 | GAMM Results Summary.** Overview of generalized additive mixed model statistics for q × condition interaction tests across full q-spectrum with paired sample structure.", label = "tab:gam-summary-stats", align = c("l", "r"))
+knitr::kable(summary_stats, caption = "**Supplementary Table 17 | GAMM Results Summary.** Overview of generalized additive mixed model statistics for q × condition interaction tests across full q-spectrum with paired sample structure.", label = "gam-summary-stats", align = c("l", "r"))
 
 # Show top genes with additional information
 if ("p_interaction" %in% colnames(sait_results)) {
@@ -448,13 +458,24 @@ if ("p_interaction" %in% colnames(sait_results)) {
         })
       }
       
-      # Rename columns for better readability
-      colnames(gam_display) <- c("Gene", "p (interaction)", "Adjusted p", "Effect size", "Test statistic", "df")
+      # Rename columns for better readability — dynamic to match actual columns present
+      col_name_map <- c(
+        "gene" = "Gene",
+        "p_interaction" = "p (interaction)",
+        "adj_p_interaction" = "Adjusted p",
+        "effect_size" = "Effect size",
+        "test_statistic" = "Test statistic",
+        "df_residual" = "df"
+      )
+      present_cols <- intersect(names(col_name_map), colnames(gam_display))
+      gam_display <- gam_display[, present_cols, drop = FALSE]
+      colnames(gam_display) <- unname(col_name_map[present_cols])
+      n_cols <- ncol(gam_display)
       
       knitr::kable(gam_display, 
-                   caption = "**Supplementary Table 18 | Top 10 Genes by GAMM p-value (with Effect Size and Test Statistics).** Ranked by adjusted p-value; compare with SRH results (Supplementary Table 16) for method agreement assessment.",
-                   label = "tab:gam-top-genes",
-                   align = c("l", "r", "r", "r", "r", "r"))
+                   caption = "**Supplementary Table 18 | Top 10 Genes by GAMM p-value (with Effect Size and Test Statistics).** Ranked by adjusted p-value; compare with ART results (Supplementary Table 16) for method agreement assessment.",
+                   label = "gam-top-genes",
+                   align = c("l", rep("r", max(0, n_cols - 1))))
     }
   }
 } else {
@@ -467,18 +488,23 @@ if ("p_interaction" %in% colnames(sait_results)) {
 
 # Method Concordance Analysis
 
-A critical validation step is to compare whether the SRH rank-based test and GAM produce consistent results. High concordance between methods (i.e., genes significant in both approaches) provides strong evidence that discoveries are robust to methodological choice. Discordant genes—those significant in only one method—warrant closer inspection: they may represent genuine biological signals revealed by one method's specific advantages, or artifacts of that method's assumptions. This section quantifies agreement between approaches and identifies high-confidence genes significant across both statistical frameworks.
+A critical validation step is to compare whether the Aligned Rank Transform (ART) and GAMM produce consistent results. High concordance between methods (i.e., genes significant in both approaches) provides strong evidence that discoveries are robust to methodological choice. Discordant genes — those significant in only one method — warrant closer inspection: they may represent genuine biological signals revealed by one method's specific advantages, or artifacts of that method's assumptions. This section quantifies agreement between approaches and identifies high-confidence genes significant across both statistical frameworks.
 
-```{r compare-srh-gam-methods, message=FALSE}
+```{r compare-rank-transform-gam-methods, message=FALSE}
 # Compute concordance analysis using new two-object API
-analysis <- calculate_concordance(
+rank_results <- results(analysis_rank, type = "rank_test")
+if (is.null(rank_results) || length(rank_results) == 0) {
+    stop("Cannot run calculate_concordance(): rank_test results are empty. Ensure calculate_rank_transform() completed successfully.")
+}
+
+analysis_rank <- calculate_concordance(
     analysis_sait = analysis_sait,
-    analysis_rank = analysis,
+    analysis_rank = analysis_rank,
     verbose = TRUE
 )
 
 # Extract concordance results with list format for component display
-concordance_results <- results(analysis, type = "concordance", format = "list")
+concordance_results <- results(analysis_rank, type = "concordance", format = "list")
 ```
 
 ```{r display-concordance-metrics, message=FALSE, echo=FALSE, results='asis'}
@@ -486,26 +512,26 @@ concordance_results <- results(analysis, type = "concordance", format = "list")
 if (!is.null(concordance_results) && is.list(concordance_results)) {
   # Display summary table
   if (!is.null(concordance_results$summary_table) && nrow(concordance_results$summary_table) > 0) {
-    knitr::kable(concordance_results$summary_table, 
-                 caption = "**Supplementary Table 19 | Global Concordance Metrics: GAMM vs Scheirer-Ray-Hare Methods.** Quantifies agreement between parametric (GAMM) and nonparametric (SRH) approaches for detecting q × condition interactions.",
-                 align = c("l", "r"))
+    print(knitr::kable(concordance_results$summary_table, 
+                 caption = "**Supplementary Table 19 | Global Concordance Metrics: GAMM vs Aligned Rank Transform (ART).** Quantifies agreement between parametric (GAMM) and non-parametric (ART) approaches for detecting q × condition interactions.",
+                 align = c("l", "r")))
   }
   
   # Display agreement distribution
   if (!is.null(concordance_results$agreement_dist) && nrow(concordance_results$agreement_dist) > 0) {
     cat("\n")
-    knitr::kable(concordance_results$agreement_dist, 
-                 caption = "**Supplementary Table 20 | Agreement Distribution: Concordance by Gene Category.** Distribution of genes across categories: both methods significant, GAM only, SRH only, and neither method.",
-                 align = c("l", "r", "r"))
+    print(knitr::kable(concordance_results$agreement_dist, 
+                 caption = "**Supplementary Table 20 | Agreement Distribution: Concordance by Gene Category.** Distribution of genes across categories: both methods significant, GAMM only, ART only, and neither method.",
+                 align = c("l", "r", "r")))
   }
   
   # Display high-confidence genes (concordant in both methods)
   if (!is.null(concordance_results$high_conf_table) && nrow(concordance_results$high_conf_table) > 0) {
     cat("\n")
     n_hc <- nrow(concordance_results$high_conf_table)
-    knitr::kable(concordance_results$high_conf_table, 
-                 caption = paste0("**Supplementary Table 21 | Robust Entropic Order Index Interactions: High-Confidence Genes Detected by Both Methods (n=", n_hc, ", ranked by statistical significance).** Cross-method validation: genes significant in both GAM and SRH provide strongest evidence for q × condition effects."),
-                 align = c("l", "r", "r", "r", "r"))
+    print(knitr::kable(concordance_results$high_conf_table, 
+                 caption = paste0("**Supplementary Table 21 | Robust Entropic Order Index Interactions: High-Confidence Genes Detected by Both Methods (n=", n_hc, ", ranked by statistical significance).** Cross-method validation: genes significant in both GAMM and ART provide strongest evidence for q × condition effects."),
+                 align = c("l", "r", "r", "r", "r")))
   }
 } else {
   cat("Concordance results not available\n")
@@ -514,13 +540,13 @@ if (!is.null(concordance_results) && is.list(concordance_results)) {
 
 ## Statistical Power vs. Robustness: Understanding Method Discordance
 
-The striking discordance between GAMM and SRH results (75.0% significant in GAMM only, 0.0% in rank test only, 2.6% both methods significant) reflects a fundamental trade-off in statistical methodology: **parametric methods maximize power when assumptions hold, while nonparametric methods sacrifice power for robustness to assumption violations**.
+The striking discordance between GAMM and ART results (42.1% significant in GAMM only, 1.3% in ART only, and 1.3% in both methods significant) reflects a fundamental trade-off in statistical methodology: **parametric methods maximize power when assumptions hold, while non-parametric methods sacrifice power for robustness to assumption violations**.
 
 GAMM's superior power derives from two factors:
 
-1. Distributional assumptions: GAMM assumes approximately normal residuals and homogeneous variance, which are reasonable after appropriate transformation for entropy data. Under these assumptions, parametric methods are theoretically optimal, achieving maximum power for a given type I error rate. The rank-based SRH test is assumption-free but necessarily discards quantitative information by converting measurements to ranks, which reduces statistical power when the underlying data are approximately normal.
+1. Distributional assumptions: GAMM assumes approximately normal residuals and homogeneous variance, which are reasonable after appropriate transformation for entropy data. Under these assumptions, parametric methods are theoretically optimal, achieving maximum power for a given type I error rate. ART is assumption-free but necessarily discards quantitative information through alignment and ranking, which reduces statistical power when the underlying data are approximately normal.
 
-2. Model flexibility with penalty: GAMM uses thin-plate splines with smoothness penalties that simultaneously fit nonlinear patterns while controlling degrees of freedom. This flexibility allows GAMM to detect subtle entropic index × group interactions across all q-values. The SRH test, by contrast, operates on rank patterns only, which is inherently less sensitive to continuous relationships across the ordering (q-values).
+2. Model flexibility with penalty: GAMM uses thin-plate splines with smoothness penalties that simultaneously fit nonlinear patterns while controlling degrees of freedom. This flexibility allows GAMM to detect subtle entropic index × group interactions across all q-values. ART operates on aligned rank patterns, which is inherently less sensitive to continuous relationships across q-values but provides superior Type I error control for interaction terms.
 
 This complementary approach—combining high-power parametric tests with robust nonparametric alternatives—provides confidence that discoveries are methodologically sound rather than artifacts of statistical assumptions.
 
@@ -528,11 +554,11 @@ This complementary approach—combining high-power parametric tests with robust 
 
 Visual comparison of concordance patterns provides intuitive assessment of which genes align between methods and which are method-specific. The following plots display significance calls, effect sizes, and agreement metrics in a format that facilitates interpretation of both robust discoveries and method-specific findings.
 
-```{r visualize-method-concordance, fig.width=10, fig.height=8, out.width="98%", fig.pos="H", fig.cap="**Supplementary Figure 2 | Method concordance visualization comparing SRH rank-based and GAMM approaches for detecting q × condition interactions.** Venn diagram or scatter plot showing overlap in genes identified as significant by each method; reveals parametric-nonparametric agreement patterns."}
+```{r visualize-method-concordance, fig.width=10, fig.height=8, out.width="98%", fig.pos="H", fig.cap="**Supplementary Figure 2 | Method concordance visualization comparing Aligned Rank Transform (ART) and GAMM approaches for detecting q × condition interactions.** Scatter plot showing overlap in genes identified as significant by each method; reveals parametric-non-parametric agreement patterns."}
 # Create comparison plot using S4 wrapper
 # Concordance analysis results are stored in analysis metadata after calculate_concordance()
-p <- plot_concordance(analysis, verbose = TRUE)
-print(p)
+p <- plot_concordance(analysis_rank, verbose = TRUE)
+grid::grid.draw(p)
 ```
 
 ***

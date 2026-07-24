@@ -31,7 +31,7 @@
 #
 # RETURNS:
 #   BiocParallel BPPARAM object
-.get_bpparam <- function(nthreads = 1) {
+.get_bpparam <- function(nthreads = 1, seed = NULL) {
     # Apply environment variable constraints
     nthreads <- .get_effective_nthreads(nthreads)
 
@@ -39,11 +39,13 @@
         return(BiocParallel::SerialParam())
     }
 
-    # On Unix-like systems, use MulticoreParam; on Windows use SnowParam
+    # AUDIT FIX #20: Pass RNGseed for reproducible parallel execution.
+    # Without RNGseed, different runs (even with set.seed) produce different results
+    # when using multiple threads.
     if (.Platform$OS.type == "unix") {
-        return(BiocParallel::MulticoreParam(workers = nthreads))
+        return(BiocParallel::MulticoreParam(workers = nthreads, RNGseed = seed))
     } else {
-        return(BiocParallel::SnowParam(workers = nthreads))
+        return(BiocParallel::SnowParam(workers = nthreads, RNGseed = seed))
     }
 }
 
@@ -67,7 +69,11 @@
     }
 
     # Parallel execution
-    bpparam <- .get_bpparam(nthreads)
+    # Derive seed from current RNG state for reproducibility across parallel runs.
+    # Without this, set.seed() has no effect on parallel workers, making results
+    # non-deterministic even when the main R session's RNG is seeded.
+    seed <- sample.int(.Machine$integer.max, 1)
+    bpparam <- .get_bpparam(nthreads, seed = seed)
 
     if (is.null(FUN.VALUE)) {
         return(BiocParallel::bplapply(X, FUN, BPPARAM = bpparam))

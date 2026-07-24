@@ -2096,7 +2096,7 @@ create_sait_res_p_interaction <- function() {
   )
 }
 
-# Helper: Create sait_res dataframe with adj_p_value format (Scheirer-Ray-Hare rank test)
+# Helper: Create sait_res dataframe with adj_p_value format (Conover-Iman Rank Transform)
 create_sait_res_adj_p_value <- function() {
   data.frame(
     gene = c("GENE_1", "GENE_2", "GENE_3", "GENE_4", "GENE_5"),
@@ -2348,7 +2348,7 @@ test_that("plot_diversity_spectrum gene-mode: detect adj_p_value format (line 58
   analysis <- setup_gene_mode_analysis()
   sait_res <- create_sait_res_adj_p_value()
   
-  # Should accept adj_p_value format (Scheirer-Ray-Hare rank test)
+  # Should accept adj_p_value format (Conover-Iman Rank Transform)
   result <- suppressWarnings(tryCatch({
     plot_diversity_spectrum(
       analysis,
@@ -5094,4 +5094,114 @@ test_that("Lazy switching_tables data types are consistent", {
     # Lazy computation
     tables <- results(analysis_sait_jis_q12, type = "switching_tables")
     expect_true(is.data.frame(tables) || is.list(tables))
+})
+
+# =============================================================================
+# Tests for plot_divergence_distribution() — validation paths
+# =============================================================================
+
+test_that("plot_divergence_distribution errors with non-TSENATAnalysis input", {
+    expect_error(
+        plot_divergence_distribution(list()),
+        "'analysis' must be a TSENATAnalysis object"
+    )
+})
+
+test_that("plot_divergence_distribution errors when effect sizes not computed", {
+    data(readcounts, package = "TSENAT", envir = environment())
+    readcounts <- as.matrix(readcounts)
+    mode(readcounts) <- "numeric"
+    
+    metadata_df <- read.table(
+        system.file("extdata", "metadata.tsv", package = "TSENAT"),
+        header = TRUE, sep = "\t"
+    )
+    gff3_file <- system.file("extdata", "annotation.gff3.gz", package = "TSENAT")
+    
+    config <- TSENAT_config(
+        sample_col = "sample",
+        condition_col = "condition",
+        q = seq(0, 2, by = 0.5)
+    )
+    analysis <- suppressWarnings(build_analysis(
+        readcounts = readcounts,
+        tx2gene = gff3_file,
+        metadata = metadata_df,
+        config = config,
+        tpm = tpm,
+        effective_length = effective_length
+    ))
+    # Don't compute effect sizes
+    
+    expect_error(
+        plot_divergence_distribution(analysis),
+        "Effect sizes not found"
+    )
+})
+
+test_that("plot_divergence_distribution errors with invalid effect size structure", {
+    data(readcounts, package = "TSENAT", envir = environment())
+    readcounts <- as.matrix(readcounts)
+    mode(readcounts) <- "numeric"
+    
+    metadata_df <- read.table(
+        system.file("extdata", "metadata.tsv", package = "TSENAT"),
+        header = TRUE, sep = "\t"
+    )
+    gff3_file <- system.file("extdata", "annotation.gff3.gz", package = "TSENAT")
+    
+    config <- TSENAT_config(
+        sample_col = "sample",
+        condition_col = "condition",
+        q = seq(0, 2, by = 0.5)
+    )
+    analysis <- suppressWarnings(build_analysis(
+        readcounts = readcounts,
+        tx2gene = gff3_file,
+        metadata = metadata_df,
+        config = config,
+        tpm = tpm,
+        effective_length = effective_length
+    ))
+    # Set up invalid effect size structure (not a list with interaction_results)
+    analysis@metadata$effect_sizes_divergence <- "invalid_structure"
+    
+    expect_error(
+        plot_divergence_distribution(analysis),
+        "Invalid effect size structure"
+    )
+})
+
+test_that("plot_divergence_distribution errors with empty interaction_results", {
+    data(readcounts, package = "TSENAT", envir = environment())
+    readcounts <- as.matrix(readcounts)
+    mode(readcounts) <- "numeric"
+    
+    metadata_df <- read.table(
+        system.file("extdata", "metadata.tsv", package = "TSENAT"),
+        header = TRUE, sep = "\t"
+    )
+    gff3_file <- system.file("extdata", "annotation.gff3.gz", package = "TSENAT")
+    
+    config <- TSENAT_config(
+        sample_col = "sample",
+        condition_col = "condition",
+        q = seq(0, 2, by = 0.5)
+    )
+    analysis <- suppressWarnings(build_analysis(
+        readcounts = readcounts,
+        tx2gene = gff3_file,
+        metadata = metadata_df,
+        config = config,
+        tpm = tpm,
+        effective_length = effective_length
+    ))
+    analysis@metadata$effect_sizes_divergence <- list(
+        interaction_results = data.frame()
+    )
+    
+    expect_error(
+        plot_divergence_distribution(analysis),
+        "non-empty data frame"
+    )
 })

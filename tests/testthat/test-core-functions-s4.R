@@ -63,7 +63,7 @@ test_that(".prepare_diversity_params extracts q values from config", {
                          "bootstrap_method", "bootstrap_ci", "tpm", 
                          "genes", "nboot", 
                          "bootstrap_include_diagnostics", "metadata", "norm_method", 
-                         "reference_group"))
+                         "reference_group", "log_base"))
 })
 
 test_that(".prepare_diversity_params uses explicit q values over config", {
@@ -1506,7 +1506,7 @@ test_that("S4 Wrappers: calculate_divergence accepts new arguments", {
   
   # Test each argument individually
   args_to_test <- list(
-    list(control_group = "Control"),
+    list(control_group = "control"),
     list(method = "mean"),
     list(paired = FALSE),
     list(bootstrap = FALSE),
@@ -1732,11 +1732,11 @@ test_that("calculate_divergence S4 wrapper basic call", {
   expect_true(is.null(result) || methods::is(result, "TSENATAnalysis"))
 })
 
-test_that("calculate_srh S4 wrapper with condition", {
+test_that("calculate_rank_transform S4 wrapper with condition", {
   analysis <- setup_minimal_analysis()
   
   result <- tryCatch({
-    TSENAT::calculate_srh(analysis, condition_col = "condition")
+    TSENAT::calculate_rank_transform(analysis, condition_col = "condition")
   }, error = function(e) NULL)
   
   expect_true(is.null(result) || methods::is(result, "TSENATAnalysis"))
@@ -1790,7 +1790,7 @@ test_that("calculate_rank_test without condition_col falls back", {
   analysis <- setup_minimal_analysis()
   
   result <- tryCatch({
-    TSENAT::calculate_srh(analysis)
+    TSENAT::calculate_rank_transform(analysis)
   }, error = function(e) NULL)
   
   expect_true(is.null(result) || methods::is(result, "TSENATAnalysis"))
@@ -2543,7 +2543,7 @@ test_that("plot_concordance verbose output uses correct slot names (Bug #1 fix)"
         high_conf = c("gene_1", "gene_2"),
         agreement_table = matrix(1:4, nrow=2),
         sait_method = "lmm_interaction",
-        rank_method = "scheirer_ray_hare",
+        rank_method = "conover_iman",
         timestamp = Sys.time()
     )
     

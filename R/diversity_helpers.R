@@ -228,7 +228,7 @@
 }
 
 
-.normalize_log_odds_ratio <- function(entropy_matrix, n_isoforms, q = 2) {
+.normalize_log_odds_ratio <- function(entropy_matrix, n_isoforms, q = 2, log_base = exp(1)) {
     if (!is.matrix(entropy_matrix) && !is.data.frame(entropy_matrix)) {
         stop("Input must be a matrix or data.frame", call. = FALSE)
     }
@@ -288,7 +288,7 @@
         # Vectorized S_max computation across all rows
         if (abs(col_q - 1) < 1e-10) {
             # Shannon entropy: H_max = log(m) (vectorized)
-            s_max_vec <- log(n_iso_vec)
+            s_max_vec <- log(n_iso_vec, base = log_base)
         } else {
             # Tsallis entropy: S_max = (1 - m^(1-q)) / (q-1) (vectorized)
             s_max_vec <- (1 - n_iso_vec^(1 - col_q))/(col_q - 1)
@@ -299,7 +299,11 @@
         valid_mask <- !is.na(n_iso_vec) & n_iso_vec > 1 & !is.na(col_q) & !is.na(s_vals) &
             is.finite(s_vals) & s_max_vec > 0 & s_vals > 0
 
-        result[valid_mask, col_idx] <- log(s_vals[valid_mask]/s_max_vec[valid_mask])
+        # AUDIT FIX July 2026: Use log(..., base = log_base) instead of hardcoded
+        # natural log to maintain consistency with the entropy calculation's
+        # logarithm base.
+        result[valid_mask, col_idx] <- log(s_vals[valid_mask]/s_max_vec[valid_mask],
+            base = log_base)
     }
 
     return(result)
@@ -822,50 +826,52 @@
     return(list(lower = lower, upper = upper))
 }
 
-.ci_bca <- function(x, bootstrap_dist, q, norm, ci, log_base, pseudocount, what) {
+.ci_bca <- function(x, bootstrap_dist, q, norm, ci, log_base, pseudocount, what, point_est = NULL) {
     alpha <- 1 - ci
     z_alpha <- qnorm(alpha/2)  # Two-tailed critical value
 
-    # Bias correction: z0 = Phi^{-1}(#F* <= F / B)
-    point_est <- .calculate_tsallis_entropy(x, q = q, norm = norm, what = what, log_base = log_base,
-        pseudocount = pseudocount)
+    # AUDIT FIX #4: Accept pre-computed point_est from caller to avoid recomputing
+    # from raw x when x has already been normalized (e.g., by effective_length).
+    if (is.null(point_est)) {
+        point_est <- .calculate_tsallis_entropy(x, q = q, norm = norm, what = what, log_base = log_base,
+            pseudocount = pseudocount)
+    }
     point_est <- as.numeric(point_est)
 
     # Proportion of bootstrap replicates <= point estimate
-    prop_less <- mean(bootstrap_dist <= point_est)
+    # AUDIT FIX #12: Use strict < comparison with +0.5/B padding to prevent
+    # qnorm(0) → -Inf when all bootstrap values exceed the point estimate.
+    # Clamp to [0.001, 0.999] to avoid qnorm(1) = Inf producing NaN.
+    B <- length(bootstrap_dist)
+    prop_less <- (sum(bootstrap_dist < point_est, na.rm = TRUE) + 0.5) / B
+    prop_less <- max(0.001, min(0.999, prop_less))
     z0 <- qnorm(prop_less)
 
-    # Acceleration: computed via vectorized left-one-out jackknife on bootstrap
-    # distribution OPTIMIZATION (April 2026): Replace O(n²) explicit loop with
-    # O(n) vectorized formula Mathematics: mean(bootstrap_dist[-i]) = (sum -
-    # bootstrap_dist[i]) / (n - 1) Reference: S121 (1993) Foundations of
-    # Jackknife, S115 (2015) BCa methodology This avoids redundant Tsallis
-    # recalculation while maintaining numerical equivalence
-
-    # Vectorized leave-one-out means: theta_jack[i] = (sum(bootstrap_dist) -
-    # bootstrap_dist[i]) / (n-1)
-    theta_bar <- mean(bootstrap_dist, na.rm = TRUE)
-    total_sum <- sum(bootstrap_dist, na.rm = TRUE)
-    n_valid <- sum(!is.na(bootstrap_dist))
-
-    # Leave-one-out mean for each bootstrap replicate
-    if (n_valid > 1) {
-        theta_jack <- (total_sum - bootstrap_dist)/(n_valid - 1)
+    # AUDIT FIX #3: BCa acceleration MUST be computed from true leave-one-out
+    # jackknife on the ORIGINAL data, not from the bootstrap distribution.
+    # Computing leave-one-out means of bootstrap replicates yields theta_jack[i] ≈ theta_bar
+    # for all i when B is large, forcing a → 0 and silently disabling the BCa skewness correction.
+    # Reference: Efron & Tibshirani (1993), "An Introduction to the Bootstrap", Chapter 14.
+    n_x <- length(x)
+    if (n_x >= 3) {
+        theta_jack <- numeric(n_x)
+        for (i in seq_len(n_x)) {
+            theta_jack[i] <- .calculate_tsallis_entropy(x[-i], q = q, norm = norm,
+                what = what, log_base = log_base, pseudocount = pseudocount)
+        }
     } else {
-        # Degenerate case: only 1 valid observation
-        theta_jack <- rep(theta_bar, length(bootstrap_dist))
-    }
-
-    # Filter out NAs from jackknife estimates
-    theta_jack_clean <- theta_jack[!is.na(theta_jack)]
-    if (length(theta_jack_clean) < 2) {
-        # Fall back to percentile if jackknife fails
+        # Degenerate: can't compute jackknife with <3 observations
         return(.ci_percentile(bootstrap_dist, ci = ci))
     }
 
-    # Acceleration: a = sum(theta_bar - theta_jack)^3 / (6 * (sum(theta_bar -
-    # theta_jack)^2)^1.5)
-    diffs <- theta_bar - theta_jack_clean
+    # Filter out NAs and compute acceleration
+    theta_jack_clean <- theta_jack[!is.na(theta_jack) & is.finite(theta_jack)]
+    if (length(theta_jack_clean) < 2) {
+        return(.ci_percentile(bootstrap_dist, ci = ci))
+    }
+
+    theta_bar_jack <- mean(theta_jack_clean)
+    diffs <- theta_bar_jack - theta_jack_clean
     numerator <- sum(diffs^3, na.rm = TRUE)
     denominator <- 6 * (sum(diffs^2, na.rm = TRUE))^1.5
 
@@ -1116,7 +1122,9 @@
 
     # Pre-allocate weights matrix (vectorized storage)
     weights_matrix <- matrix(1, nrow = n_rows, ncol = n_cols)
-    means_vector <- rep(0, n_cols)
+    # AUDIT FIX July 2026: Initialize to NA_real_ instead of 0 so that
+    # columns whose q-value cannot be matched do not silently fill NAs with 0.
+    means_vector <- rep(NA_real_, n_cols)
 
     # Process all columns efficiently (vectorized outer loop handling)
     for (col_idx in seq_len(n_cols)) {
@@ -1192,9 +1200,12 @@
     result[is_finite_mask] <- weights_matrix[is_finite_mask] * entropy_matrix[is_finite_mask] +
         (1 - weights_matrix[is_finite_mask]) * rep(means_vector, n_rows)[is_finite_mask]
 
-    # For NA/NaN values: use prior mean
+    # For NA/NaN values: use prior mean (only for columns where mean was
+    # successfully determined)
     for (col_idx in seq_len(n_cols)) {
-        result[is_na_mask[, col_idx], col_idx] <- means_vector[col_idx]
+        if (!is.na(means_vector[col_idx])) {
+            result[is_na_mask[, col_idx], col_idx] <- means_vector[col_idx]
+        }
     }
 
     return(result)

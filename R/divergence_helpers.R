@@ -17,12 +17,12 @@
 #' 2. 'condition', 'treatment', 'sample_type' (common alternatives)
 #'
 #' **Detection Strategy for control_group:**
-#' Once group column is found, identifies the reference group by:
-#' 1. First looking for common control/reference names: 'Normal', 'Control', 
-#'    'WT' (wild-type), 'Reference', 'Baseline', 'wt'
-#' 2. If no match, selects the unique group value with smallest sample count
-#'    (typically the control/reference in case-control designs)
-#' 3. If still no match, uses the first alphabetically sorted group name
+#' Once group column is found, identifies the reference group by looking for
+#' common control/reference names: 'Normal', 'Control', 'WT' (wild-type),
+#' 'Reference', 'Baseline', 'Wild-type', 'wild_type', 'wt'.
+#' If no standard name matches, an error is raised because the control group
+#' is a scientific decision that cannot be reliably guessed — the user must
+#' specify it explicitly via the \code{control_group} parameter.
 #'
 #' @param se SummarizedExperiment object with sample metadata in colData
 #'
@@ -71,9 +71,12 @@
     unique_groups <- unique(group_vec)
     group_counts <- table(group_vec)
 
-    # Candidate names for control/reference group (in priority order)
-    control_candidates <- c("Normal", "Control", "WT", "wt", "Reference", "Baseline",
-        "Wild-type", "wild_type")
+    # Candidate names for control/reference group (in priority order).
+    # Both capitalized and lowercase variants are included because real-world
+    # metadata uses inconsistent casing (e.g., "normal" in vignette, "Control"
+    # in TCGA-style datasets).
+    control_candidates <- c("Normal", "normal", "Control", "control", "WT", "wt",
+        "Reference", "reference", "Baseline", "baseline", "Wild-type", "wild_type")
 
     control_group <- NA_character_
 
@@ -85,14 +88,22 @@
         }
     }
 
-    # If no standard control label is found, use a conservative heuristic.
-    # This is only a fallback: it chooses the smallest group by sample count,
-    # which is typical for case/control designs but may be wrong for imbalanced
-    # or non-case-control datasets.
+    # If no standard control label is found, we cannot reliably guess the
+    # reference group.  The control group is a scientific decision, not a
+    # computational convenience — choosing the smallest group, the first
+    # alphabetically, or any other heuristic can silently produce incorrect
+    # results.  Per Bioconductor reproducibility guidelines, we error out
+    # with a clear message that lists the available groups so the user can
+    # make an explicit, documented choice.
     if (is.na(control_group)) {
         if (length(unique_groups) >= 2) {
-            min_samples_group <- names(group_counts)[which.min(group_counts)]
-            control_group <- min_samples_group
+            stop(
+                "Could not auto-detect control_group. ",
+                "Available groups: ", paste(sQuote(unique_groups), collapse = ", "), ". ",
+                "Please specify 'control_group' explicitly (e.g., control_group = \"",
+                unique_groups[1], "\").",
+                call. = FALSE
+            )
         } else if (length(unique_groups) == 1) {
             control_group <- unique_groups[1]
         }
@@ -479,15 +490,20 @@
         return(NA_real_)
     }
 
-    # BUGFIX #2: Add explicit safeguard for near-zero probabilities Prevents
-    # NaN/Inf from log(0) or extremely small values in power operations
-    min_prob <- 1e-10
-    p[p < min_prob] <- min_prob
-    r[r < min_prob] <- min_prob
+    # AUDIT FIX July 2026 (I6): Only apply min-probability clamping when
+    # pseudocount is zero. When pseudocount > 0, it already handles zero
+    # probabilities — applying both is a double-correction that distorts
+    # divergence values. When pseudocount == 0, min_prob acts as a safety
+    # net against log(0) and power-of-zero numerical issues.
+    if (pseudocount < 1e-10) {
+        min_prob <- 1e-10
+        p[p < min_prob] <- min_prob
+        r[r < min_prob] <- min_prob
 
-    # Re-normalize to maintain probability constraint (sum = 1)
-    p <- p/sum(p)
-    r <- r/sum(r)
+        # Re-normalize to maintain probability constraint (sum = 1)
+        p <- p/sum(p)
+        r <- r/sum(r)
+    }
 
     # Compute Tsallis divergence using correct formula from Paper I004
     # D_q(p||r) with D_q >= 0 and equality iff p = r BUGFIX: Ensure formula is
@@ -531,16 +547,16 @@
         return(NA_real_)
     }
 
-    # Apply log_base normalization CONSISTENTLY for all q values This ensures
-    # consistent scaling across multi-q spectrum analysis
-    if (log_base != exp(1)) {
+    # AUDIT FIX July 2026 (I10): log_base normalization only applies to the
+    # q→1 (KL divergence) limit. The Tsallis divergence for q≠1 is scale-invariant
+    # and does not involve a logarithm base. Previously applied to all q values,
+    # which distorted divergence values by a factor of 1/log(log_base) for q≠1.
+    if (abs(q_val - 1) < 0.01 && log_base != exp(1)) {
         div <- div/log(log_base)
     }
 
-    # BUG FIX: Handle sign correctly for q < 1 When q < 1, (q_val - 1) is
-    # negative, so the formula naturally produces a positive divergence. We
-    # must take absolute value and ensure non-negativity.  Divergence should
-    # always be >= 0.
+    # abs() handles numerical underflow (sum_term ≈ 1) while preserving magnitude.
+    # max(0, div) would zero out small negative values, losing information.
     return(abs(div))
 }
 
@@ -586,14 +602,19 @@
         return(rep(NA_real_, length(q_vals)))
     }
 
-    # BUGFIX: Add explicit safeguard for near-zero probabilities (ONCE)
-    min_prob <- 1e-10
-    p[p < min_prob] <- min_prob
-    r[r < min_prob] <- min_prob
+    # AUDIT FIX July 2026 (I6): Only apply min-probability clamping when
+    # pseudocount is zero. When pseudocount > 0, it already handles zero
+    # probabilities — applying both is a double-correction that distorts
+    # divergence values.
+    if (pseudocount < 1e-10) {
+        min_prob <- 1e-10
+        p[p < min_prob] <- min_prob
+        r[r < min_prob] <- min_prob
 
-    # Re-normalize to maintain probability constraint (ONCE)
-    p <- p/sum(p)
-    r <- r/sum(r)
+        # Re-normalize to maintain probability constraint (ONCE)
+        p <- p/sum(p)
+        r <- r/sum(r)
+    }
 
     # OPTIMIZATION: Pre-compute p and r powers for all q-values at once Using
     # outer product: p_q_matrix[i, j] = p[i]^q_vals[j] This is the KEY
@@ -637,9 +658,12 @@
         }
     }
 
-    # Apply log_base normalization CONSISTENTLY for all q values
-    if (log_base != exp(1)) {
-        result <- result/log(log_base)
+    # AUDIT FIX July 2026 (I10): log_base normalization only applies to the
+    # q→1 (KL divergence) limit. For q≠1, Tsallis divergence is scale-invariant.
+    # Only normalize the q≈1 entries in the result vector.
+    q1_mask <- abs(q_vals - 1) < 0.01
+    if (log_base != exp(1) && any(q1_mask)) {
+        result[q1_mask] <- result[q1_mask] / log(log_base)
     }
 
     # Ensure non-negativity (handle q < 1 cases that may produce negative

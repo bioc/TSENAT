@@ -79,7 +79,7 @@
 #' @return Data frame with columns:
 #'   - gene: Gene identifier
 #'   - n_q_values_tested: Number of q-levels tested for this gene
-#' - f_statistic: F-statistic from Scheirer-Ray-Hare test (two-way ANOVA on ranked data)
+#' - f_statistic: F-statistic from Conover-Iman Rank Transform (two-way ANOVA on ranked data)
 #'   - p_value: P-value for H0: 'No Q×Condition interaction' (unadjusted)
 #'   - adj_p_value: Adjusted p-value using multicorr method (NEW - March 2026)
 #'   - ss_interaction: Sum of squares for q-effect (interaction sum of squares)
@@ -94,7 +94,7 @@
 #'     'Strongly q-dependent' (p < 0.05 AND eta2 > 0.10),
 #'     or 'Insufficient data' if < 2 q-levels
 #'   - test_method: Which rank-based test was used 
-#'     ('srh_paired' for paired designs, 'srh_unpaired' for unpaired)
+#'     ('rt_paired' for paired designs, 'rt_unpaired' for unpaired)
 #'   - heteroscedastic: Logical; whether unequal variances were detected
 #' - boundary_clustered: Logical; whether values clustered at boundaries
 #' detected
@@ -133,8 +133,8 @@
 #'     that differs significantly between conditions
 #'   
 #'   When condition_col provided, automatically uses:
-#' - **Paired designs** (paired=TRUE): Scheirer-Ray-Hare test with within-subject ranks (preserves subject-level dependence)
-#' - **Unpaired designs** (paired=FALSE): Scheirer-Ray-Hare test with global ranks
+#' - **Paired designs** (paired=TRUE): Conover-Iman Rank Transform with within-subject ranks (preserves subject-level dependence)
+#' - **Unpaired designs** (paired=FALSE): Conover-Iman Rank Transform with global ranks
 #' Both test for Q×Condition interactions on ranked data (non-parametric two-way ANOVA)
 #'
 
@@ -144,14 +144,14 @@
 #'   beneficial when multicorr='westfall-young' with high wy_randomizations.
 #'   
 #'   **Paired and unpaired Q×Condition interaction testing (March 2026):**
-#' Both use Scheirer-Ray-Hare test (two-way ANOVA on ranked data):
+#' Both use Conover-Iman Rank Transform (two-way ANOVA on ranked data):
 #' - **Paired designs** (paired=TRUE): Ranks computed within each subject, preserves subject-level dependence
 #' - **Unpaired designs** (paired=FALSE): Ranks computed globally across entire dataset
-#' Both then apply identical Scheirer-Ray-Hare framework for interaction testing.
+#' Both then apply identical Conover-Iman Rank Transform framework for interaction testing.
 #' This unified approach (revised March 2026) properly handles multi-q data with AR(1) correlation
 #' via Westfall-Young permutation when multicorr='westfall-young'.
 #'   
-#'   Theory: Scherier-Ray-Hare on ranked data is robust to distributional violations
+#'   Theory: Conover-Iman Rank Transform on ranked data is robust to distributional violations
 #'   and properly tests two-way interactions (Papers S165-S166, S181-S187).
 #' @param alpha Numeric; significance level for p-value correction methods
 #' (default: 0.05). 
@@ -218,12 +218,12 @@
 #'
 #' **Test selection by design:**
 #'
-#' Uses Scheirer-Ray-Hare test (rank-based) for Q×Condition interaction testing, or
+#' Uses Conover-Iman Rank Transform for Q×Condition interaction testing, or
 #' Westfall-Young permutation (blocked) if paired=TRUE. Both are appropriate for
 #' non-normally distributed entropy data.
 #'
 #' **Unpaired mode (paired=FALSE, default):**
-#' - Uses Scheirer-Ray-Hare test (non-parametric 2-way ANOVA)
+#' - Uses Conover-Iman Rank Transform (non-parametric 2-way ANOVA on ranks)
 #'
 #' **BLOCK-PERMUTATION WESTFALL-YOUNG FOR PAIRED DESIGNS (NEW - March 2026):**
 #' 
@@ -296,7 +296,7 @@
 #'             Papers S165-S166 (TSENAT-specific validation)
 #' 
 #' **Paired mode (paired=TRUE):**
-#' - Uses Scheirer-Ray-Hare test with subject blocking for Q * condition interaction
+#' - Uses Conover-Iman Rank Transform with subject blocking for Q * condition interaction
 #' - Uses Westfall-Young Max T permutation test with BLOCKED permutations that
 #'   respect within-subject pairing structure. Details:
 #' - Permutation: Labels shuffled within subjects, respecting condition structure
@@ -324,7 +324,7 @@
 #' provide a single-level condition variable or use an auxiliary grouping factor.
 #'
 #' Statistical test method (Q×Condition interaction):
-#' Uses Scheirer-Ray-Hare rank-based (within-subject ranking) test exclusively.
+#' Uses Conover-Iman Rank Transform (within-subject ranking) exclusively.
 #' This test handles the paired/within-subject design efficiently and is robust
 #' to heteroscedasticity and non-normality. See Papers S041-S042 for details.
 #'
@@ -375,8 +375,8 @@
 #' ts_se <- .calculate_diversity(counts, genes = genes, q = seq(0.5, 1.5, by
 #' = 0.25))
 #' 
-#' # Unpaired analysis (default): Scheirer-Ray-Hare + multi-test correction for AR(1) q-values
-#' results <- .calculate_srh(ts_se, multicorr = 'hochberg')
+#' # Unpaired analysis (default): Conover-Iman Rank Transform + multi-test correction for AR(1) q-values
+#' results <- .calculate_rank_transform(ts_se, multicorr = 'hochberg')
 #' head(results)
 #' 
 #' # Paired analysis with metadata
@@ -390,7 +390,7 @@
 #' SummarizedExperiment::colData(ts_se) <- coldata
 #' 
 #' # Paired analysis with blocked permutations
-#' results_paired <- .calculate_srh(
+#' results_paired <- .calculate_rank_transform(
 #'   ts_se, 
 #'   paired = TRUE,
 #'   subject_col = 'patient_id',
@@ -399,14 +399,15 @@
 #' )
 #' head(results_paired)
 #' @noRd
-.calculate_srh <- function(data, entropy_col = "diversity", q_col = "q", gene_col = "gene",
+.calculate_rank_transform <- function(data, entropy_col = "diversity", q_col = "q", gene_col = "gene",
     condition_col = NULL, paired = FALSE, subject_col = "paired_samples", multicorr = c("hochberg",
         "benjamini-yekutieli", "westfall-young", "none"), wy_randomizations = 500,
     nperm_mode = "standard", nthreads = 1, alpha = 0.05, p_threshold = 0.05, eta2_threshold_moderate = 0.01,
     eta2_threshold_strong = 0.1, min_nperm = 100, max_nperm = 10000, n_permutations = 5000,
-    verbose = FALSE) {
+    verbose = FALSE, method = c("art", "rt")) {
 
     multicorr <- match.arg(multicorr)
+    method <- match.arg(method)
 
     # Clamp nthreads early to handle high thread requests gracefully and safely
     nthreads <- .get_effective_nthreads(nthreads)
@@ -467,7 +468,8 @@
     # parallel using .bplapply for cross-platform support (Windows compatible)
     analysis_results <- .bplapply(X = seq_len(n_genes), FUN = function(g_idx) {
         gene_data <- data[data$gene == all_genes[g_idx], ]
-        return(.detect_q_analyze_gene(gene_data, paired, subject_col, has_condition))
+        return(.detect_q_analyze_gene(gene_data, paired, subject_col, has_condition,
+            method = method))
     }, nthreads = nthreads)
 
     # Collect results from parallel computation
@@ -640,7 +642,9 @@
 #' Internal: Analyze single gene for q-effects
 
 #' @noRd
-.detect_q_analyze_gene <- function(gene_data, paired, subject_col, has_condition) {
+.detect_q_analyze_gene <- function(gene_data, paired, subject_col, has_condition,
+                                     method = c("art", "rt")) {
+    method <- match.arg(method)
     q_levels <- unique(gene_data$q)
     if (length(q_levels) < 2) {
         return(list(test_failed = TRUE, class = "Insufficient data", method = "insufficient"))
@@ -649,26 +653,47 @@
     # Always run QxCondition interaction test (condition is now REQUIRED)
     test_result <- tryCatch(.test_q_condition_interaction(gene_data, "entropy", "q",
         "condition", paired, if (paired)
-            subject_col else NULL, pre_factored = TRUE), error = function(e) NULL)
+            subject_col else NULL, pre_factored = TRUE, method = method),
+        error = function(e) NULL)
 
     if (is.null(test_result))
         return(list(test_failed = TRUE, class = "Test failed", method = "failed"))
 
-    # Compute total rank sum of squares to normalize effect size to the ranked analysis.
-    rank_data <- gene_data
-    if (paired && !is.null(subject_col)) {
-        rank_data$ranks <- ave(rank_data$entropy, rank_data[[subject_col]], FUN = function(x) rank(x,
-            na.last = "keep"))
-    } else {
-        rank_data$ranks <- rank(rank_data$entropy, na.last = "keep")
+    # AUDIT FIX July 2026: Also treat NA p-value or explicit failure test_type
+    # as a test failure. ART may return a valid list with NA values when the
+    # model cannot be fit (e.g., residual df = 0), which would otherwise
+    # silently propagate NA downstream.
+    if (is.na(test_result$p_value) || grepl("failed|error", test_result$test_type)) {
+        return(list(test_failed = TRUE, class = "Test failed", method = test_result$method))
     }
-    overall_rank_mean <- mean(rank_data$ranks, na.rm = TRUE)
-    ss_total <- sum((rank_data$ranks - overall_rank_mean)^2, na.rm = TRUE)
+
+    # Compute effect size (eta-squared) on the ORIGINAL ENTROPY SCALE, not on ranks.
+    # The Conover-Iman F-test and p-value are correctly computed on ranked data,
+    # but eta-squared should reflect the proportion of entropy variance explained
+    # by the q×condition interaction, not rank variance. Standard Cohen (1988)
+    # thresholds (0.01 small, 0.06 medium, 0.14 large) apply to original-scale
+    # eta-squared, not rank-scale.
+    # AUDIT FIX July 2026: Compute eta2 on raw entropy via separate ANOVA.
+    gene_data$q_factor <- factor(gene_data$q)
+    gene_data$condition_factor <- factor(gene_data$condition)
+    raw_model <- tryCatch(
+        lm(entropy ~ q_factor * condition_factor, data = gene_data),
+        error = function(e) NULL
+    )
+    if (!is.null(raw_model)) {
+        raw_anova <- anova(raw_model)
+        interaction_row <- nrow(raw_anova) - 1
+        ss_interaction_raw <- raw_anova$`Sum Sq`[interaction_row]
+        ss_total_raw <- sum(raw_anova$`Sum Sq`)
+        eta2_raw <- if (ss_total_raw > 0) ss_interaction_raw / ss_total_raw else 0
+    } else {
+        eta2_raw <- 0
+    }
 
     list(test_failed = FALSE, f_stat = as.numeric(test_result$statistic), p_val = as.numeric(test_result$p_value),
         n_q = length(q_levels), df_interaction = test_result$df_interaction,
         ss_interaction = test_result$ss_interaction, ss_residual = test_result$ss_residual,
-        eta2 = if (ss_total > 0) test_result$ss_interaction/ss_total else 0,
+        eta2 = eta2_raw,
         test_type = test_result$test_type, characteristics = test_result$characteristics)
 }
 
@@ -764,7 +789,8 @@
                 # shuffled with factors
                 test_result <- tryCatch(.test_q_condition_interaction(gene_data_perm,
                   "entropy", "q", "condition", paired, if (paired)
-                    subject_col else NULL, pre_ranked = TRUE, pre_factored = TRUE), error = function(e) NULL)
+                    subject_col else NULL, pre_ranked = TRUE, pre_factored = TRUE,
+                  method = "rt"), error = function(e) NULL)
                 if (!is.null(test_result) && !is.na(test_result$statistic)) {
                   perm_stats[i] <- test_result$statistic
                   perm_pvals[i] <- test_result$p_value

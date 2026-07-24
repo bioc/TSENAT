@@ -1,6 +1,6 @@
 #' Detect q-dependent gene interactions
 #'
-#' Wrapper around [.calculate_srh()] that manages TSENATAnalysis object.
+#' Wrapper around [.calculate_rank_transform()] that manages TSENATAnalysis object.
 #' Tests for genes with condition-specific q-dependent entropy patterns by
 #' testing whether the effect of q-values DIFFERS between experimental conditions.
 #' This detects disease-relevant or condition-specific isoform switching patterns.
@@ -11,8 +11,11 @@
 #'   by condition (main discovery goal)
 #' - **Multi-q Analysis**: Combines diversity results for multiple q-values into
 #'   a single SummarizedExperiment for joint hypothesis testing
-#' - **Rank-Based Statistics**: Scheirer-Ray-Hare test (two-way ANOVA on ranked data)
-#' - **Scheirer-Ray-Hare Test**: Two-way non-parametric ANOVA on ranks
+#' - **Aligned Rank Transform (ART)**: State-of-the-art non-parametric interaction
+#'   testing via ARTool package (default). Strips main effects before ranking to
+#'   preserve interaction structure (Higgins & Tashtoush 1994, Wobbrock et al. 2011).
+#' - **Conover-Iman Rank Transform**: Two-way non-parametric ANOVA on ranks
+#'   (fallback via `method='rt'`)
 #' - **Multiple Testing Correction**: Hochberg, Benjamini-Yekutieli, or permutation
 #'   (Westfall-Young) procedures
 #' - **AR(1) Correlation Handling**: Westfall-Young preserves q-value spatial
@@ -89,13 +92,23 @@
 #'  when wy_randomizations='auto' (default: 100).
 #' @param max_nperm \code{integer}. Maximum permutations for automatic estimation
 #'  when wy_randomizations='auto' (default: 10000).
-#' @param ... Additional arguments passed to the base \code{.calculate_srh()} function.
+#' @param method \code{character}. Non-parametric test method:
+#'   \itemize{
+#'     \item \code{'art'} (default): Aligned Rank Transform via ARTool package.
+#'       State-of-the-art for non-parametric interaction testing. Properly
+#'       handles factorial interactions by stripping main effects before ranking
+#'       (Higgins & Tashtoush 1994, Wobbrock et al. 2011).
+#'   \item \code{'rt'}: Conover-Iman Rank Transform. Legacy non-parametric
+#'     procedure. Valid for main effects but has known limitations for interaction
+#'     testing (Conover & Iman 1981). ART is strongly recommended.
+#'   }
+#' @param ... Additional arguments passed to the base \code{.calculate_rank_transform()} function.
 #'
 #' @return Modified TSENATAnalysis with interaction results in @rank_test_results.
 #'
 #' @details
 #' Analyzes how gene interactions change across q-value spectrum using
-#' rank-based (Scheirer-Ray-Hare) statistical tests.
+#' rank-based (Conover-Iman Rank Transform) statistical tests.
 #'
 #' **Parameter resolution priority** (explicit > @config > default/auto-detect):
 #' \itemize{
@@ -142,7 +155,7 @@
 #' analysis <- calculate_diversity(analysis, q = c(0.5, 1.0, 1.5))
 #' 
 #' # Test Q\eqn{\times} Condition interaction (condition_col is REQUIRED)
-#' analysis <- calculate_srh(
+#' analysis <- calculate_rank_transform(
 #'   analysis,
 #'   condition_col = 'condition',
 #'   multicorr = 'hochberg'
@@ -153,23 +166,25 @@
 #'
 #' @export
 #' @importFrom utils write.table
-calculate_srh <- function(analysis, condition_col, output_file = NULL, paired = NULL,
+calculate_rank_transform <- function(analysis, condition_col, output_file = NULL, paired = NULL,
     subject_col = NULL, multicorr = c("hochberg", "benjamini-yekutieli", "westfall-young",
         "none"), entropy_col = "diversity", q_col = "q", gene_col = "gene", wy_randomizations = 500,
     nperm_mode = c("standard", "conservative", "interactive"), nthreads = NULL, alpha = 0.05,
     p_threshold = 0.05, eta2_threshold_moderate = 0.01, eta2_threshold_strong = 0.1,
-    min_nperm = 100, max_nperm = 10000, verbose = FALSE, ...) {
+    min_nperm = 100, max_nperm = 10000, verbose = FALSE,
+    method = c("art", "rt"), ...) {
 
     # PHASE 1: Validate input and prerequisites
-    condition_col <- .validate_srh_input(analysis, condition_col, verbose)
+    condition_col <- .validate_rank_transform_input(analysis, condition_col, verbose)
 
     # PHASE 2: Resolve parameters from config + explicit args Note: q-values
     # are ALWAYS auto-detected from diversity_results
-    param_result <- .resolve_srh_params(analysis, multicorr, nperm_mode, paired,
+    param_result <- .resolve_rank_transform_params(analysis, multicorr, nperm_mode, paired,
         subject_col, nthreads, wy_randomizations, entropy_col, q_col, gene_col)
     dots <- param_result$dots
     dots$condition_col <- condition_col
     dots$verbose <- verbose
+    dots$method <- method
 
     # Add exposed statistical parameters
     dots$alpha <- alpha
@@ -184,21 +199,21 @@ calculate_srh <- function(analysis, condition_col, output_file = NULL, paired = 
 
     # PHASE 4: Run core rank-based testing
     result <- tryCatch({
-        do.call(.calculate_srh, c(list(data = se_multi_q), dots))
+        do.call(.calculate_rank_transform, c(list(data = se_multi_q), dots))
     }, error = function(e) {
         stop("q-interaction detection failed:\n", e$message, call. = FALSE)
     })
 
     # PHASE 5: Store results and save if requested
-    analysis <- .store_srh_results(analysis, result, output_file, verbose)
+    analysis <- .store_rank_transform_results(analysis, result, output_file, verbose)
 
     analysis
 }
 
-#' Internal: Validate SRH input and prerequisites
+#' Internal: Validate rank transform input and prerequisites
 #'
 #' @noRd
-.validate_srh_input <- function(analysis, condition_col, verbose = FALSE) {
+.validate_rank_transform_input <- function(analysis, condition_col, verbose = FALSE) {
     if (!is(analysis, "TSENATAnalysis")) {
         stop("'analysis' must be a TSENATAnalysis object", call. = FALSE)
     }
@@ -225,10 +240,10 @@ calculate_srh <- function(analysis, condition_col, output_file = NULL, paired = 
     condition_col
 }
 
-#' Internal: Resolve SRH parameters from config
+#' Internal: Resolve rank transform parameters from config
 #'
 #' @noRd
-.resolve_srh_params <- function(analysis, multicorr, nperm_mode, paired, subject_col,
+.resolve_rank_transform_params <- function(analysis, multicorr, nperm_mode, paired, subject_col,
     nthreads, wy_randomizations, entropy_col, q_col, gene_col) {
     dots <- list()
 
@@ -364,10 +379,10 @@ calculate_srh <- function(analysis, condition_col, output_file = NULL, paired = 
     se_multi_q
 }
 
-#' Internal: Store SRH results in analysis object
+#' Internal: Store rank transform results in analysis object
 #'
 #' @noRd
-.store_srh_results <- function(analysis, result, output_file, verbose) {
+.store_rank_transform_results <- function(analysis, result, output_file, verbose) {
     # Store in dedicated rank_test_results slot (not in sait_results)
     if (is.list(analysis@rank_test_results)) {
         analysis@rank_test_results$rank_test <- result
@@ -378,7 +393,7 @@ calculate_srh <- function(analysis, condition_col, output_file = NULL, paired = 
     if (!is.null(output_file)) {
         result_df <- as.data.frame(result)
         save_analysis_output(result_df, output_file, object = analysis, verbose = verbose,
-            func_name = "calculate_srh")
+            func_name = "calculate_rank_transform")
     }
 
     analysis

@@ -26,13 +26,13 @@
 #'   \describe{
 #'     \item{\code{sait_interaction}}{Regularized regression (GAM/LMM/GEE/FPCA) model results (list with
 #'           \code{$results} data.frame, \code{$models} list, etc.)}
-#'     \item{\code{rank_test}}{Scheirer-Ray-Hare rank-based test results}
+#'     \item{\code{rank_test}}{ART (Aligned Rank Transform) or Conover-Iman Rank Transform results}
 #'     \item{\code{divergence_difference}}{Differential divergence comparison}
 #'   }
 #'
-#' @slot rank_test_results \code{list}. Scheirer-Ray-Hare rank-based statistical
+#' @slot rank_test_results \code{list}. ART (Aligned Rank Transform) or Conover-Iman Rank Transform
 #'   test results. Names correspond to q-values (e.g., 'q_0.5', 'q_1.0').
-#'   Computed by \code{calculate_srh()} as a non-parametric alternative
+#'   Computed by \code{calculate_rank_transform()} as a non-parametric alternative
 #'   to linear mixed model testing.
 #'
 #' @slot jackknife_results \code{list}. Resampling-based confidence intervals.
@@ -64,7 +64,7 @@
 #' Access results via the unified \code{results(obj, type = ...)} accessor method:
 #' - \code{type='diversity'} for Tsallis entropy across q-values
 #' - \code{type = "sait"} for regularized/penalized regression (GAM, LMM, GEE, FPCA) interaction results
-#' - \code{type='rank_test'} for Scheirer-Ray-Hare rank-based test results
+#' - \code{type='rank_test'} for Conover-Iman Rank Transform results
 #' - \code{type='divergence'} for divergence metrics
 #' - \code{type='jackknife'} for jackknife resampling results
 #' Use \code{metadata(obj)} to access reproducibility metadata.

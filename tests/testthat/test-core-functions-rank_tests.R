@@ -170,7 +170,7 @@ test_that(".detect_q_analyze_gene: identifies insufficient data", {
   )
   
   result <- TSENAT:::.detect_q_analyze_gene(
-    gene_data, paired = FALSE, subject_col = NULL, has_condition = TRUE
+    gene_data, paired = FALSE, subject_col = NULL, has_condition = TRUE, method = "rt"
   )
   
   expect_true(result$test_failed)
@@ -188,7 +188,7 @@ test_that(".detect_q_analyze_gene: computes test statistics for valid data", {
   )
   
   result <- TSENAT:::.detect_q_analyze_gene(
-    gene_data, paired = FALSE, subject_col = NULL, has_condition = TRUE
+    gene_data, paired = FALSE, subject_col = NULL, has_condition = TRUE, method = "rt"
   )
   
   expect_false(result$test_failed)
@@ -216,7 +216,7 @@ test_that(".detect_q_analyze_gene: computes valid effect sizes", {
   )
   
   result <- TSENAT:::.detect_q_analyze_gene(
-    gene_data, paired = FALSE, subject_col = NULL, has_condition = TRUE
+    gene_data, paired = FALSE, subject_col = NULL, has_condition = TRUE, method = "rt"
   )
   
   # Effect size should be meaningful (eta2 between 0 and 1)
@@ -236,7 +236,7 @@ test_that(".detect_q_analyze_gene: sums of squares are consistent", {
   )
   
   result <- TSENAT:::.detect_q_analyze_gene(
-    gene_data, paired = FALSE, subject_col = NULL, has_condition = TRUE
+    gene_data, paired = FALSE, subject_col = NULL, has_condition = TRUE, method = "rt"
   )
   
   # Function returns ss_interaction (not ss_q) and ss_residual
@@ -257,7 +257,7 @@ test_that(".detect_q_analyze_gene: handles condition column", {
   )
   
   result <- TSENAT:::.detect_q_analyze_gene(
-    gene_data, paired = FALSE, subject_col = NULL, has_condition = TRUE
+    gene_data, paired = FALSE, subject_col = NULL, has_condition = TRUE, method = "rt"
   )
   
   expect_false(result$test_failed)
@@ -266,12 +266,12 @@ test_that(".detect_q_analyze_gene: handles condition column", {
 })
 
 # ============================================================================
-# TEST: test_result is NULL handling (srh_core.R lines 653-654)
+# TEST: test_result is NULL handling (rank_transform_core.R lines 653-654)
 # ============================================================================
 
 test_that(".detect_q_analyze_gene returns correct structure for test failure", {
     # This test verifies that .detect_q_analyze_gene has proper failure handling
-    # when test_result is NULL (srh_core.R lines 653-654)
+    # when test_result is NULL (rank_transform_core.R lines 653-654)
     # The NULL case occurs when .test_q_condition_interaction() throws an error
     # and the tryCatch catches it
     
@@ -290,7 +290,7 @@ test_that(".detect_q_analyze_gene returns correct structure for test failure", {
     
     # Normal case should not have NULL test_result
     result <- TSENAT:::.detect_q_analyze_gene(
-        gene_data, paired = FALSE, subject_col = NULL, has_condition = TRUE
+        gene_data, paired = FALSE, subject_col = NULL, has_condition = TRUE, method = "rt"
     )
     
     # Either test succeeds or returns proper failure structure
@@ -301,7 +301,7 @@ test_that(".detect_q_analyze_gene returns correct structure for test failure", {
 test_that(".detect_q_analyze_gene failure path returns correct list structure", {
     # This test verifies that when .detect_q_analyze_gene needs to return early
     # (insufficient data case), the returned list has the expected structure
-    # This tests the failure code path at srh_core.R lines 653-654
+    # This tests the failure code path at rank_transform_core.R lines 653-654
     # where test_failed, class, and method are set
     
     # Create data with insufficient q levels (only 1)
@@ -314,13 +314,13 @@ test_that(".detect_q_analyze_gene failure path returns correct list structure", 
     )
     
     result <- TSENAT:::.detect_q_analyze_gene(
-        gene_data, paired = FALSE, subject_col = NULL, has_condition = TRUE
+        gene_data, paired = FALSE, subject_col = NULL, has_condition = TRUE, method = "rt"
     )
     
     # Should return failure list
     expect_true(result$test_failed, info = "Insufficient data should have test_failed=TRUE")
     
-    # Check the list structure matches what srh_core.R produces
+    # Check the list structure matches what rank_transform_core.R produces
     expected_names <- c("test_failed", "class", "method")
     for (name in expected_names) {
         expect_true(name %in% names(result),
@@ -332,7 +332,7 @@ test_that(".detect_q_analyze_gene distinguishes error modes", {
     # This test verifies that the function distinguishes between different failure modes:
     # 1. Insufficient data (< 2 q levels) - caught at line 645-646
     # 2. Test failed (test_result is NULL) - caught at lines 653-654
-    # (srh_core.R lines 645-646 vs. 653-654)
+    # (rank_transform_core.R lines 645-646 vs. 653-654)
     
     # Insufficient data case
     gene_data_insufficient <- data.frame(
@@ -344,7 +344,7 @@ test_that(".detect_q_analyze_gene distinguishes error modes", {
     )
     
     result_insufficient <- TSENAT:::.detect_q_analyze_gene(
-        gene_data_insufficient, paired = FALSE, subject_col = NULL, has_condition = TRUE
+        gene_data_insufficient, paired = FALSE, subject_col = NULL, has_condition = TRUE, method = "rt"
     )
     
     # Should be "Insufficient data" error
@@ -363,7 +363,7 @@ test_that(".detect_q_analyze_gene distinguishes error modes", {
     )
     
     result_valid <- TSENAT:::.detect_q_analyze_gene(
-        gene_data_valid, paired = FALSE, subject_col = NULL, has_condition = TRUE
+        gene_data_valid, paired = FALSE, subject_col = NULL, has_condition = TRUE, method = "rt"
     )
     
     # Should compute test results (test_failed should be FALSE for valid data)
@@ -372,7 +372,7 @@ test_that(".detect_q_analyze_gene distinguishes error modes", {
 })
 
 test_that(".detect_q_analyze_gene returns failure when test computation fails", {
-    # This test documents the code path at srh_core.R lines 653-654
+    # This test documents the code path at rank_transform_core.R lines 653-654
     # where if (is.null(test_result)) causes early return with failure list
     # 
     # This is triggered when .test_q_condition_interaction() throws an error
@@ -391,7 +391,7 @@ test_that(".detect_q_analyze_gene returns failure when test computation fails", 
     )
     
     result <- TSENAT:::.detect_q_analyze_gene(
-        gene_data_degenerate, paired = FALSE, subject_col = NULL, has_condition = TRUE
+        gene_data_degenerate, paired = FALSE, subject_col = NULL, has_condition = TRUE, method = "rt"
     )
     
     # Function should return a list (either success or failure)
@@ -414,12 +414,12 @@ test_that(".detect_q_analyze_gene returns failure when test computation fails", 
 # ============================================================================
 
 # ============================================================================
-# TEST: Result characteristics assignment (srh_core.R lines 488-490)
+# TEST: Result characteristics assignment (rank_transform_core.R lines 488-490)
 # ============================================================================
 
 test_that("Result characteristics are correctly assigned to interaction_results", {
     # This test verifies that characteristics from result objects are correctly
-    # assigned to the interaction_results data frame at srh_core.R:488-490
+    # assigned to the interaction_results data frame at rank_transform_core.R:488-490
     
     # Create test result with characteristics
     result <- list(
@@ -431,7 +431,7 @@ test_that("Result characteristics are correctly assigned to interaction_results"
         ss_interaction = 100,
         ss_residual = 50,
         eta2 = 0.667,
-        test_type = "SRH",
+        test_type = "Conover-Iman Rank Transform",
         method = "scheirer",
         characteristics = list(
             heteroscedastic = TRUE,
@@ -477,7 +477,7 @@ test_that("Result characteristics are correctly assigned to interaction_results"
 
 test_that("NULL characteristics are handled gracefully", {
     # This test verifies that missing characteristics don't cause errors
-    # (srh_core.R line 487 checks if (!is.null(result$characteristics)))
+    # (rank_transform_core.R line 487 checks if (!is.null(result$characteristics)))
     
     # Create test result WITHOUT characteristics
     result <- list(
@@ -489,7 +489,7 @@ test_that("NULL characteristics are handled gracefully", {
         ss_interaction = 100,
         ss_residual = 50,
         eta2 = 0.667,
-        test_type = "SRH",
+        test_type = "Conover-Iman Rank Transform",
         method = "scheirer",
         characteristics = NULL  # NULL characteristics
     )
@@ -544,7 +544,7 @@ test_that("Multiple gene characteristics are assigned independently", {
             ss_interaction = 80,
             ss_residual = 40,
             eta2 = 0.667,
-            test_type = "SRH",
+            test_type = "Conover-Iman Rank Transform",
             method = "scheirer",
             characteristics = list(
                 heteroscedastic = TRUE,
@@ -561,7 +561,7 @@ test_that("Multiple gene characteristics are assigned independently", {
             ss_interaction = 120,
             ss_residual = 60,
             eta2 = 0.667,
-            test_type = "SRH",
+            test_type = "Conover-Iman Rank Transform",
             method = "scheirer",
             characteristics = list(
                 heteroscedastic = FALSE,

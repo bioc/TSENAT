@@ -21,7 +21,7 @@
 #' ```
 #' 1. [For multi-q correlation-adjusted analysis, see
 #' .calculate_sait() with multicorr='westfall-young']
-#' 2. Or: Use .calculate_srh() for rank-based multi-q testing with
+#' 2. Or: Use .calculate_rank_transform() for rank-based multi-q testing with
 #' WY control
 #'   3. Then: pi0_obj <- .estimate_storey_pi0(adjusted_pvalues)
 #' 4. Then: qvals <- .compute_storey_qvalues(adjusted_pvalues, pi0 =
@@ -169,7 +169,9 @@
     if (pi0_method == "bootstrap") {
         lambda_grid <- seq(0, 0.95, length.out = 20)
         n_boot <- 100
-        pi0_boot_mat <- matrix(NA, nrow = n_boot, ncol = length(lambda_grid))
+
+        # AUDIT FIX July 2026: Removed extraneous pi0_boot_mat <- matrix(NA, ...)
+        # allocation that was immediately overwritten by the vapply() call below.
 
         # Seed handling left to caller for Bioconductor compliance
         # Vectorize bootstrap loop: first use vapply over lambdas for each bootstrap sample
@@ -328,8 +330,8 @@
 # WESTFALL-YOUNG PERMUTATION HELPER (March 2026)
 # ════════════════════════════════════════════════════════════════════════════════
 # Consolidates redundant WY permutation logic shared between: 1.
-# .calculate_sait() - parametric tests (GAM, LMM, GEE) 2.  .calculate_srh() -
-# rank-based tests (Scheirer-Ray-Hare only, March 2026) rank) DESIGN PATTERN: -
+# .calculate_sait() - parametric tests (GAM, LMM, GEE) 2.  .calculate_rank_transform() -
+# rank-based tests (Conover-Iman Rank Transform only, March 2026) rank) DESIGN PATTERN: -
 # Core permutation loop is identical in both functions (~70% code duplication)
 # - Model refitting logic differs (parametric vs rank-based) - Solution:
 # Extract permutation machinery, supply model-specific refit_fn callback USAGE:
