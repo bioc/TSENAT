@@ -731,6 +731,28 @@ testthat::test_that("GEE method integrates Shapiro-Wilk results into output", {
     }
 })
 
+testthat::test_that(".test_residual_normality handles lme model type", {
+    skip_if_not_installed("nlme")
+    set.seed(333)
+    n <- 30
+    df <- data.frame(
+        y = rnorm(n, 0.5, 0.1),
+        q = rep(seq(0.1, 1.0, length.out = 5), 6),
+        group = factor(rep(c("A", "B"), each = 15)),
+        subject = factor(rep(1:6, each = 5))
+    )
+    fit_lme <- try(
+        nlme::lme(y ~ q * group, random = ~1 | subject, data = df, method = "ML"),
+        silent = TRUE
+    )
+    skip_if(inherits(fit_lme, "try-error"), "lme fitting failed")
+
+    result <- TSENAT:::.test_residual_normality(fit_lme, "lme", verbose = FALSE)
+    expect_type(result, "list")
+    expect_true("shapiro_p_value" %in% names(result))
+    expect_true(result$test_status %in% c("pass", "fail", "error"))
+})
+
 # Comprehensive test suite for LM helper functions
 # Coverage for: .report_fit_summary, .gam_regularization, 
 # .ar1_design_effect, .estimate_ar1_rho, .gam_bias_correct,
@@ -828,9 +850,32 @@ test_that(".report_fit_summary silent when verbose=FALSE", {
     fit_method = c("lmer", "lmer", "glm")
   )
   
-  # Should not produce messages when verbose=FALSE
   expect_silent(
     TSENAT:::.report_fit_summary(res, verbose = FALSE)
+  )
+})
+
+test_that(".report_fit_summary reports singular fits when column present", {
+  res <- data.frame(
+    fit_method = c("lmer", "lmer", "saits_nosubject"),
+    singular = c(FALSE, TRUE, FALSE),
+    stringsAsFactors = FALSE
+  )
+  expect_message(
+    TSENAT:::.report_fit_summary(res, verbose = TRUE),
+    "Singular fits"
+  )
+})
+
+test_that(".report_fit_summary reports F-stat range when column present", {
+  res <- data.frame(
+    fit_method = c("lmer", "lmer", "lmer", "lmer"),
+    f_statistic = c(1.5, 3.2, 2.1, NA),
+    stringsAsFactors = FALSE
+  )
+  expect_message(
+    TSENAT:::.report_fit_summary(res, verbose = TRUE),
+    "F-stat range"
   )
 })
 
@@ -978,6 +1023,20 @@ test_that(".estimate_ar1_rho handles NULL subject_vec", {
   
   # Should treat as single time series
   expect_true(is.numeric(result))
+})
+
+test_that(".estimate_ar1_rho removes NAs and uses acf for estimation", {
+  set.seed(42)
+  entropy_diff <- c(NA, arima.sim(model = list(ar = 0.3), n = 25), NA, NA)
+  result <- TSENAT:::.estimate_ar1_rho(entropy_diff)
+  expect_true(is.numeric(result))
+  expect_gte(result, 0)
+  expect_lte(result, 1)
+})
+
+test_that(".estimate_ar1_rho returns NULL when all NAs after cleaning", {
+  result <- TSENAT:::.estimate_ar1_rho(c(NA, NA, NA_real_, NA))
+  expect_null(result)
 })
 
 # ===== GAM Bias Correction Tests =====
@@ -1911,6 +1970,34 @@ test_that(".validate_sait_interaction_input auto-detects paired_samples column",
     
     expect_is(result, "list")
     expect_equal(result$subject_col, "paired_samples")
+})
+
+test_that(".validate_sait_interaction_input auto-detects sample_base column with verbose message", {
+    skip_if_not_installed("SummarizedExperiment")
+    set.seed(42)
+    count_data <- matrix(rpois(100, lambda = 5), nrow = 10)
+    rownames(count_data) <- paste0("g", 1:10)
+    colnames(count_data) <- paste0("sample", 1:10)
+
+    se <- SummarizedExperiment::SummarizedExperiment(
+        assays = list(counts = count_data),
+        colData = data.frame(
+            condition = rep(c("A", "B"), 5),
+            sample_base = paste0("subj", rep(1:5, 2))
+        )
+    )
+
+    expect_message(
+        result <- TSENAT:::.validate_sait_interaction_input(
+            method = "gam", pvalue = "absolute", corstr = "exchangeable",
+            regularization = "none", multicorr = "none", pcorr = "none",
+            storey = FALSE, wy_randomizations = 101,
+            paired = TRUE, subject_col = NULL,
+            se = se, verbose = TRUE
+        ),
+        "auto-using subject_col='sample_base'"
+    )
+    expect_equal(result$subject_col, "sample_base")
 })
 
 test_that(".validate_sait_interaction_input errors on paired without subject column", {

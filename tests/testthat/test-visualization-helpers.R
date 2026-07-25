@@ -3312,3 +3312,59 @@ testthat::test_that(".filter_genes_by_pvalue fails when gene_col not found (line
     "nonexistent_gene_column"  # dplyr error mentioning the column name
   )
 })
+
+# ════════════════════════════════════════════════════════════════════════════════
+# Uncovered branch tests for .validate_diversity_se() and .validate_results_df()
+# ════════════════════════════════════════════════════════════════════════════════
+
+test_that(".validate_diversity_se errors on 0 rows", {
+  skip_if_not_installed("SummarizedExperiment")
+  se <- SummarizedExperiment::SummarizedExperiment(
+    assays = list(diversity = matrix(nrow = 0, ncol = 5))
+  )
+  expect_error(
+    TSENAT:::.validate_diversity_se(se, check_metadata = FALSE),
+    "has no rows"
+  )
+})
+
+test_that(".validate_diversity_se errors on 0 columns", {
+  skip_if_not_installed("SummarizedExperiment")
+  se <- SummarizedExperiment::SummarizedExperiment(
+    assays = list(diversity = matrix(nrow = 3, ncol = 0))
+  )
+  expect_error(
+    TSENAT:::.validate_diversity_se(se, check_metadata = FALSE),
+    "has no columns"
+  )
+})
+
+test_that(".validate_diversity_se errors when all diversity values are NA", {
+  skip_if_not_installed("SummarizedExperiment")
+  se <- SummarizedExperiment::SummarizedExperiment(
+    assays = list(diversity = matrix(NA_real_, nrow = 3, ncol = 3))
+  )
+  expect_error(
+    TSENAT:::.validate_diversity_se(se, check_metadata = FALSE),
+    "All diversity values are NA"
+  )
+})
+
+test_that(".validate_diversity_se warns when q-values missing from metadata", {
+  skip_if_not_installed("SummarizedExperiment")
+  se <- SummarizedExperiment::SummarizedExperiment(
+    assays = list(diversity = matrix(rnorm(9), nrow = 3, ncol = 3))
+  )
+  expect_warning(
+    TSENAT:::.validate_diversity_se(se, check_metadata = TRUE),
+    "q-values not found"
+  )
+})
+
+test_that(".validate_results_df errors when no gene identifier column", {
+  results <- data.frame(p_value = c(0.01, 0.05), logFC = c(1.5, -2.0))
+  expect_error(
+    TSENAT:::.validate_results_df(results, require_pvalue = FALSE),
+    "No gene identifier column found"
+  )
+})

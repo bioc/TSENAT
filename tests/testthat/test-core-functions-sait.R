@@ -1183,3 +1183,66 @@ test_that(".extract_sait_result_df errors on invalid input", {
         "sait_result must be either"
     )
 })
+
+# ════════════════════════════════════════════════════════════════════════════════
+# Tests for wy_randomizations = "auto" branch in .calculate_sait()
+# ════════════════════════════════════════════════════════════════════════════════
+
+test_that(".calculate_sait: wy_randomizations='auto' errors when multicorr != 'westfall-young'", {
+    skip_if_not_installed("SummarizedExperiment")
+    skip_if_not_installed("nlme")
+    skip_if_not_installed("mgcv")
+
+    mat <- matrix(runif(30, 0, 1), nrow = 3, ncol = 10)
+    rownames(mat) <- c("g1", "g2", "g3")
+    colnames(mat) <- paste0(rep(c("s1", "s2"), each = 5), "_q=", rep(seq(0, 2, by = 0.5), 2))
+
+    cd <- data.frame(
+        condition = rep(c("normal", "tumor"), each = 5),
+        row.names = colnames(mat),
+        stringsAsFactors = FALSE
+    )
+    se <- SummarizedExperiment::SummarizedExperiment(
+        assays = list(diversity = mat),
+        colData = cd
+    )
+
+    expect_error(
+        TSENAT:::.calculate_sait(
+            se = se, condition_col = "condition", method = "lmm",
+            multicorr = "hochberg", wy_randomizations = "auto",
+            min_obs = 3, verbose = FALSE
+        ),
+        "wy_randomizations='auto' is only supported when multicorr='westfall-young'"
+    )
+})
+
+test_that(".calculate_sait: wy_randomizations='auto' auto-estimates permutations with multicorr='westfall-young'", {
+    skip_if_not_installed("SummarizedExperiment")
+    skip_if_not_installed("nlme")
+    skip_if_not_installed("mgcv")
+
+    mat <- matrix(runif(30, 0, 1), nrow = 3, ncol = 10)
+    rownames(mat) <- c("g1", "g2", "g3")
+    colnames(mat) <- paste0(rep(c("s1", "s2"), each = 5), "_q=", rep(seq(0, 2, by = 0.5), 2))
+
+    cd <- data.frame(
+        condition = rep(c("normal", "tumor"), each = 5),
+        row.names = colnames(mat),
+        stringsAsFactors = FALSE
+    )
+    se <- SummarizedExperiment::SummarizedExperiment(
+        assays = list(diversity = mat),
+        colData = cd
+    )
+
+    result <- suppressWarnings(
+        TSENAT:::.calculate_sait(
+            se = se, condition_col = "condition", method = "lmm",
+            multicorr = "westfall-young", wy_randomizations = "auto",
+            min_obs = 3, verbose = FALSE
+        )
+    )
+
+    expect_true(is.data.frame(result) || is.list(result))
+})

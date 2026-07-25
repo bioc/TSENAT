@@ -2716,3 +2716,19 @@ test_that(".gee_interaction handles ARIMA differencing with paired data", {
   expect_true(is.data.frame(result) || is.null(result))
 })
 
+test_that(".gee_interaction warns on validation failure with too few obs", {
+  skip_if_not_installed("geepack")
+  set.seed(6001)
+  df <- data.frame(
+    entropy = rnorm(4),
+    q = c(0.5, 1.0, 1.5, 2.0),
+    group = factor(c("A", "A", "B", "B")),
+    subject = factor(c(1, 1, 2, 2))
+  )
+  expect_warning(
+    TSENAT:::.gee_interaction(df, q_vals=df$q, g="G1", subject=df$subject,
+      min_obs=10, corstr="ar1"),
+    "GEE input validation failed"
+  )
+})
+
