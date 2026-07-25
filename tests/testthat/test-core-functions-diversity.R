@@ -2987,6 +2987,12 @@ test_that("[BUG #5] Invalid effective_length raises error instead of silent conv
     .calculate_tsallis_entropy(x, q, effective_length = invalid_eff_len_neg),
     pattern = "invalid effective_length"
   )
+
+  # Invalid: length mismatch
+  expect_error(
+    .calculate_tsallis_entropy(x, q, effective_length = c(100, 200)),
+    "effective_length must have same length as x"
+  )
 })
 
 # ============================================================================

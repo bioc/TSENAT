@@ -3094,6 +3094,93 @@ test_that("calculate_m_estimator with condition_col resolution", {
     expect_true(is.null(result) || is(result, "TSENATAnalysis"))
 })
 
+test_that("calculate_m_estimator errors when config$condition_col is empty string", {
+    skip_on_bioc()
+
+    se <- SummarizedExperiment(
+        assays = list(counts = matrix(rpois(50, 5), nrow = 10, ncol = 5)),
+        colData = data.frame(
+            sample = paste0("s", 1:5),
+            condition = rep(c("A", "B"), c(2, 3)),
+            row.names = paste0("s", 1:5)
+        )
+    )
+    # Set config after construction to bypass TSENATAnalysis validation
+    analysis <- TSENATAnalysis(se, config = list())
+    analysis@config$condition_col <- ""
+
+    test_se <- SummarizedExperiment(
+        assays = list(diversity = matrix(rnorm(50), nrow = 10, ncol = 5)),
+        rowData = data.frame(gene = paste0("gene_", 1:10))
+    )
+    analysis@diversity_results <- list(q_1_0 = test_se)
+
+    expect_error(
+        calculate_m_estimator(analysis, condition_col = NULL),
+        "must be a non-empty character value"
+    )
+})
+
+test_that("calculate_m_estimator errors when config has no condition_col key", {
+    skip_on_bioc()
+
+    se <- SummarizedExperiment(
+        assays = list(counts = matrix(rpois(50, 5), nrow = 10, ncol = 5)),
+        colData = data.frame(
+            sample = paste0("s", 1:5),
+            condition = rep(c("A", "B"), c(2, 3)),
+            row.names = paste0("s", 1:5)
+        )
+    )
+    analysis <- TSENATAnalysis(se, config = list())
+
+    test_se <- SummarizedExperiment(
+        assays = list(diversity = matrix(rnorm(50), nrow = 10, ncol = 5)),
+        colData = data.frame(
+            sample = paste0("s", 1:5),
+            condition = rep(c("A", "B"), c(2, 3)),
+            row.names = paste0("s", 1:5)
+        )
+    )
+    analysis@diversity_results <- list(q_1_0 = test_se)
+
+    expect_error(
+        calculate_m_estimator(analysis, condition_col = NULL),
+        "Sample grouping column not specified"
+    )
+})
+
+test_that("calculate_m_estimator verbose auto-detection message", {
+    skip_on_bioc()
+
+    se <- SummarizedExperiment(
+        assays = list(counts = matrix(rpois(50, 5), nrow = 10, ncol = 5)),
+        colData = data.frame(
+            sample = paste0("s", 1:5),
+            condition = rep(c("A", "B"), c(2, 3)),
+            row.names = paste0("s", 1:5)
+        )
+    )
+    analysis <- TSENATAnalysis(se, config = list(condition_col = "condition"))
+
+    test_se <- SummarizedExperiment(
+        assays = list(diversity = matrix(rnorm(50), nrow = 10, ncol = 5)),
+        colData = data.frame(
+            sample = paste0("s", 1:5),
+            condition = rep(c("A", "B"), c(2, 3)),
+            row.names = paste0("s", 1:5)
+        )
+    )
+    analysis@diversity_results <- list(q_1_0 = test_se)
+
+    expect_message(
+        suppressWarnings(
+            calculate_m_estimator(analysis, condition_col = NULL, verbose = TRUE)
+        ),
+        "Auto-detected 'condition_col' from config"
+    )
+})
+
 # ============================================================================
 # Test: Priority 2 - Optional Parameters (Coverage Lines 2439-2460, output_file)
 # ============================================================================
@@ -3215,6 +3302,45 @@ test_that(".extract_object_with_fallbacks handles empty list gracefully", {
     )
     
     expect_null(result)
+})
+
+test_that(".extract_object_with_fallbacks verbose messages for each path", {
+    skip_on_bioc()
+    se <- SummarizedExperiment::SummarizedExperiment(
+        assays = list(counts = matrix(1:4, nrow = 2))
+    )
+    # Direct class match verbose
+    expect_message(
+        TSENAT:::.extract_object_with_fallbacks(se, "SummarizedExperiment", verbose = TRUE),
+        "Found object via direct class match"
+    )
+    # Key name match verbose
+    test_list <- list(data = se)
+    expect_message(
+        TSENAT:::.extract_object_with_fallbacks(test_list, "SummarizedExperiment", key_name = "data", verbose = TRUE),
+        "Found object via key"
+    )
+    # First element fallback verbose
+    test_list2 <- list(se, "other")
+    expect_message(
+        TSENAT:::.extract_object_with_fallbacks(test_list2, "SummarizedExperiment", verbose = TRUE),
+        "Using first element of list"
+    )
+})
+
+test_that("plot_concordance errors on empty comparison_df", {
+    skip_on_bioc()
+    skip_if_not_installed("ggplot2")
+    se <- SummarizedExperiment::SummarizedExperiment(
+        assays = list(counts = matrix(1:4, nrow = 2))
+    )
+    analysis <- TSENATAnalysis(se, config = list())
+    analysis@metadata$method_concordance <- list(comparison_df = data.frame())
+
+    expect_error(
+        plot_concordance(analysis, verbose = FALSE),
+        "empty or missing"
+    )
 })
 
 # ============================================================================

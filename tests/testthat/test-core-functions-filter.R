@@ -3858,6 +3858,22 @@ test_that(".select_samples_from_analysis errors on invalid n_samples", {
 # Tests for .detect_paired_structure()
 # ════════════════════════════════════════════════════════════════════════════════
 
+test_that(".resolve_filter_parameters errors on non-numeric assay", {
+  skip_if_not_installed("SummarizedExperiment")
+  char_mat <- matrix(as.character(1:20), nrow=4, ncol=5)
+  se <- SummarizedExperiment::SummarizedExperiment(
+    assays = list(counts = char_mat)
+  )
+  expect_error(
+    TSENAT:::.resolve_filter_parameters(
+      se = se, min_samples = 3, min_tpm = NULL, stringency = "medium",
+      pair_col = NULL, tpm_assay_name = NULL, assay_name = "counts",
+      min_tx_per_gene = 2, min_isoform_abundance = NULL, verbose = FALSE
+    ),
+    "TPM data is required"  # TPM lookup fails before reaching assay numeric check
+  )
+})
+
 test_that(".detect_paired_structure detects paired_samples column", {
   coldata <- data.frame(
     condition = c("normal", "normal", "tumor", "tumor"),
