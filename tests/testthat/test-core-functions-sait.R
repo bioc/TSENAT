@@ -1246,12 +1246,10 @@ test_that(".calculate_sait: wy_randomizations='auto' auto-estimates permutations
 
     expect_true(is.data.frame(result) || is.list(result))
 })
-# H1: regularization validation — (method, regularization) combo checked
-# ============================================================================ 
-# M3: corstr = "auto" — now accepted in public API
-# ============================================================================ 
+
 # ============================================================================
-# H1: regularization validation — (method, regularization) combo checked# ============================================================================
+# H1: regularization validation — (method, regularization) combo checked
+# ============================================================================
 
 test_that("H1: Invalid (method, regularization) combo produces error", {
     # GAM only accepts pca, gamsel, spline
@@ -1286,8 +1284,10 @@ test_that("H1: Invalid (method, regularization) combo produces error", {
         )
     )
 })
+
 # ============================================================================
-# M3: corstr = "auto" — now accepted in public API# ============================================================================
+# M3: corstr = "auto" — now accepted in public API
+# ============================================================================
 
 test_that("M3: corstr='auto' is a valid argument", {
     # Verify "auto" is in the match.arg choices
