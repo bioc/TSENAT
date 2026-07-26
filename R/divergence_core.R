@@ -211,10 +211,13 @@
                   "' column.\n", "      Using pair-respecting bootstrap resampling.")
             }
         } else {
-            if (isTRUE(paired) && progress) {
+            if (isTRUE(paired)) {
                 # Use isTRUE to safely handle NA
-                message("paired=TRUE but no pair ID column detected in colData.",
-                  " Using independent bootstrap resampling instead.")
+                warning("paired=TRUE but no pair ID column detected in colData. ",
+                    "Using independent bootstrap resampling instead. ",
+                    "This ignores within-pair correlation and may produce ",
+                    "anti-conservative confidence intervals.",
+                    call. = FALSE)
             }
         }
     }
@@ -791,15 +794,11 @@
             if (sd_val > 0) {
                 assay_matrix[, j] <- (col_vals - mean_val)/sd_val
 
-                # Apply same to estimate and CI bounds
+                # Apply z-score to point estimate only; CIs stay on raw scale
                 estimate_col <- paste0("estimate_q", q_vals[j])
-                lower_col <- paste0("lower_ci_q", q_vals[j])
-                upper_col <- paste0("upper_ci_q", q_vals[j])
 
                 if (estimate_col %in% colnames(row_data_df)) {
                   row_data_df[[estimate_col]] <- (row_data_df[[estimate_col]] - mean_val)/sd_val
-                  row_data_df[[lower_col]] <- (row_data_df[[lower_col]] - mean_val)/sd_val
-                  row_data_df[[upper_col]] <- (row_data_df[[upper_col]] - mean_val)/sd_val
                 }
             }
         }
@@ -817,23 +816,23 @@
         col_vals <- assay_matrix[, j]
         valid_vals <- col_vals[!is.na(col_vals)]
 
-        # Maximum divergence depends on q
-        d_max <- if (q_val < 1)
-            log(2) else 1
+        # Use the column maximum as the normalization reference.
+        # The Furuichi Tsallis divergence has no simple theoretical upper bound
+        # across all q (KL at q=1 is unbounded; q>1 bound depends on support).
+        # Using max(D_q) across genes provides a data-driven normalization
+        # that maps to (0, 1] before the log-odds transform.
+        valid_col <- col_vals[is.finite(col_vals) & col_vals > 0]
+        d_max <- if (length(valid_col) > 0) max(valid_col) else 1
 
         if (d_max > 0) {
             assay_matrix[, j] <- log(pmax(col_vals, 1e-10)/d_max)
 
-            # Apply same to estimate and CI bounds
+            # Apply log-odds to point estimate only; CIs stay on raw scale
             estimate_col <- paste0("estimate_q", q_vals[j])
-            lower_col <- paste0("lower_ci_q", q_vals[j])
-            upper_col <- paste0("upper_ci_q", q_vals[j])
 
             if (estimate_col %in% colnames(row_data_df)) {
                 row_data_df[[estimate_col]] <- log(pmax(row_data_df[[estimate_col]],
                   1e-10)/d_max)
-                row_data_df[[lower_col]] <- log(pmax(row_data_df[[lower_col]], 1e-10)/d_max)
-                row_data_df[[upper_col]] <- log(pmax(row_data_df[[upper_col]], 1e-10)/d_max)
             }
         }
     }
@@ -855,15 +854,11 @@
             if (reference_mean > 0) {
                 assay_matrix[, j] <- col_vals/reference_mean
 
-                # Apply same to estimate and CI bounds
+                # Apply reference to point estimate only; CIs stay on raw scale
                 estimate_col <- paste0("estimate_q", q_vals[j])
-                lower_col <- paste0("lower_ci_q", q_vals[j])
-                upper_col <- paste0("upper_ci_q", q_vals[j])
 
                 if (estimate_col %in% colnames(row_data_df)) {
                   row_data_df[[estimate_col]] <- row_data_df[[estimate_col]]/reference_mean
-                  row_data_df[[lower_col]] <- row_data_df[[lower_col]]/reference_mean
-                  row_data_df[[upper_col]] <- row_data_df[[upper_col]]/reference_mean
                 }
             }
         }

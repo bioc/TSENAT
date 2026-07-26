@@ -246,7 +246,7 @@
     "gam", "fpca", "gee"), pvalue = c("satterthwaite", "lrt", "both"), subject_col = NULL,
     paired = FALSE, nthreads = 1, assay_name = "diversity", pcorr = "BH", verbose = FALSE,
     bias_correction = TRUE, regularization = c("pca", "lasso", "elasticnet", "gamsel",
-        "spline"), corstr = c("ar1", "exchangeable", "independence"), multicorr = c("hochberg",
+        "spline"), corstr = c("ar1", "exchangeable", "independence", "auto"), multicorr = c("hochberg",
         "westfall-young", "benjamini-yekutieli"), storey = FALSE, wy_randomizations = 1000,
     adaptive_knots = TRUE, return_model_data = FALSE) {
     

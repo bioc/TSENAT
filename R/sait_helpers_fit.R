@@ -580,7 +580,7 @@
 
 #' @noRd
 #' @noRd
-.check_lmm_sample_sizes <- function(df, min_obs = 3) {
+.check_lmm_sample_sizes <- function(df, min_obs = 5) {
     if (nrow(df) < min_obs) {
         warning(sprintf(".check_lmm_sample_sizes: Insufficient observations in model data. Found %d rows, minimum required: %d.",
             nrow(df), min_obs), call. = FALSE)

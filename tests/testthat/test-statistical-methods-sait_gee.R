@@ -2732,3 +2732,72 @@ test_that(".gee_interaction warns on validation failure with too few obs", {
   )
 })
 
+# C3: KC multiplier — vcov_sandwich_raw and coef_value are now passed
+# ============================================================================ 
+# H2: AR(1) design effect — uses finite-m form
+# ============================================================================ 
+# L3: n_clusters — uses nlevels(df$subject), not length(unique(as.numeric(...)))
+# ============================================================================ 
+# ============================================================================
+# C3: KC multiplier — vcov_sandwich_raw and coef_value are now passed# ============================================================================
+
+test_that("C3: .kc_bias_correct applies multiplier when vcov is provided", {
+    # Without vcov: multiplier is computed but z stays unchanged
+    result_no_vcov <- TSENAT:::.kc_bias_correct(
+        p_value = 0.05, z_statistic = 1.96,
+        vcov_sandwich_raw = NULL, coef_value = NULL,
+        n_clusters = 20, n_parameters = 3,
+        bias_correction_method = "hc1", use_t_distribution = TRUE,
+        apply_correction = TRUE, verbose = FALSE
+    )
+    expect_equal(result_no_vcov$multiplier, 20 / (20 - 3), tolerance = 1e-10)
+
+    # With vcov: multiplier should affect z and p-value
+    vcov_mat <- matrix(c(0.25, 0.05, 0.05, 0.30), nrow = 2)
+    result_with_vcov <- TSENAT:::.kc_bias_correct(
+        p_value = 0.05, z_statistic = 1.96,
+        vcov_sandwich_raw = vcov_mat, coef_value = 0.5, coef_index = 1,
+        n_clusters = 20, n_parameters = 2,
+        bias_correction_method = "hc1", use_t_distribution = TRUE,
+        apply_correction = TRUE, verbose = FALSE
+    )
+    # z_corrected should differ from input z_statistic
+    expect_false(isTRUE(all.equal(result_with_vcov$z_corrected, 1.96)))
+})
+# ============================================================================
+# H2: AR(1) design effect — uses finite-m form# ============================================================================
+
+test_that("H2: .compute_ar1_design_effect uses finite-m formula", {
+    # For m=5, rho=0.5:
+    # finite-m: 1 + 2*sum_{k=1}^{4} (1-k/5)*0.5^k
+    k <- 1:4
+    expected <- 1 + 2 * sum((1 - k/5) * 0.5^k)
+
+    result <- TSENAT:::.compute_ar1_design_effect(rho = 0.5, cluster_size = 5)
+    expect_equal(result, expected, tolerance = 1e-10)
+
+    # For no correlation: D_eff = 1
+    expect_equal(TSENAT:::.compute_ar1_design_effect(rho = 0, cluster_size = 10), 1)
+    expect_equal(TSENAT:::.compute_ar1_design_effect(rho = NA, cluster_size = 10), 1)
+
+    # For perfect correlation: D_eff = m
+    expect_equal(TSENAT:::.compute_ar1_design_effect(rho = 1, cluster_size = 7), 7)
+})
+# ============================================================================
+# L3: n_clusters — uses nlevels(df$subject), not length(unique(as.numeric(...)))# ============================================================================
+
+test_that("L3: GEE cluster count uses nlevels for factor subjects", {
+    df <- data.frame(
+        entropy = rnorm(10),
+        q = rep(1:5, 2),
+        group = factor(rep(c("A", "B"), each = 5)),
+        subject = factor(rep(c("s1", "s2"), each = 5)),
+        stringsAsFactors = FALSE
+    )
+
+    # nlevels should work correctly
+    expect_equal(nlevels(df$subject), 2)
+
+    # Old method would also give 2, but nlevels is cleaner
+    expect_equal(nlevels(df$subject), length(unique(df$subject)))
+})

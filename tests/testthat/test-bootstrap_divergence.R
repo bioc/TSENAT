@@ -963,3 +963,24 @@ test_that(".bootstrap_divergence_compute_samples with pseudocount effect", {
   expect_is(result_high_pc, "numeric")
   expect_equal(length(result_low_pc), length(result_high_pc))
 })
+# M7: Paired bootstrap — warns when paired=TRUE but no pair column
+# ============================================================================ 
+# ============================================================================
+# M7: Paired bootstrap — warns when paired=TRUE but no pair column# ============================================================================
+
+test_that("M7: Paired bootstrap warns when no pair column detected", {
+    skip_if_not_installed("SummarizedExperiment")
+    set.seed(42)
+
+    se <- create_count_se(n_genes = 4, n_samples = 6, n_control = 3, lambda = 100, seed = 42)
+    colnames(se) <- paste0("Sample_", seq_len(ncol(se)))
+
+    # paired=TRUE but no pairing column → should warn
+    expect_warning(
+        TSENAT:::.prepare_divergence_execution(
+            se = se, bootstrap = TRUE, paired = TRUE,
+            nboot = 10, method = "percentile", nthreads = 1, progress = FALSE
+        ),
+        "paired.*TRUE.*no pair"
+    )
+})

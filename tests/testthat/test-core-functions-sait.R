@@ -1246,3 +1246,51 @@ test_that(".calculate_sait: wy_randomizations='auto' auto-estimates permutations
 
     expect_true(is.data.frame(result) || is.list(result))
 })
+# H1: regularization validation — (method, regularization) combo checked
+# ============================================================================ 
+# M3: corstr = "auto" — now accepted in public API
+# ============================================================================ 
+# ============================================================================
+# H1: regularization validation — (method, regularization) combo checked# ============================================================================
+
+test_that("H1: Invalid (method, regularization) combo produces error", {
+    # GAM only accepts pca, gamsel, spline
+    expect_error(
+        TSENAT:::.validate_sait_interaction_input(
+            method = "gam", pvalue = "satterthwaite", corstr = "ar1",
+            regularization = "lasso", multicorr = "hochberg",
+            pcorr = "BH", storey = FALSE, wy_randomizations = 100,
+            paired = FALSE, subject_col = NULL, se = NULL, verbose = FALSE
+        ),
+        "regularization"
+    )
+
+    # LMM only accepts pca, lasso, elasticnet
+    expect_error(
+        TSENAT:::.validate_sait_interaction_input(
+            method = "lmm", pvalue = "satterthwaite", corstr = "ar1",
+            regularization = "gamsel", multicorr = "hochberg",
+            pcorr = "BH", storey = FALSE, wy_randomizations = 100,
+            paired = FALSE, subject_col = NULL, se = NULL, verbose = FALSE
+        ),
+        "regularization"
+    )
+
+    # Valid combos should NOT error
+    expect_silent(
+        TSENAT:::.validate_sait_interaction_input(
+            method = "gam", pvalue = "satterthwaite", corstr = "ar1",
+            regularization = "gamsel", multicorr = "hochberg",
+            pcorr = "BH", storey = FALSE, wy_randomizations = 100,
+            paired = FALSE, subject_col = NULL, se = NULL, verbose = FALSE
+        )
+    )
+})
+# ============================================================================
+# M3: corstr = "auto" — now accepted in public API# ============================================================================
+
+test_that("M3: corstr='auto' is a valid argument", {
+    # Verify "auto" is in the match.arg choices
+    choices <- eval(formals(TSENAT:::.calculate_sait)$corstr)
+    expect_true("auto" %in% choices)
+})

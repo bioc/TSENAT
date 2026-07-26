@@ -297,13 +297,23 @@
         # Vectorized log-odds computation for entire column
         s_vals <- result[, col_idx]
         valid_mask <- !is.na(n_iso_vec) & n_iso_vec > 1 & !is.na(col_q) & !is.na(s_vals) &
-            is.finite(s_vals) & s_max_vec > 0 & s_vals > 0
+            is.finite(s_vals) & s_max_vec > 0
 
         # AUDIT FIX July 2026: Use log(..., base = log_base) instead of hardcoded
         # natural log to maintain consistency with the entropy calculation's
         # logarithm base.
-        result[valid_mask, col_idx] <- log(s_vals[valid_mask]/s_max_vec[valid_mask],
+        # Also handle s_vals ≤ 0: these are non-positive entropy estimates
+        # (numerical edge cases). Floor at a small positive value to avoid
+        # silent unit mixing (raw entropy vs log-odds in same column).
+        pos_mask <- valid_mask & s_vals > 0
+        neg_mask <- valid_mask & s_vals <= 0
+        
+        result[pos_mask, col_idx] <- log(s_vals[pos_mask]/s_max_vec[pos_mask],
             base = log_base)
+        if (any(neg_mask)) {
+            # Floor at log(1e-10) to indicate near-zero entropy
+            result[neg_mask, col_idx] <- log(1e-10, base = log_base)
+        }
     }
 
     return(result)
@@ -1249,7 +1259,7 @@
 #' @noRd
 .calculate_method <- function(x, genes, norm = TRUE, verbose = FALSE, show_messages = FALSE,
     q = 2, what = c("S", "D"), nthreads = 1, pseudocount = 0, min_valid_frac = 0.75,
-    shrinkage = c("none", "empirical_bayes"), effective_length = NULL) {
+    shrinkage = c("none", "empirical_bayes"), effective_length = NULL, log_base = exp(1)) {
     what <- match.arg(what)
     shrinkage <- match.arg(shrinkage)
     # validate q (q=0 represents species richness)
@@ -1274,7 +1284,7 @@
     # compute requested quantity ('S' or 'D') in parallel
     result_list <- .bplapply(gene_levels, function(gene) {
         .tsallis_row(x = x, genes = genes, gene = gene, q = q, norm = norm, what = what,
-            pseudocount = pseudocount, effective_length = effective_length)
+            pseudocount = pseudocount, effective_length = effective_length, log_base = log_base)
     }, nthreads = nthreads)
 
     # Convert list to matrix (each element is a named vector) result_list is a
@@ -1343,7 +1353,8 @@
 
 # Internal helpers for calculate_method
 
-.tsallis_row <- function(x, genes, gene, q, norm, what, pseudocount = 0, effective_length = NULL) {
+.tsallis_row <- function(x, genes, gene, q, norm, what, pseudocount = 0, effective_length = NULL,
+    log_base = exp(1)) {
     idx <- which(genes == gene)
     n_q <- length(q)
     n_samples <- ncol(x)
@@ -1376,7 +1387,7 @@
         }
 
         # Calculate entropy on the adjusted counts
-        v <- .calculate_tsallis_entropy(counts, q = q, norm = norm, what = what)
+        v <- .calculate_tsallis_entropy(counts, q = q, norm = norm, what = what, log_base = log_base)
         out_idx <- (j - 1) * n_q + seq_len(n_q)
         if (length(v) == n_q && all(is.finite(v) | is.na(v))) {
             out[out_idx] <- v

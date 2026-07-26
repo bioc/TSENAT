@@ -52,74 +52,10 @@
 #   (which assumes exchangeable ICC); TSENAT uses AR(1) correlation structure
 #   after ARIMA(1,1,0) differencing.
 #
-# CRITICAL CORRECTION (March 2026):
-#   Previous code mistakenly used Kish formula designed for exchangeable
-#   correlation (ICC). TSENAT uses AR(1) correlation after differencing—
-#   fundamentally different structures.
-#
-# AR(1) DESIGN EFFECT FORMULA:
-#   For large m (m >> 1):
-#     D_eff = (1 + phi) / (1 - phi)
-#
-#   For moderate m (typical multi-q designs, m = q-values per subject):
-#     D_eff = (1 + phi) / (1 - phi) * [1 - phi^m] / [m - (m-1)*phi^m]
-#
-# PARAMETERS ASSUMED:
-#   - rho applied to DIFFERENCED entropy (ARIMA(1,1,0) applied first)
-#   - m = cluster_size = observations per subject (typically q-values)
-#   - phi = autocorrelation on differenced data (0 < phi < 1)
-#
-# REFERENCES:
-#   - Diggle et al. (2002) 'Analysis of Longitudinal Data' Section 4.3
-#   - Crowder (1995) 'Generalised Estimating Equations for repeated measurements'
-#   - Liang & Zeger (1986) 'Longitudinal data analysis using GEE'
-#
-# COMPARISON: AR(1) vs Kish Formula
-#   ┌─────────────────────────────────────────────────────────────────┐
-#   │ KISH FORMULA: 1 + (m-1)*rho                                     │
-#   │   - Assumes exchangeable correlation (ICC)                      │
-#   │   - All pairs equally correlated with ICC rho                   │
-#   │   - Appropriate for clusters with homogeneous correlation       │
-#   │                                                                 │
-#   │ AR(1) FORMULA: (1+phi)/(1-phi)                                  │
-#   │   - Assumes geometric correlation decay                         │
-#   │   - Correlation decreases as lag k increases: Corr(t,t+k)=phi^k│
-#   │   - Appropriate for ordered measurements (like q-values)        │
-#   │   - Applied to differenced data (ARIMA(1,1,0) stationarity)     │
-#   └─────────────────────────────────────────────────────────────────┘
-.ar1_design_effect <- function(rho, cluster_size) {
-    # Compute design effect for AR(1) correlation Args: rho: autocorrelation
-    # coefficient phi on differenced data (0 <= phi <= 1) cluster_size: m =
-    # observations per subject (e.g., number of q-values) Returns: D_eff =
-    # design effect to adjust effective sample size as n_eff = n_subjects /
-    # D_eff
-
-    if (is.null(rho) || is.na(rho) || rho <= 0 || cluster_size <= 1) {
-        # No correlation or invalid input: D_eff = 1 (independence)
-        return(1)
-    }
-
-    if (rho >= 1) {
-        # Perfect correlation: D_eff = m (complete non-independence)
-        return(as.numeric(cluster_size))
-    }
-
-    # AR(1) design effect: D_eff = 1 + 2*Sum_{k=1}^{m-1} (1 - k/m)*rho^k This
-    # accounts for geometric correlation decay and edge effects Reference:
-    # Diggle et al. (2002), Crowder (1995)
-
-    # Compute sum efficiently
-    summed <- 0
-    for (k in seq_len(cluster_size - 1)) {
-        lambda_k <- 1 - k/cluster_size  # Edge effect weight
-        summed <- summed + lambda_k * (rho^k)
-    }
-
-    d_eff <- 1 + 2 * summed
-    d_eff <- pmax(1, d_eff)  # Ensure D_eff >= 1
-
-    return(d_eff)
-}
+# NOTE: AR(1) design effect computation has been consolidated into
+# .compute_ar1_design_effect() in sait_gee.R, which uses the exact
+# finite-m form: D_eff = 1 + 2*Σ_{k=1}^{m-1} (1-k/m)*ρ^k
+# (Diggle et al. 2002, Crowder 1995).
 
 .estimate_ar1_rho <- function(entropy_diff, subject_vec = NULL) {
     # Estimate first-order autocorrelation rho from differenced entropy Input:
@@ -406,287 +342,6 @@
             p_value, if (is_normal) "residuals appear" else "residuals NOT", n_res)))
 }
 
-# Helper: Check visual monotonicity of entropy values Purpose: Detect ordering
-# issues or data quality problems before statistical testing
-.check_monotonicity <- function(entropy_vals, q_vals, tolerance = 0.05) {
-    # Args: entropy_vals: numeric vector of entropy values q_vals: numeric
-    # vector of q-values (should match entropy_vals length) tolerance:
-    # proportion of non-monotone pairs tolerated (default 5%) Returns: List
-    # with: is_monotone (logical), n_violations, violation_indices, report
-    # (string)
-
-    if (is.null(entropy_vals) || length(entropy_vals) < 2) {
-        return(list(is_monotone = NA, n_values = 0, n_violations = 0, violation_indices = integer(0),
-            report = "Insufficient data for monotonicity check"))
-    }
-
-    # Sort by q-values to ensure proper ordering
-    order_idx <- order(q_vals)
-    entropy_sorted <- entropy_vals[order_idx]
-    q_sorted <- q_vals[order_idx]
-
-    # Compute differences: d_i = H_{q_{i+1}} - H_{q_i} For monotone decreasing:
-    # all d_i < 0
-    diffs <- diff(entropy_sorted)
-
-    # Identify violations (positive differences indicate increase instead of
-    # decrease) Use numerical tolerance to avoid false positives from
-    # floating-point errors
-    violation_tolerance <- 1e-10
-    violations <- which(diffs >= violation_tolerance)
-    n_violations <- length(violations)
-    n_total_pairs <- length(diffs)
-    violation_rate <- n_violations/n_total_pairs
-
-    # Determine if monotonicity holds (with tolerance)
-    is_monotone <- violation_rate <= tolerance
-
-    return(list(is_monotone = is_monotone, n_values = length(entropy_vals), n_violations = n_violations,
-        n_pairs = n_total_pairs, violation_rate = violation_rate, violation_indices = violations +
-            1, report = sprintf(paste("Monotonicity check: %d/%d pairs decreasing",
-            "(%.1f%% violations). %s monotone."), n_total_pairs - n_violations, n_total_pairs,
-            100 * violation_rate, if (is_monotone) "PASS:" else "FAIL:")))
-}
-
-# Helper: Augmented Dickey-Fuller (ADF) test for unit root Simple
-# implementation without external package dependencies
-.adf_test <- function(time_series, max_lag = 3, alpha = 0.05) {
-    # Args: time_series: numeric vector (observations) max_lag: maximum lag
-    # order for augmentation (default 3) alpha: significance level (default
-    # 0.05) Returns: List with: test_stat, p_value, lag_used, conclusion,
-    # report (string) H0: Unit root present (non-stationary) Reject H0 ->
-    # series is stationary Fail to reject H0 -> series is non-stationary (may
-    # have unit root)
-
-    if (is.null(time_series) || length(na.omit(time_series)) < 5) {
-        return(list(test_stat = NA_real_, p_value = NA_real_, lag_used = NA_integer_,
-            stationary = NA, conclusion = "INSUFFICIENT_DATA", report = "Insufficient data for ADF test"))
-    }
-
-    # Remove NAs
-    ts_clean <- na.omit(as.numeric(time_series))
-
-    if (length(ts_clean) < 5) {
-        return(list(test_stat = NA_real_, p_value = NA_real_, lag_used = NA_integer_,
-            stationary = NA, conclusion = "INSUFFICIENT_DATA", report = "Insufficient non-NA data for ADF test"))
-    }
-
-    # Simplified ADF: regress Deltay_t on y_{t-1} and lagged differences y_t =
-    # c + beta*y_{t-1} + Sum alpha_i*Deltay_{t-i} + ?_t Test: H0: beta = 0
-    # (unit root, non-stationary)
-
-    n <- length(ts_clean)
-    y <- ts_clean
-    dy <- diff(y)  # First differences
-
-    # Use lag order 1 (balance between flexibility and power) In practice, lag
-    # selection would use AIC/BIC
-    lag_order <- min(max_lag, max(1, floor(sqrt(n))))
-
-    # Build regression matrix Dependent variable: dy[2:n] (Deltay_t for
-    # t=2,...,n) Predictor 1: y[seq_len(n-1)] (y_{t-1}) Predictor 2+: lagged
-    # differences dy[seq_len(n-lag_order-1)], etc.
-
-    y_lag1 <- y[seq_len(n - 1)]
-    dy_response <- dy[2:length(dy)]  # Deltay_t for t=2
-    y_lag1_response <- y_lag1[2:length(y_lag1)]  # y_{t-1} aligned with Deltay_t
-
-    # Simple regression: just use y_{t-1} without augmentation for stability
-    valid_idx <- !is.na(dy_response) & !is.na(y_lag1_response)
-    if (sum(valid_idx) < 3) {
-        return(list(test_stat = NA_real_, p_value = NA_real_, lag_used = lag_order,
-            stationary = NA, conclusion = "REGRESSION_FAILED", report = "Insufficient valid data for regression"))
-    }
-
-    dy_model <- dy_response[valid_idx]
-    y_lag_model <- y_lag1_response[valid_idx]
-
-    # Fit: Deltay_t = beta * y_{t-1} + ?_t
-    fit <- try(lm(dy_model ~ y_lag_model), silent = TRUE)
-    if (inherits(fit, "try-error")) {
-        return(list(test_stat = NA_real_, p_value = NA_real_, lag_used = lag_order,
-            stationary = NA, conclusion = "REGRESSION_FAILED", report = "Regression failed"))
-    }
-
-    # Extract t-statistic for beta (coefficient on y_lag_model)
-    coef_table <- tryCatch(coef(summary(fit)), error = function(e) NULL)
-    if (is.null(coef_table) || nrow(coef_table) < 2) {
-        return(list(test_stat = NA_real_, p_value = NA_real_, lag_used = lag_order,
-            stationary = NA, conclusion = "STAT_EXTRACTION_FAILED", report = "Could not extract test statistic"))
-    }
-
-    # Critical values for ADF test (MacKinnon 1996, 5% level) These are
-    # approximate; exact values depend on regression specification
-    critical_values_5pct <- c(-2.86, -2.57, -2.57)  # For n~25, 50, 100+
-    critical_value <- -2.86  # Conservative for small n
-
-    t_stat <- as.numeric(coef_table[2, 3])  # t-statistic for y_lag_model coefficient
-
-    # Approximate p-value based on t-statistic comparison to critical value
-    # This is a simplified approximation; exact p-values require special
-    # distribution
-    if (is.na(t_stat)) {
-        p_value <- NA_real_
-        stationary <- NA
-    } else {
-        # If t_stat < critical_value: REJECT H0 (stationary) If t_stat >
-        # critical_value: FAIL TO REJECT H0 (non-stationary)
-        stationary <- t_stat < critical_value
-        # Approximate p-value (crude)
-        p_value <- 2 * pt(t_stat, df = length(dy_model) - 2)  # Two-tailed
-        p_value <- max(0.001, min(0.999, p_value))  # Bound to [0.001, 0.999]
-    }
-
-    return(list(test_stat = t_stat, p_value = p_value, lag_used = lag_order, critical_value = critical_value,
-        stationary = stationary, conclusion = if (is.na(stationary)) "FAILED" else if (stationary) "REJECT_H0:_STATIONARY" else "FAIL_REJECT_H0:_NON-STATIONARY",
-        report = sprintf("ADF test (lag=%d): t=%.3f, crit=%.3f. %s -> %s", lag_order,
-            t_stat, critical_value, if (is.na(stationary)) "FAILED" else if (t_stat <
-                critical_value) "REJECT H0" else "FAIL REJECT H0", if (is.na(stationary)) "inconclusive" else if (stationary) "STATIONARY (rejects unit root)" else "NON-STATIONARY (has unit root)")))
-}
-
-# Helper: KPSS Test for stationarity (reverse of ADF) H0: Series IS stationary
-.kpss_test <- function(time_series, trend = "constant", alpha = 0.05) {
-    # Args: time_series: numeric vector trend: 'constant' or 'ct' (constant +
-    # time trend) alpha: significance level Returns: List with: test_stat,
-    # p_value, conclusion, report (string) H0: Series is stationary Reject H0
-    # -> series is NON-stationary Fail to reject H0 -> series is stationary
-
-    if (is.null(time_series) || length(na.omit(time_series)) < 5) {
-        return(list(test_stat = NA_real_, p_value = NA_real_, stationary = NA, conclusion = "INSUFFICIENT_DATA",
-            report = "Insufficient data for KPSS test"))
-    }
-
-    ts_clean <- na.omit(as.numeric(time_series))
-
-    if (length(ts_clean) < 5) {
-        return(list(test_stat = NA_real_, p_value = NA_real_, stationary = NA, conclusion = "INSUFFICIENT_DATA",
-            report = "Insufficient non-NA data for KPSS test"))
-    }
-
-    # Simplified KPSS: Compute cumulative residuals variance ratio
-    n <- length(ts_clean)
-    y <- ts_clean
-
-    # Demean if trend='constant', detrend if trend='ct'
-    if (trend == "constant") {
-        y_residual <- y - mean(y, na.rm = TRUE)
-    } else {
-        time_idx <- seq_len(n)
-        fit <- try(lm(y ~ time_idx), silent = TRUE)
-        if (inherits(fit, "try-error")) {
-            y_residual <- y - mean(y, na.rm = TRUE)
-        } else {
-            y_residual <- residuals(fit)
-        }
-    }
-
-    # Cumulative sum of residuals
-    S_t <- cumsum(y_residual)
-
-    # Long-run variance estimate (Newey-West with lag=1)
-    s2 <- mean(y_residual^2)  # Short-run variance
-
-    # Autocovariance at lag 1
-    if (n > 1) {
-        gamma1 <- sum(y_residual[-n] * y_residual[-1])/n
-    } else {
-        gamma1 <- 0
-    }
-
-    # Long-run variance (Newey-West)
-    sigma2_lr <- s2 + 2 * gamma1 * (1 - 1/n)
-    sigma2_lr <- max(s2 * 0.1, sigma2_lr)  # Ensure positive
-
-    # KPSS statistic
-    kpss_stat <- sum(S_t^2)/(n^2 * sigma2_lr)
-
-    # Critical values for KPSS (Kwiatkowski et al. 1992) trend='constant': 10%,
-    # 5%, 2.5%, 1% are 0.347, 0.463, 0.574, 0.739 With trend: 0.119, 0.146,
-    # 0.176, 0.216
-    if (trend == "constant") {
-        crit_5pct <- 0.463
-    } else {
-        crit_5pct <- 0.146
-    }
-
-    # Reject H0 (stationarity) if KPSS stat > critical value
-    reject_h0 <- kpss_stat > crit_5pct
-    stationary <- !reject_h0
-
-    # Approximate p-value
-    if (kpss_stat < 0.347) {
-        p_value <- 0.1
-    } else if (kpss_stat < 0.463) {
-        p_value <- 0.05
-    } else if (kpss_stat < 0.574) {
-        p_value <- 0.025
-    } else if (kpss_stat < 0.739) {
-        p_value <- 0.01
-    } else {
-        p_value <- 0.001
-    }
-    if (!reject_h0)
-        p_value <- 1 - p_value
-
-    return(list(test_stat = kpss_stat, p_value = p_value, critical_value = crit_5pct,
-        stationary = stationary, conclusion = if (reject_h0) "REJECT_H0:_NON-STATIONARY" else "FAIL_REJECT_H0:_STATIONARY",
-        report = sprintf("KPSS test (trend=%s): LM=%.3f, crit=%.3f. %s -> %s", trend,
-            kpss_stat, crit_5pct, if (reject_h0) "REJECT H0" else "FAIL REJECT H0",
-            if (stationary) "STATIONARY" else "NON-STATIONARY")))
-}
-
-# Comprehensive stationarity validation Returns diagnostic report comparing raw
-# and differenced data
-.validate_stationarity <- function(entropy_vals, q_vals, subject_vec = NULL, gene_name = NULL) {
-    # Args: entropy_vals: raw entropy values q_vals: corresponding q-values
-    # subject_vec: (optional) subject identifiers for within-subject validation
-    # gene_name: (optional) identifier for reporting Returns: List with full
-    # diagnostic report including all tests
-
-    if (is.null(gene_name))
-        gene_name <- "Unknown"
-
-    # Test 1: Monotonicity
-    mono_check <- .check_monotonicity(entropy_vals, q_vals)
-
-    # Test 2-3: ADF and KPSS on raw data
-    adf_raw <- .adf_test(entropy_vals)
-    kpss_raw <- .kpss_test(entropy_vals, trend = "constant")
-
-    # Test 4-5: ADF and KPSS on first differences
-    if (length(entropy_vals) > 1) {
-        # Sort by q first
-        sort_idx <- order(q_vals)
-        entropy_sorted <- entropy_vals[sort_idx]
-        entropy_diff <- diff(entropy_sorted)
-
-        adf_diff <- .adf_test(entropy_diff)
-        kpss_diff <- .kpss_test(entropy_diff, trend = "constant")
-    } else {
-        adf_diff <- list(test_stat = NA, p_value = NA, stationary = NA, conclusion = "NO_DATA")
-        kpss_diff <- list(test_stat = NA, p_value = NA, stationary = NA, conclusion = "NO_DATA")
-        entropy_diff <- NULL
-    }
-
-    # Summary: Check if ARIMA(1,1,0) is justified
-    arima_justified <- !mono_check$is_monotone && !isTRUE(adf_raw$stationary) &&
-        isTRUE(kpss_raw$stationary) == FALSE && isTRUE(adf_diff$stationary)
-
-    return(list(gene = gene_name, n_values = length(entropy_vals), n_q_values = length(unique(q_vals)),
-        monotonicity = mono_check, raw_data_tests = list(adf = adf_raw, kpss = kpss_raw,
-            interpretation = sprintf("Raw entropy: ADF=%s, KPSS=%s. %s", adf_raw$conclusion,
-                kpss_raw$conclusion, if (!isTRUE(adf_raw$stationary) && isTRUE(kpss_raw$stationary) ==
-                  FALSE) "CONFIRMED non-stationary (unit root likely)" else "QUESTIONABLE stationarity")),
-        differenced_data_tests = list(adf = adf_diff, kpss = kpss_diff, interpretation = sprintf("Differenced entropy: ADF=%s, KPSS=%s. %s",
-            adf_diff$conclusion, kpss_diff$conclusion, if (isTRUE(adf_diff$stationary) &&
-                isTRUE(kpss_diff$stationary) == FALSE) "CONFIRMED stationary (differencing effective)" else "QUESTIONABLE stationarity after differencing")),
-        arima_justified = arima_justified, recommendation = if (arima_justified) "[OK] Use ARIMA(1,1,0): differencing removes trend, AR(1) appropriate for residuals" else "? REVIEW: Stationarity assumptions may not hold, consider alternative modeling",
-        report = sprintf("STATIONARITY VALIDATION for %s:\n%s\nRaw: %s, %s\nDiff: %s, %s\n%s",
-            gene_name, mono_check$report, adf_raw$report, kpss_raw$report, adf_diff$report,
-            kpss_diff$report, if (arima_justified) "[OK] ARIMA(1,1,0) assumptions validated" else "? Issues detected")))
-}
-
-
 # ==================================================================
 # ARIMA(1,1,0) Implementation: Compute First Differences of Entropy
 # ==================================================================
@@ -748,7 +403,8 @@
         n_diff <- nrow(subj_data) - 1
 
         df_diff_list[[subj]] <- data.frame(entropy_diff = diff(subj_data$entropy),
-            q = subj_data$q[-1], q_prev = subj_data$q[-nrow(subj_data)], group = as.character(subj_data$group[-nrow(subj_data)]),
+            q = subj_data$q[-1], q_prev = subj_data$q[-nrow(subj_data)],
+            group = rep(as.character(subj_data$group[1]), n_diff),
             subject = rep(subj, n_diff), stringsAsFactors = FALSE)
     }
 
@@ -810,14 +466,9 @@ if (getOption("TSENAT.memoization", TRUE)) {
     # Cache knot selection: input = (entropy, q_vals, n_unique, ...)  Avoids
     # recomputing knots for same entropy data across iterations
     .adaptive_spline_knots_memo <- memoise(.adaptive_spline_knots, cache = cache_memory())
-
-    # Cache design effect: input = (rho, cluster_size) Avoids recomputing
-    # design effect for repeated (rho, cluster_size) pairs
-    .ar1_design_effect_memo <- memoise(.ar1_design_effect, cache = cache_memory())
 } else {
     # Fallback: no memoization if disabled globally
     .adaptive_spline_knots_memo <- .adaptive_spline_knots
-    .ar1_design_effect_memo <- .ar1_design_effect
 }
 
 #' Internal: Clear memoization cache
@@ -826,7 +477,6 @@ if (getOption("TSENAT.memoization", TRUE)) {
 .clear_sait_helper_cache <- function() {
     if (getOption("TSENAT.memoization", TRUE)) {
         forget(.adaptive_spline_knots_memo)
-        forget(.ar1_design_effect_memo)
     }
 }
 
@@ -1095,6 +745,19 @@ if (getOption("TSENAT.memoization", TRUE)) {
                 paste(cd_colnames, collapse = ", "), ". Ensure .calculate_diversity() or map_metadata() was ",
                 "called with appropriate metadata.", call. = FALSE)
         }
+    }
+
+    # Validate (method, regularization) combination
+    valid_reg_methods <- list(
+        gam  = c("pca", "gamsel", "spline"),
+        lmm  = c("pca", "lasso", "elasticnet"),
+        fpca = c("pca", "lasso", "elasticnet"),
+        gee  = c("pca", "lasso", "elasticnet", "gamsel", "spline")  # all accepted, ignored
+    )
+    if (!regularization %in% valid_reg_methods[[method]]) {
+        stop(sprintf("regularization='%s' is not valid for method='%s'. Valid options: %s",
+            regularization, method, paste(valid_reg_methods[[method]], collapse = ", ")),
+            call. = FALSE)
     }
 
     return(list(method = method, pvalue = pvalue, corstr = corstr, regularization = regularization,
@@ -1398,15 +1061,36 @@ if (getOption("TSENAT.memoization", TRUE)) {
         # Save original group vector for safe restoration
         group_vec_orig <- metadata$group_vec
 
+        # Determine if this is a paired design for correct permutation
+        is_paired <- isTRUE(paired) && !is.null(subject_col) &&
+            subject_col %in% colnames(SummarizedExperiment::colData(se))
+
+        # Build subject vector for paired permutation
+        subject_vec <- NULL
+        if (is_paired) {
+            cd <- SummarizedExperiment::colData(se)
+            sample_q <- colnames(mat)
+            subject_vec <- as.character(cd[sample_q, subject_col])
+        }
+
         # Run Westfall-Young permutation
         perm_result <- .westfall_young_permutation(n_genes = length(p_values), wy_randomizations = wy_randomizations,
             permute_fn = function() {
-                # Shuffle group labels separately within each q-level
-                q_unique <- unique(metadata$q_vals)
                 perm_assignment <- group_vec_orig
-                for (q_val in q_unique) {
-                  q_idx <- which(metadata$q_vals == q_val)
-                  perm_assignment[q_idx] <- sample(group_vec_orig[q_idx])
+                if (is_paired && !is.null(subject_vec)) {
+                    # PAIRED: shuffle condition labels WITHIN each subject
+                    # (preserves within-subject correlation structure)
+                    for (subj in unique(subject_vec)) {
+                        subj_idx <- which(subject_vec == subj)
+                        perm_assignment[subj_idx] <- sample(group_vec_orig[subj_idx])
+                    }
+                } else {
+                    # UNPAIRED: shuffle group labels within each q-level
+                    q_unique <- unique(metadata$q_vals)
+                    for (q_val in q_unique) {
+                        q_idx <- which(metadata$q_vals == q_val)
+                        perm_assignment[q_idx] <- sample(group_vec_orig[q_idx])
+                    }
                 }
                 return(perm_assignment)
             }, refit_fn = function(perm_assignment) {

@@ -787,7 +787,8 @@ calculate_diversity <- function(analysis, q = NULL, norm = TRUE, norm_method = N
         what = params$what, nthreads = params$nthreads, pseudocount = params$pseudocount,
         min_valid_frac = params$min_valid_frac, shrinkage = params$shrinkage, bootstrap = params$bootstrap,
         bootstrap_nboot = params$nboot, bootstrap_method = params$bootstrap_method,
-        bootstrap_ci = params$bootstrap_ci, bootstrap_include_diagnostics = params$bootstrap_include_diagnostics)
+        bootstrap_ci = params$bootstrap_ci, bootstrap_include_diagnostics = params$bootstrap_include_diagnostics,
+        log_base = params$log_base)
 
     # Add optional parameters
     if (!is.null(params$genes)) {

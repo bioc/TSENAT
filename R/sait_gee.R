@@ -111,7 +111,7 @@
     gee_weights <- weights_result$gee_weights
 
     # Count clusters for bias correction decisions
-    n_clusters <- length(unique(as.numeric(df$subject)))
+    n_clusters <- nlevels(df$subject)
 
     # Final validation
     if (sum(!is.na(df$entropy)) < 2) {
@@ -152,7 +152,30 @@
     if (!is.na(p_interaction)) {
         residuals_alt <- residuals(fit_alt)
         if (!is.null(residuals_alt) && length(residuals_alt) > 2) {
-            rho_ar1 <- .estimate_ar1_correlation(residuals_alt)
+            # Estimate AR(1) ρ within each cluster (subject) and pool via
+            # Fisher z-transform. Previously concatenated residuals across
+            # clusters, contaminating lag-1 estimate with between-cluster
+            # covariance (M5 fix, July 2026).
+            subject_levels <- levels(df$subject)
+            if (length(subject_levels) > 0 && length(residuals_alt) == nrow(df)) {
+                rho_per_subject <- vapply(subject_levels, function(s) {
+                    idx <- which(df$subject == s)
+                    if (length(idx) >= 3) {
+                        .estimate_ar1_correlation(residuals_alt[idx])
+                    } else NA_real_
+                }, FUN.VALUE = numeric(1))
+                rho_valid <- rho_per_subject[!is.na(rho_per_subject)]
+                if (length(rho_valid) > 0) {
+                    # Pool via Fisher z-transform (inverse hyperbolic tangent)
+                    z_vals <- atanh(pmin(pmax(rho_valid, -0.99), 0.99))
+                    rho_ar1 <- tanh(mean(z_vals))
+                } else {
+                    rho_ar1 <- NA_real_
+                }
+            } else {
+                # Fallback: flat correlation (no subject grouping available)
+                rho_ar1 <- .estimate_ar1_correlation(residuals_alt)
+            }
 
             # Compute design effect if AR(1) significant
             cluster_size <- length(unique(df$q))
@@ -175,9 +198,15 @@
                 z_interact <- .compute_wald_statistic(fit_alt, ia_idx)
 
                 if (!is.na(z_interact)) {
-                  # Apply K-C correction with design effect
+                  # Get robust sandwich variance and coefficient for K-C correction
+                  vcov_sandwich <- try(vcov(fit_alt), silent = TRUE)
+                  if (inherits(vcov_sandwich, "try-error")) vcov_sandwich <- NULL
+                  coef_value <- coefs_alt[ia_idx]
+
+                  # Apply K-C correction with design effect and actual sandwich variance
                   kc_result <- .kc_bias_correct(p_value = p_interaction, z_statistic = z_interact,
-                    vcov_sandwich_raw = NULL, n_clusters = n_clusters, n_parameters = length(coefs_alt),
+                    vcov_sandwich_raw = vcov_sandwich, coef_value = coef_value,
+                    coef_index = ia_idx, n_clusters = n_clusters, n_parameters = length(coefs_alt),
                     rho_ar1 = rho_ar1, cluster_size = cluster_size, design_effect = design_effect_value,
                     bias_correction_method = "hc1", use_t_distribution = TRUE, apply_correction = TRUE,
                     verbose = FALSE)
@@ -297,8 +326,11 @@
             subj_idx <- which(subject_sorted == subj)
             if (length(subj_idx) >= 2) {
                 subj_data <- df_sorted[subj_idx, ]
+                # Use the first group value for the subject (should be constant within subject)
+                subj_group <- as.character(subj_data$group[1])
+                n_diff <- nrow(subj_data) - 1
                 df_diff_list[[as.character(subj)]] <- data.frame(entropy = diff(subj_data$entropy),
-                  q = subj_data$q[-nrow(subj_data)], group = subj_data$group[-nrow(subj_data)],
+                  q = subj_data$q[-nrow(subj_data)], group = rep(subj_group, n_diff),
                   stringsAsFactors = FALSE)
             }
         }
@@ -406,8 +438,8 @@
                     if (!is.na(p_int_candidate) && !is.nan(p_int_candidate)) {
                       p_interaction <- p_int_candidate
 
-                      # Apply bias correction if needed
-                      if (bias_correction && n_clusters < 20) {
+                      # Apply bias correction if needed (consistent threshold with caller)
+                      if (bias_correction && n_clusters < 30) {
                         p_corrected <- .apply_bias_correction(fit_alt, ia_name, ia_names,
                           n_clusters)
                         return(if (!is.na(p_corrected)) p_corrected else p_interaction)
@@ -481,8 +513,8 @@
     if (is.na(z_stat))
         return(NA_real_)
 
-    # Apply bias correction if specified and small clusters
-    if (bias_correction && n_clusters < 20) {
+    # Apply bias correction if specified and small clusters (threshold: 30, consistent)
+    if (bias_correction && n_clusters < 30) {
         df_corr <- max(1, n_clusters - 1)
         2 * stats::pt(abs(z_stat), df = df_corr, lower.tail = FALSE)
     } else {
@@ -514,7 +546,7 @@
     wald_stat <- as.numeric(t(beta) %*% V_inv %*% beta)
     df <- length(ia_idx)
 
-    if (bias_correction && n_clusters < 20) {
+    if (bias_correction && n_clusters < 30) {
         # Use F-distribution for small clusters: Wald/k ~ F(k, n_clusters - k)
         f_stat <- wald_stat / df
         df2 <- max(1, n_clusters - df)
@@ -580,31 +612,35 @@
 }
 
 # ============================================================================
-# HELPER: Compute design effect for AR(1) structure
+# HELPER: Compute design effect for AR(1) structure (finite-m form)
 # ============================================================================
+# Uses the exact finite-m formula (Diggle et al. 2002, Crowder 1995):
+#   D_eff = 1 + 2 * Σ_{k=1}^{m-1} (1 - k/m) * ρ^k
+# This correctly accounts for edge effects in small clusters (few q-values),
+# unlike the asymptotic (1+ρ)/(1-ρ) which overstates the design effect.
 .compute_ar1_design_effect <- function(rho, cluster_size) {
-    # Design effect for AR(1) repeated measures D_eff = (1 + rho) / (1 - rho)
-    # for positive correlation This accounts for reduction in effective sample
-    # size due to within-subject correlation For multi-q Tsallis: cluster_size
-    # = number of q-values per subject Result: effective sample size =
-    # n_subjects_observed / design_effect
-
-    if (is.null(rho) || is.na(rho) || abs(rho) < 0.001) {
+    if (is.null(rho) || is.na(rho) || rho <= 0 || cluster_size <= 1) {
         return(1)
+    }
+
+    if (rho >= 1) {
+        return(as.numeric(cluster_size))
     }
 
     # Bound rho to avoid numerical issues
     rho <- pmin(pmax(rho, -0.99), 0.99)
 
-    # Standard design effect formula
-    if (abs(rho) < 1) {
-        design_effect <- (1 + rho)/(1 - rho)
-    } else {
-        design_effect <- 1
+    # Finite-m AR(1) design effect with edge-effect weights
+    summed <- 0
+    for (k in seq_len(cluster_size - 1)) {
+        lambda_k <- 1 - k / cluster_size
+        summed <- summed + lambda_k * (rho^k)
     }
 
-    # Ensure positive
-    max(1, design_effect)
+    d_eff <- 1 + 2 * summed
+    d_eff <- pmax(1, d_eff)  # Ensure D_eff >= 1
+
+    return(d_eff)
 }
 
 

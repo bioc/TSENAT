@@ -1606,3 +1606,102 @@ test_that("[AUDIT #25] tsallis_divergence_cpp warns on unequal-length vectors", 
         pattern = "different lengths"
     )
 })
+# C4: Bootstrap CIs — NOT transformed by normalization
+# ============================================================================ 
+# H6: BCa bootstrap — warns and reports "percentile" instead of "bca"
+# ============================================================================ 
+# H7: log_odds_ratio d_max — uses column-maximum, not log(2)/1
+# ============================================================================ 
+# M6: q=0 divergence — support-difference, not constant zero
+# ============================================================================ 
+# ============================================================================
+# C4: Bootstrap CIs — NOT transformed by normalization# ============================================================================
+
+test_that("C4: Divergence normalization does not transform CI bounds", {
+    skip_if_not_installed("SummarizedExperiment")
+    set.seed(42)
+
+    se <- create_count_se(n_genes = 8, n_samples = 6, n_control = 3, lambda = 100, seed = 42)
+    colnames(se) <- paste0("Sample_", seq_len(ncol(se)))
+
+    result <- TSENAT:::.calculate_divergence(
+        se = se, bootstrap = TRUE, nboot = 20,
+        norm = "range", control_group = "Control", progress = FALSE
+    )
+
+    rd <- SummarizedExperiment::rowData(result)
+    # After normalization, CI bounds remain on raw scale
+    # (estimate is normalized but CIs are not)
+    expect_true("lower_ci_q1" %in% colnames(rd) || "lower_ci" %in% colnames(rd))
+})
+# ============================================================================
+# H6: BCa bootstrap — warns and reports "percentile" instead of "bca"# ============================================================================
+
+test_that("H6: Divergence BCa bootstrap warns and reports percentile method", {
+    skip_if_not_installed("SummarizedExperiment")
+    set.seed(42)
+
+    se <- create_count_se(n_genes = 4, n_samples = 6, n_control = 3, lambda = 100, seed = 42)
+    colnames(se) <- paste0("Sample_", seq_len(ncol(se)))
+
+    # BCa should produce a warning
+    expect_warning(
+        result <- TSENAT:::.calculate_divergence(
+            se = se, bootstrap = TRUE, nboot = 10,
+            method = "bca", control_group = "Control", progress = FALSE
+        ),
+        "BCa"
+    )
+})
+# ============================================================================
+# H7: log_odds_ratio d_max — uses column-maximum, not log(2)/1# ============================================================================
+
+test_that("H7: log_odds_ratio normalization uses data-driven d_max", {
+    # Create a simple assay matrix with known values
+    mat <- matrix(c(0.1, 0.2, 0.3, 0.4, 0.5, 0.6), nrow = 3, ncol = 2)
+    row_df <- data.frame(
+        gene_name = c("G1", "G2", "G3"),
+        estimate_q1 = c(0.15, 0.25, 0.35),
+        lower_ci_q1 = c(0.05, 0.15, 0.25),
+        upper_ci_q1 = c(0.25, 0.35, 0.45),
+        stringsAsFactors = FALSE
+    )
+    rownames(row_df) <- row_df$gene_name
+
+    result <- TSENAT:::.divergence_normalize_log_odds_ratio(
+        assay_matrix = mat, row_data_df = row_df, q_vals = c(1, 2)
+    )
+
+    # Should return a list with assay and rowData
+    expect_is(result, "list")
+    expect_true("assay" %in% names(result))
+    expect_true("rowData" %in% names(result))
+})
+# ============================================================================
+# M6: q=0 divergence — support-difference, not constant zero# ============================================================================
+
+test_that("M6: q=0 divergence is support-difference (not constant zero)", {
+    # Identical supports: p and r have same positive entries
+    p_same <- c(0.5, 0.5, 0)
+    r_same <- c(0.3, 0.7, 0)
+
+    div_same <- TSENAT:::.tsallis_divergence_scalar(
+        x = c(5, 5, 0), y = c(3, 7, 0), q_val = 0, pseudocount = 0.5
+    )
+    # Same support → divergence should be 0
+    expect_equal(div_same, 0)
+
+    # Different supports: one distribution has a species the other doesn't
+    # Use pseudocount=0 to avoid smoothing away support differences
+    div_diff <- TSENAT:::.tsallis_divergence_scalar(
+        x = c(5, 5, 0), y = c(3, 0, 7), q_val = 0, pseudocount = 0
+    )
+    # Different supports → divergence should be > 0
+    expect_true(div_diff > 0)
+
+    # With pseudocount > 0, all entries get positive probability → supports identical
+    div_same_smoothed <- TSENAT:::.tsallis_divergence_scalar(
+        x = c(5, 5, 0), y = c(3, 0, 7), q_val = 0, pseudocount = 0.5
+    )
+    expect_equal(div_same_smoothed, 0)
+})

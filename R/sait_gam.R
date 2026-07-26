@@ -197,7 +197,7 @@
     if (is.null(p_val) || length(p_val) == 0) p_val <- NA_real_
     bc_result <- list(
         p_value = p_val,
-        p_raw = p_val,
+        p_raw = p_val,  # Intentionally identical: bias correction removed (audit fix #8)
         bias_correction_applied = FALSE,
         n_observations = n_obs,
         n_samples = n_obs,
