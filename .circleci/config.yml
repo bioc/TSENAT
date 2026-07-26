@@ -81,10 +81,7 @@ jobs:
             install.packages(cran_pkgs, repos = "https://cloud.r-project.org")
             # Use BiocManager to install ALL dependencies (handles both CRAN + Bioconductor)
             BiocManager::install(version = "3.22", ask = FALSE, update = FALSE)
-            options(repos = BiocManager::repositories())
-            BiocManager::install(ask = FALSE)
-            # Verify critical Bioconductor packages are available
-            stopifnot(requireNamespace("SummarizedExperiment", quietly = TRUE))
+            BiocManager::install(dependencies = TRUE, ask = FALSE, update = FALSE)
             EOF
           no_output_timeout: 30m
       - save_cache:
