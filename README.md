@@ -25,21 +25,13 @@ By examining diversity across multiple entropic indices (q-values), TSENAT allow
 
 - [Installation](#installation)
 - [Quick Start](#quick-start)
-  - [Load Example Data](#load-example-data)
-  - [Create configuration and build analysis](#create-configuration-and-build-analysis)
-  - [Orchestration Function](#orchestration-function)
-  - [Accessing Results](#accessing-results)
 - [The Mathematics Behind Tsallis Entropy](#the-mathematics-behind-tsallis-entropy)
-  - [Divergence Analysis: Measuring Information-Theoretic Distance Between Conditions](#divergence-analysis-measuring-information-theoretic-distance-between-conditions)
 - [Statistical Inference Methods](#statistical-inference-methods)
 - [Related Packages](#related-packages)
 - [Native Salmon Integration](#native-salmon-integration)
-  - [Salmon Directory Structure](#salmon-directory-structure)
-  - [Metadata File Structure](#metadata-file-structure)
 - [Tests Coverage](#tests-coverage)
 - [Citation](#citation)
 - [License and Attribution](#license-and-attribution)
-
 
 ## Installation
 
