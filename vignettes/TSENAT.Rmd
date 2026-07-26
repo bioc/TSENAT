@@ -499,7 +499,12 @@ if (!is.null(sait_res) && is.data.frame(sait_res) && nrow(sait_res) > 0) {
 }
 ```
 
-**Interpretation:** TRUE in the Heteroscedasticity column indicates that variance heterogeneity was detected across the q-spectrum (assumption violated, results warrant caution); FALSE indicates homoscedasticity (variance homogeneity assumption satisfied).
+**Interpretation:**
+
+- **Effect Size** ($\eta^2$): Proportion of variance in entropy explained by the q × condition interaction, ranging from 0 to 1. Values above 0.14 are considered large (Cohen's convention).
+- **Test Statistic** ($F$): F-statistic for the smooth interaction term, quantifying the signal-to-noise ratio of the scale-dependent effect.
+- **Model Converged**: TRUE if the GAM optimization converged successfully; FALSE indicates convergence failure (results for that gene are unreliable and should be excluded).
+- **Heteroscedasticity**: TRUE indicates variance heterogeneity was detected across the q-spectrum (assumption violated, results warrant caution).
 
 Now we will plot the q-curve profile for the top genes identified 
 by the scale-adaptive interaction test.
