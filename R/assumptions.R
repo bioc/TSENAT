@@ -1935,6 +1935,19 @@ print.rank_correlation_ci <- function(x, ...) {
         data <- as.matrix(data)
     }
 
+    # Guard against NA/Inf values that would break SVD
+    n_na_rows <- sum(!complete.cases(data))
+    n_inf <- sum(is.infinite(data))
+    if (n_na_rows > 0 || n_inf > 0) {
+        data <- data[complete.cases(data), , drop = FALSE]
+        if (nrow(data) < 3) {
+            return(list(description = "Functional PCA Dimension Adequacy",
+                status = "? SKIP",
+                details = sprintf("Insufficient complete cases after removing %d rows with NA/Inf",
+                    n_na_rows)))
+        }
+    }
+
     tryCatch({
         # Compute PCA via singular value decomposition (functional PCA
         # approximation) For functional data, we treat rows as observations and
@@ -2021,6 +2034,19 @@ print.rank_correlation_ci <- function(x, ...) {
 
     if (!inherits(data, "matrix")) {
         data <- as.matrix(data)
+    }
+
+    # Guard against NA/Inf values that would break SVD
+    n_na_rows <- sum(!complete.cases(data))
+    n_inf <- sum(is.infinite(data))
+    if (n_na_rows > 0 || n_inf > 0) {
+        data <- data[complete.cases(data), , drop = FALSE]
+        if (nrow(data) < 5) {
+            return(list(description = "FPCA Bootstrap Stability",
+                status = "? SKIP",
+                details = sprintf("Insufficient complete cases after removing %d rows with NA/Inf",
+                    n_na_rows)))
+        }
     }
 
     tryCatch({
