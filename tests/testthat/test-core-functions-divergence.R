@@ -1606,16 +1606,6 @@ test_that("[AUDIT #25] tsallis_divergence_cpp warns on unequal-length vectors", 
         pattern = "different lengths"
     )
 })
-# C4: Bootstrap CIs — NOT transformed by normalization
-# ============================================================================ 
-# H6: BCa bootstrap — warns and reports "percentile" instead of "bca"
-# ============================================================================ 
-# H7: log_odds_ratio d_max — uses column-maximum, not log(2)/1
-# ============================================================================ 
-# M6: q=0 divergence — support-difference, not constant zero
-# ============================================================================ 
-# ============================================================================
-# C4: Bootstrap CIs — NOT transformed by normalization# ============================================================================
 
 test_that("C4: Divergence normalization does not transform CI bounds", {
     skip_if_not_installed("SummarizedExperiment")
