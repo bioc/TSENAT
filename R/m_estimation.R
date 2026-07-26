@@ -316,7 +316,9 @@
         if (loss_type == "huber") {
             abs_resid <- abs(standardized_resid)
             abs_resid[is.na(abs_resid)] <- 0
-            weights <- ifelse(abs_resid <= 1, 1, 1/pmax(abs_resid, 0.01))
+            # Standard Huber weight: w=1 for |u|≤1, w=1/|u| for |u|>1.
+            # No floor needed — abs_resid > 1 guards against division by zero.
+            weights <- ifelse(abs_resid <= 1, 1, 1/abs_resid)
         } else if (loss_type == "tukey") {
             abs_resid <- abs(standardized_resid)
             abs_resid[is.na(abs_resid)] <- 0
@@ -692,8 +694,9 @@
 
         # Compute weights based on loss function
         if (loss_type == "huber") {
-            weights <- ifelse(abs(standardized_resid) <= 1, 1, 1/pmax(abs(standardized_resid),
-                0.01))
+            # Standard Huber weight: w=1 for |u|≤1, w=1/|u| for |u|>1.
+            # No floor needed — |u|>1 guards against division by zero.
+            weights <- ifelse(abs(standardized_resid) <= 1, 1, 1/abs(standardized_resid))
         } else if (loss_type == "tukey") {
             weights <- ifelse(abs(standardized_resid) <= 1, (1 - standardized_resid^2)^2,
                 0)
@@ -835,7 +838,9 @@
     # t-statistic and p-value
     if (se_diff > 0) {
         t_stat <- location_diff/se_diff
-        df <- n_obs - 2
+        # Paired (use_intercept=FALSE): one-parameter location model → df = n-1
+        # Unpaired (use_intercept=TRUE): two-parameter (intercept+slope) → df = n-2
+        df <- if (use_intercept) n_obs - 2 else n_obs - 1
         pvalue <- 2 * pt(abs(t_stat), df = max(1, df), lower.tail = FALSE)
     } else {
         t_stat <- Inf

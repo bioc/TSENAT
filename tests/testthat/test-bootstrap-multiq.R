@@ -1153,7 +1153,7 @@ test_that("block_bootstrap_compute_cpp_wrapper accepts matching pseudocount vect
 #   - divergence_bootstrap_compute_cpp_wrapper (lines 127-156)
 
 test_that("divergence_bootstrap_compute_cpp_wrapper rejects non-numeric inputs", {
-  # x must be numeric
+  # x must be numeric — early type check avoids noisy NA coercion warnings
   expect_error(
     divergence_bootstrap_compute_cpp_wrapper(
       x = c("a", "b", "c"),              # non-numeric
@@ -1164,7 +1164,7 @@ test_that("divergence_bootstrap_compute_cpp_wrapper rejects non-numeric inputs",
       pseudocount = 0,
       log_base = exp(1)
     ),
-    "x and y must be numeric vectors"
+    "input must be numeric"
   )
   
   # y must be numeric
@@ -1178,7 +1178,7 @@ test_that("divergence_bootstrap_compute_cpp_wrapper rejects non-numeric inputs",
       pseudocount = 0,
       log_base = exp(1)
     ),
-    "x and y must be numeric vectors"
+    "input must be numeric"
   )
 })
 
@@ -1198,7 +1198,7 @@ test_that("divergence_bootstrap_compute_cpp_wrapper requires equal length for x 
 })
 
 test_that("divergence_bootstrap_compute_cpp_wrapper rejects negative values", {
-  # Negative in x
+  # Negative in x — now routed through .validate_bootstrap_input
   expect_error(
     divergence_bootstrap_compute_cpp_wrapper(
       x = c(100, -50, 25),               # negative value
@@ -1209,7 +1209,7 @@ test_that("divergence_bootstrap_compute_cpp_wrapper rejects negative values", {
       pseudocount = 0,
       log_base = exp(1)
     ),
-    "x and y must contain non-negative values only"
+    "input contains.*negative"
   )
   
   # Negative in y
@@ -1223,7 +1223,7 @@ test_that("divergence_bootstrap_compute_cpp_wrapper rejects negative values", {
       pseudocount = 0,
       log_base = exp(1)
     ),
-    "x and y must contain non-negative values only"
+    "input contains.*negative"
   )
 })
 
@@ -1258,6 +1258,8 @@ test_that("divergence_bootstrap_compute_cpp_wrapper validates nboot parameter", 
 })
 
 test_that("divergence_bootstrap_compute_cpp_wrapper validates paired parameter", {
+  # R coerces c(TRUE,FALSE) && ... with a warning before our check
+  # The paired type check is now in the wrapper (divergence-specific)
   expect_error(
     divergence_bootstrap_compute_cpp_wrapper(
       x = c(100, 50, 25),
@@ -1268,7 +1270,7 @@ test_that("divergence_bootstrap_compute_cpp_wrapper validates paired parameter",
       pseudocount = 0,
       log_base = exp(1)
     ),
-    "paired must be a single logical value"
+    "paired must be a single logical"
   )
 })
 
@@ -1283,7 +1285,7 @@ test_that("divergence_bootstrap_compute_cpp_wrapper requires even length for pai
       pseudocount = 0,
       log_base = exp(1)
     ),
-    "For paired=TRUE, x and y must have even length"
+    "with paired=TRUE.*even length"
   )
 })
 

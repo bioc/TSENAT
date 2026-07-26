@@ -144,7 +144,87 @@ TSENAT <- function(analysis, output_dir = "tsenat_outputs", save_output = TRUE, 
     
     step_times <- list()
     
-    # Step 1: Filtering
+    # =========================================================================
+    # STAGE 1: PREPROCESSING — Filter low-abundance transcripts
+    # =========================================================================
+    stage_result <- .pipeline_stage_preprocessing(analysis, cfg, verbose)
+    analysis <- stage_result$analysis
+    step_times <- .merge_step_times(step_times, stage_result$step_times)
+    
+    # =========================================================================
+    # STAGE 2: DIVERSITY — Tsallis entropy computation + q-spectrum plot
+    # =========================================================================
+    stage_result <- .pipeline_stage_diversity(analysis, q_vals, verbose,
+        output_dir, output_format)
+    analysis <- stage_result$analysis
+    step_times <- .merge_step_times(step_times, stage_result$step_times)
+    
+    # =========================================================================
+    # STAGE 3: QC — M-estimator influence analysis
+    # =========================================================================
+    stage_result <- .pipeline_stage_qc(analysis, condition_col, verbose,
+        output_dir, output_format)
+    analysis <- stage_result$analysis
+    step_times <- .merge_step_times(step_times, stage_result$step_times)
+    
+    # =========================================================================
+    # STAGE 4: INTERACTION — SAIT model fitting + visualization
+    # =========================================================================
+    stage_result <- .pipeline_stage_sait(analysis, verbose, output_dir,
+        output_format)
+    analysis <- stage_result$analysis
+    step_times <- .merge_step_times(step_times, stage_result$step_times)
+    
+    # =========================================================================
+    # STAGE 5: JACKKNIFE — Isoform switching + influence + transcript plots
+    # =========================================================================
+    stage_result <- .pipeline_stage_jackknife(analysis, q_vals, condition_col,
+        verbose, output_dir, output_format)
+    analysis <- stage_result$analysis
+    step_times <- .merge_step_times(step_times, stage_result$step_times)
+    
+    # =========================================================================
+    # STAGE 6: COMPARISON & VALIDATION — Divergence + ART + concordance
+    # =========================================================================
+    stage_result <- .pipeline_stage_comparison_validation(analysis, q_vals,
+        verbose, output_dir, output_format)
+    analysis <- stage_result$analysis
+    step_times <- .merge_step_times(step_times, stage_result$step_times)
+    
+    list(analysis = analysis, step_times = step_times)
+}
+
+# ============================================================================
+# PIPELINE STAGE HELPERS
+# ============================================================================
+
+#' Merge step times from a stage result into the global step_times list
+#'
+#' Returns the merged list since R passes lists by value (copy-on-modify).
+#' Callers must capture the return value: `step_times <- .merge_step_times(...)`.
+#'
+#' @noRd
+.merge_step_times <- function(global_times, stage_times) {
+    for (name in names(stage_times)) {
+        global_times[[name]] <- stage_times[[name]]
+    }
+    global_times
+}
+
+# ============================================================================
+# STAGE 1: PREPROCESSING
+# ============================================================================
+
+#' Pipeline Stage 1: Filter low-abundance transcripts
+#'
+#' Applies filtering based on configured stringency level. This is a
+#' fail-fast gate: if filtering removes all transcripts, the pipeline
+#' stops immediately with a diagnostic error.
+#'
+#' @noRd
+.pipeline_stage_preprocessing <- function(analysis, cfg, verbose) {
+    step_times <- list()
+    
     if (verbose) message(sprintf("[>] [%2d/16] Filtering low-abundance transcripts", 1))
     step_start <- Sys.time()
     tryCatch({
@@ -164,17 +244,50 @@ TSENAT <- function(analysis, output_dir = "tsenat_outputs", save_output = TRUE, 
     })
     step_times[["filtering"]] <- Sys.time() - step_start
     
-    # Step 2: Diversity
+    list(analysis = analysis, step_times = step_times)
+}
+
+# ============================================================================
+# STAGE 2: DIVERSITY
+# ============================================================================
+
+#' Pipeline Stage 2: Tsallis entropy computation + spectrum visualization
+#'
+#' Computes diversity across all q-values and generates the q-spectrum plot.
+#' The spectrum plot is the primary diagnostic for identifying scale-dependent
+#' diversity patterns.
+#'
+#' @noRd
+.pipeline_stage_diversity <- function(analysis, q_vals, verbose, output_dir, output_format) {
+    step_times <- list()
+    
+    # Step 2: Diversity computation
     if (verbose) message(sprintf("[>] [%2d/16] Computing Tsallis entropy", 2))
     step_start <- Sys.time()
     analysis <- .execute_diversity_s4(analysis, q_vals, verbose, output_dir, output_format)
     step_times[["diversity"]] <- Sys.time() - step_start
     
-    # Step 3: Q-curve plot
+    # Step 3: Q-spectrum plot
     if (verbose) message(sprintf("[>] [%2d/16] Plotting diversity q-spectrum", 3))
     step_start <- Sys.time()
     analysis <- .execute_q_curve_plot(analysis, verbose, output_dir)
     step_times[["q_curve"]] <- Sys.time() - step_start
+    
+    list(analysis = analysis, step_times = step_times)
+}
+
+# ============================================================================
+# STAGE 3: QC (M-ESTIMATOR)
+# ============================================================================
+
+#' Pipeline Stage 3: M-estimator influence QC
+#'
+#' Computes robust M-estimates to detect samples with disproportionate
+#' influence on entropy estimates.
+#'
+#' @noRd
+.pipeline_stage_qc <- function(analysis, condition_col, verbose, output_dir, output_format) {
+    step_times <- list()
     
     # Step 4: M-estimate QC
     if (verbose) message(sprintf("[>] [%2d/16] Computing M-estimator influence", 4))
@@ -183,19 +296,53 @@ TSENAT <- function(analysis, output_dir = "tsenat_outputs", save_output = TRUE, 
         output_format)
     step_times[["m_estimate"]] <- Sys.time() - step_start
     
-    # Step 5: SAIT interaction
+    list(analysis = analysis, step_times = step_times)
+}
+
+# ============================================================================
+# STAGE 4: SAIT INTERACTION
+# ============================================================================
+
+#' Pipeline Stage 4: SAIT interaction testing + visualization
+#'
+#' Fits scale-adaptive interaction models (GAM/LMM/GEE/FPCA) testing for
+#' q-value × condition interactions, then generates the SAIT results plot.
+#'
+#' @noRd
+.pipeline_stage_sait <- function(analysis, verbose, output_dir, output_format) {
+    step_times <- list()
+    
+    # Step 5: SAIT interaction models
     if (verbose) message(sprintf("[>] [%2d/16] Fitting SAIT interaction models", 5))
     step_start <- Sys.time()
     analysis <- .execute_sait_interaction_s4(analysis, verbose, output_dir, output_format)
     step_times[["sait_interaction"]] <- Sys.time() - step_start
     
-    # Step 6: SAIT plot
+    # Step 6: SAIT results plot
     if (verbose) message(sprintf("[>] [%2d/16] Plotting SAIT results", 6))
     step_start <- Sys.time()
     analysis <- .execute_sait_interaction_plot(analysis, verbose, output_dir)
     step_times[["sait_plot"]] <- Sys.time() - step_start
     
-    # Step 7: Jackknife
+    list(analysis = analysis, step_times = step_times)
+}
+
+# ============================================================================
+# STAGE 5: JACKKNIFE + VISUALIZATION
+# ============================================================================
+
+#' Pipeline Stage 5: Jackknife isoform switching + visualization
+#'
+#' Performs leave-one-out jackknife to detect transcripts driving entropy
+#' differences, then generates the multi-q influence heatmap and top
+#' transcript expression plots.
+#'
+#' @noRd
+.pipeline_stage_jackknife <- function(analysis, q_vals, condition_col, verbose,
+    output_dir, output_format) {
+    step_times <- list()
+    
+    # Step 7: Jackknife isoform switching
     if (verbose) message(sprintf("[>] [%2d/16] Computing jackknife isoform switching", 7))
     step_start <- Sys.time()
     analysis <- .execute_jackknife_isoform_switching(analysis, q_vals, condition_col,
@@ -213,6 +360,25 @@ TSENAT <- function(analysis, output_dir = "tsenat_outputs", save_output = TRUE, 
     step_start <- Sys.time()
     analysis <- .execute_top_transcripts_plot(analysis, verbose, output_dir)
     step_times[["top_transcripts"]] <- Sys.time() - step_start
+    
+    list(analysis = analysis, step_times = step_times)
+}
+
+# ============================================================================
+# STAGE 6: COMPARISON & VALIDATION
+# ============================================================================
+
+#' Pipeline Stage 6: Divergence, effect sizes, ART, and concordance
+#'
+#' Combines the final analysis stages: pairwise divergence metrics,
+#' effect size computation, divergence visualization, statistical
+#' assumption checks, Aligned Rank Transform testing, and SAIT-ART
+#' concordance analysis.
+#'
+#' @noRd
+.pipeline_stage_comparison_validation <- function(analysis, q_vals, verbose,
+    output_dir, output_format) {
+    step_times <- list()
     
     # Step 10: Divergence
     if (verbose) message(sprintf("[>] [%2d/16] Computing divergence metrics", 10))

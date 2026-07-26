@@ -1294,3 +1294,92 @@ test_that("M3: corstr='auto' is a valid argument", {
     choices <- eval(formals(TSENAT:::.calculate_sait)$corstr)
     expect_true("auto" %in% choices)
 })
+
+# ============================================================================
+# P3: FINALIZE SAIT RESULTS TESTS (July 2026: metrics.json refactoring)
+# ============================================================================
+
+context("SAIT: Finalize Results (.finalize_sait_results)")
+
+test_that(".finalize_sait_results rejects non-data.frame input", {
+  expect_error(
+    TSENAT:::.finalize_sait_results(
+      res = "not_a_df", mat = matrix(1:4, 2), se = NULL,
+      metadata = NULL, method = "gam", pvalue = "lrt",
+      subject_col = NULL, paired = FALSE, min_obs = 5,
+      nthreads = 1, bias_correction = TRUE,
+      regularization = "pca", corstr = "ar1",
+      adaptive_knots = TRUE, multicorr = "hochberg",
+      wy_randomizations = 1000, storey = FALSE,
+      verbose = FALSE, return_model_data = FALSE,
+      assay_name = "diversity"
+    ),
+    "should return a data.frame"
+  )
+})
+
+test_that(".finalize_sait_results handles empty results gracefully", {
+  empty_res <- data.frame(
+    gene = character(0),
+    p_interaction = numeric(0),
+    stringsAsFactors = FALSE
+  )
+  result <- TSENAT:::.finalize_sait_results(
+    res = empty_res, mat = matrix(1:4, 2), se = NULL,
+    metadata = NULL, method = "gam", pvalue = "lrt",
+    subject_col = NULL, paired = FALSE, min_obs = 5,
+    nthreads = 1, bias_correction = TRUE,
+    regularization = "pca", corstr = "ar1",
+    adaptive_knots = TRUE, multicorr = "hochberg",
+    wy_randomizations = 1000, storey = FALSE,
+    verbose = FALSE, return_model_data = FALSE,
+    assay_name = "diversity"
+  )
+  
+  expect_is(result, "data.frame")
+  expect_equal(nrow(result), 0)
+  # Standard SAIT columns should be present
+  expect_true("adj_p_interaction" %in% colnames(result))
+})
+
+test_that(".finalize_sait_results rejects results without p_interaction", {
+  bad_res <- data.frame(gene = "G1", wrong_column = 0.05, stringsAsFactors = FALSE)
+  expect_error(
+    TSENAT:::.finalize_sait_results(
+      res = bad_res, mat = matrix(1:4, 2), se = NULL,
+      metadata = NULL, method = "gam", pvalue = "lrt",
+      subject_col = NULL, paired = FALSE, min_obs = 5,
+      nthreads = 1, bias_correction = TRUE,
+      regularization = "pca", corstr = "ar1",
+      adaptive_knots = TRUE, multicorr = "hochberg",
+      wy_randomizations = 1000, storey = FALSE,
+      verbose = FALSE, return_model_data = FALSE,
+      assay_name = "diversity"
+    ),
+    "missing required.*p_interaction"
+  )
+})
+
+test_that(".finalize_sait_results sorts by adjusted p-value", {
+  res <- data.frame(
+    gene = c("G1", "G2", "G3"),
+    p_interaction = c(0.01, 0.05, 0.03),
+    stringsAsFactors = FALSE
+  )
+  result <- TSENAT:::.finalize_sait_results(
+    res = res, mat = matrix(1:9, 3), se = NULL,
+    metadata = NULL, method = "gam", pvalue = "lrt",
+    subject_col = NULL, paired = FALSE, min_obs = 5,
+    nthreads = 1, bias_correction = TRUE,
+    regularization = "pca", corstr = "ar1",
+    adaptive_knots = TRUE, multicorr = "hochberg",
+    wy_randomizations = 1000, storey = FALSE,
+    verbose = FALSE, return_model_data = FALSE,
+    assay_name = "diversity"
+  )
+  
+  expect_is(result, "data.frame")
+  # After Hochberg adjustment, order should be by adj_p first, then raw p
+  expect_true("adj_p_interaction" %in% colnames(result))
+  expect_equal(result$gene[1], "G1")  # G1 had the lowest p-value
+})

@@ -4020,3 +4020,116 @@ test_that(".assemble_assumptions_table returns text format", {
     expect_match(result, "Rank-Based Test Assumptions")
     expect_match(result, "T1")
 })
+
+# ============================================================================
+# REFACTORED HELPERS (July 2026: .calculate_assumptions 300→80 lines)
+# ============================================================================
+
+context("Assumptions: Extracted Helpers")
+
+test_that(".expand_assumptions_checks expands 'rank' preset", {
+    result <- TSENAT:::.expand_assumptions_checks("rank")
+    expect_equal(result, "exchangeability")
+})
+
+test_that(".expand_assumptions_checks expands 'all' preset", {
+    result <- TSENAT:::.expand_assumptions_checks("all")
+    expect_true("exchangeability" %in% result)
+    expect_true("monotonicity" %in% result)
+    expect_true("consistency" %in% result)
+    expect_true("gam_metrics" %in% result)
+    expect_true("gee_metrics" %in% result)
+    expect_true("lmm_metrics" %in% result)
+    expect_true("fpca_metrics" %in% result)
+})
+
+test_that(".expand_assumptions_checks passes through single metric name", {
+    result <- TSENAT:::.expand_assumptions_checks("gam_metrics")
+    expect_equal(result, "gam_metrics")
+})
+
+test_that(".expand_assumptions_checks passes through character vector", {
+    result <- TSENAT:::.expand_assumptions_checks(c("exchangeability", "consistency"))
+    expect_equal(result, c("exchangeability", "consistency"))
+})
+
+test_that(".expand_assumptions_checks rejects non-character input", {
+    expect_error(
+        TSENAT:::.expand_assumptions_checks(123),
+        "must be a character string"
+    )
+})
+
+test_that(".assumptions_empty_data returns valid structure", {
+    result <- TSENAT:::.assumptions_empty_data(c("exchangeability", "gam_metrics"))
+    expect_s3_class(result, "rank_assumptions")
+    expect_match(result$overall_summary, "Cannot evaluate")
+    expect_equal(result$summary_stats$n_genes, 0)
+})
+
+test_that(".assumptions_empty_data includes requested check placeholders", {
+    result <- TSENAT:::.assumptions_empty_data(c("exchangeability", "gee_metrics"))
+    checks <- attr(result, "checks")
+    expect_true("exchangeability" %in% names(checks))
+    expect_true("gee_metrics" %in% names(checks))
+    expect_false("gam_metrics" %in% names(checks))
+})
+
+test_that(".check_exchangeability skips with insufficient samples", {
+    data <- matrix(1:6, nrow = 3, ncol = 2)
+    result <- TSENAT:::.check_exchangeability(data)
+    expect_equal(result$status, "? SKIP")
+    expect_match(result$details, "at least 3")
+})
+
+test_that(".check_exchangeability returns p-value for sufficient samples", {
+    set.seed(42)
+    data <- matrix(rnorm(50), nrow = 10, ncol = 5)
+    result <- TSENAT:::.check_exchangeability(data)
+    expect_true(!is.null(result$p_value))
+    expect_true(result$p_value >= 0 && result$p_value <= 1)
+    expect_true(result$status %in% c("exchangeable", "ordering detected"))
+})
+
+test_that(".check_monotonicity computes Spearman correlations", {
+    data <- matrix(rnorm(50), nrow = 10, ncol = 5)
+    result <- TSENAT:::.check_monotonicity(data)
+    expect_true(!is.null(result$mean_correlation))
+    expect_true(!is.null(result$sd_correlation))
+    expect_true(result$status %in% c("homogeneous", "moderately heterogeneous",
+        "heterogeneous"))
+})
+
+test_that(".check_monotonicity handles single-row data", {
+    data <- matrix(1:5, nrow = 1, ncol = 5)
+    result <- TSENAT:::.check_monotonicity(data)
+    expect_equal(result$status, "? SKIP")
+})
+
+test_that(".check_consistency skips with insufficient data", {
+    data <- matrix(1:3, nrow = 3, ncol = 1)
+    result <- TSENAT:::.check_consistency(data)
+    expect_equal(result$status, "? SKIP")
+})
+
+test_that(".check_consistency computes Kendall W and ICC", {
+    set.seed(123)
+    data <- matrix(rnorm(100), nrow = 20, ncol = 5)
+    result <- TSENAT:::.check_consistency(data)
+    expect_true(!is.null(result$kendall_w))
+    expect_true(!is.null(result$icc_simplified))
+    expect_true(result$status %in% c("high", "moderate", "low"))
+})
+
+test_that(".calculate_assumptions works with extracted helpers (integration)", {
+    set.seed(99)
+    data <- matrix(rnorm(100), nrow = 20, ncol = 5)
+    result <- TSENAT:::.calculate_assumptions(data, checks = "all")
+    expect_s3_class(result, "rank_assumptions")
+    checks <- attr(result, "checks")
+    expect_true("exchangeability" %in% names(checks))
+    expect_true("monotonicity" %in% names(checks))
+    expect_true("consistency" %in% names(checks))
+    expect_equal(result$summary_stats$n_genes, 20)
+    expect_equal(result$summary_stats$n_samples, 5)
+})

@@ -142,146 +142,31 @@
     p_interaction <- .extract_interaction_pvalue(fit_alt, n_clusters, bias_correction)
 
     # ========================================================================
-    # PHASE 9: Kauermann-Carroll Bias Correction with Design Effect
+    # PHASE 7: Kauermann-Carroll Bias Correction (P7 extraction, July 2026)
     # ========================================================================
-    # Estimate AR(1) autocorrelation from residuals (for multi-q Tsallis)
-    kc_metadata <- NULL
-    rho_ar1 <- NA_real_
-    design_effect_value <- 1
+    kc_result <- .gee_apply_kc_correction(
+        fit_alt = fit_alt, df = df,
+        p_interaction = p_interaction,
+        n_clusters = n_clusters,
+        bias_correction = bias_correction
+    )
+    p_interaction <- kc_result$p_interaction
+    kc_metadata <- kc_result$kc_metadata
 
-    if (!is.na(p_interaction)) {
-        residuals_alt <- residuals(fit_alt)
-        if (!is.null(residuals_alt) && length(residuals_alt) > 2) {
-            # Estimate AR(1) ρ within each cluster (subject) and pool via
-            # Fisher z-transform. Previously concatenated residuals across
-            # clusters, contaminating lag-1 estimate with between-cluster
-            # covariance (M5 fix, July 2026).
-            subject_levels <- levels(df$subject)
-            if (length(subject_levels) > 0 && length(residuals_alt) == nrow(df)) {
-                rho_per_subject <- vapply(subject_levels, function(s) {
-                    idx <- which(df$subject == s)
-                    if (length(idx) >= 3) {
-                        .estimate_ar1_correlation(residuals_alt[idx])
-                    } else NA_real_
-                }, FUN.VALUE = numeric(1))
-                rho_valid <- rho_per_subject[!is.na(rho_per_subject)]
-                if (length(rho_valid) > 0) {
-                    # Pool via Fisher z-transform (inverse hyperbolic tangent)
-                    z_vals <- atanh(pmin(pmax(rho_valid, -0.99), 0.99))
-                    rho_ar1 <- tanh(mean(z_vals))
-                } else {
-                    rho_ar1 <- NA_real_
-                }
-            } else {
-                # Fallback: flat correlation (no subject grouping available)
-                rho_ar1 <- .estimate_ar1_correlation(residuals_alt)
-            }
-
-            # Compute design effect if AR(1) significant
-            cluster_size <- length(unique(df$q))
-            if (!is.na(rho_ar1) && abs(rho_ar1) > 0.05) {
-                design_effect_value <- .compute_ar1_design_effect(rho_ar1, cluster_size)
-            }
-        }
-
-        # Apply Kauermann-Carroll bias correction if small clusters
-        if (bias_correction && n_clusters < 30) {
-            # Get interaction term coefficients for K-C correction
-            coefs_alt <- stats::coef(fit_alt)
-            ia_names <- names(coefs_alt)[grepl("^q:", names(coefs_alt), ignore.case = TRUE)]
-
-            if (length(ia_names) > 0) {
-                ia_name <- ia_names[1]
-                ia_idx <- which(names(coefs_alt) == ia_name)[1]
-
-                # Compute z-statistic for interaction
-                z_interact <- .compute_wald_statistic(fit_alt, ia_idx)
-
-                if (!is.na(z_interact)) {
-                  # Get robust sandwich variance and coefficient for K-C correction
-                  vcov_sandwich <- try(suppressWarnings(vcov(fit_alt)), silent = TRUE)
-                  if (inherits(vcov_sandwich, "try-error")) vcov_sandwich <- NULL
-                  # Validate vcov: must be a finite numeric matrix
-                  if (!is.null(vcov_sandwich) &&
-                      (!is.matrix(vcov_sandwich) || any(!is.finite(vcov_sandwich)))) {
-                    vcov_sandwich <- NULL
-                  }
-                  coef_value <- coefs_alt[ia_idx]
-
-                  # Apply K-C correction with design effect and actual sandwich variance
-                  kc_result <- .kc_bias_correct(p_value = p_interaction, z_statistic = z_interact,
-                    vcov_sandwich_raw = vcov_sandwich, coef_value = coef_value,
-                    coef_index = ia_idx, n_clusters = n_clusters, n_parameters = length(coefs_alt),
-                    rho_ar1 = rho_ar1, cluster_size = cluster_size, design_effect = design_effect_value,
-                    bias_correction_method = "hc1", use_t_distribution = TRUE, apply_correction = TRUE,
-                    verbose = FALSE)
-
-                  # Update p-value with K-C correction
-                  p_interaction <- kc_result$p_value
-                  kc_metadata <- list(kc_applied = TRUE, p_raw = kc_result$p_raw,
-                    p_corrected = kc_result$p_value, multiplier = kc_result$multiplier,
-                    n_effective = kc_result$n_effective, design_effect = kc_result$design_effect,
-                    rho_ar1 = kc_result$rho_ar1, method = kc_result$method_applied)
-                }
-            }
-        }
-    }
-
-    if (is.null(kc_metadata)) {
-        kc_metadata <- list(kc_applied = FALSE, design_effect = design_effect_value,
-            rho_ar1 = rho_ar1)
-    }
-
-    # Test residual normality (Shapiro-Wilk test)
-    shapiro_result <- .test_residual_normality(model = fit_alt, model_type = "gee",
-        verbose = FALSE)
-
-    # Extract slope difference
-    slope_diff <- .extract_slope_diff(fit_alt)
-
-    # Compile result — use consistent threshold (30) for both correction and reporting
-    gee_result <- data.frame(gene = g, p_interaction = p_interaction, n_clusters = n_clusters,
-        bias_correction_applied = bias_correction && n_clusters < 30, correlation_structure = selected_corstr,
-        corstr_selection_method = if (corstr == "auto")
-            "QIC_based" else "user_specified", stringsAsFactors = FALSE)
-
-    # Add Shapiro-Wilk residual normality test results
-    if (!is.na(shapiro_result$shapiro_p_value)) {
-        gee_result$shapiro_p_value <- shapiro_result$shapiro_p_value
-        gee_result$residuals_normal <- shapiro_result$residuals_normal
-        gee_result$n_residuals_tested <- shapiro_result$n_residuals
-    } else {
-        gee_result$shapiro_p_value <- NA_real_
-        gee_result$residuals_normal <- NA
-        gee_result$n_residuals_tested <- NA_integer_
-    }
-
-    # Add Phase 1 bootstrap CI weighting tracking (March 2026)
-    gee_result$ci_weighted <- !is.null(df$weight)
-    gee_result$slope_diff <- slope_diff
-    # AUDIT FIX #32: Flag ARIMA differencing status for cross-method comparability.
-    # GEE applies ARIMA(1,1,0) only for paired designs; GAM always applies; FPCA always applies.
-    # Users should compare p-values within method, not across methods with different ARIMA handling.
-    gee_result$arima_applied <- use_arima
-
-    # Add Phase 9 Kauermann-Carroll bias correction metadata
-    gee_result$kc_bias_correction_applied <- !is.null(kc_metadata) && isTRUE(kc_metadata$kc_applied)
-    gee_result$design_effect_ar1 <- if (!is.null(kc_metadata))
-        kc_metadata$design_effect else NA_real_
-    gee_result$rho_ar1_estimate <- if (!is.null(kc_metadata))
-        kc_metadata$rho_ar1 else NA_real_
-
-    if (!is.null(kc_metadata) && isTRUE(kc_metadata$kc_applied)) {
-        gee_result$p_interaction_raw <- kc_metadata$p_raw
-        gee_result$kc_multiplier <- kc_metadata$multiplier
-        gee_result$n_effective <- kc_metadata$n_effective
-        gee_result$kc_method <- kc_metadata$method
-    } else {
-        gee_result$p_interaction_raw <- NA_real_
-        gee_result$kc_multiplier <- NA_real_
-        gee_result$n_effective <- NA_real_
-        gee_result$kc_method <- NA_character_
-    }
+    # ========================================================================
+    # PHASE 8: Assemble result row (P7 extraction, July 2026)
+    # ========================================================================
+    gee_result <- .gee_assemble_result_row(
+        g = g, p_interaction = p_interaction,
+        n_clusters = n_clusters,
+        bias_correction = bias_correction,
+        selected_corstr = selected_corstr,
+        corstr = corstr,
+        fit_alt = fit_alt,
+        df = df,
+        use_arima = use_arima,
+        kc_metadata = kc_metadata
+    )
 
     return(gee_result)
 }
@@ -409,6 +294,171 @@
     }
 
     list(fit_null = fit_null, fit_alt = fit_alt)
+}
+
+# ============================================================================
+# P7 EXTRACTED: Apply Kauermann-Carroll bias correction (July 2026 refactoring)
+# ============================================================================
+# Extracted from .gee_interaction() to reduce cyclomatic complexity (75→~35).
+# Handles AR(1) rho estimation, design effect computation, and K-C correction.
+#
+#' @param fit_alt Fitted GEE alternative model (geeglm object)
+#' @param df Data frame with subject column
+#' @param p_interaction Raw interaction p-value before correction
+#' @param n_clusters Number of clusters/subjects
+#' @param bias_correction Logical; whether to apply correction
+#' @return List with p_interaction (possibly corrected) and kc_metadata
+#' @noRd
+.gee_apply_kc_correction <- function(fit_alt, df, p_interaction, n_clusters,
+    bias_correction) {
+    kc_metadata <- NULL
+    rho_ar1 <- NA_real_
+    design_effect_value <- 1
+
+    if (is.na(p_interaction)) {
+        return(list(p_interaction = p_interaction,
+            kc_metadata = list(kc_applied = FALSE, design_effect = 1, rho_ar1 = NA_real_)))
+    }
+
+    residuals_alt <- residuals(fit_alt)
+    if (!is.null(residuals_alt) && length(residuals_alt) > 2) {
+        # Estimate AR(1) rho within each cluster (subject) and pool via
+        # Fisher z-transform (M5 fix, July 2026)
+        subject_levels <- levels(df$subject)
+        if (length(subject_levels) > 0 && length(residuals_alt) == nrow(df)) {
+            rho_per_subject <- vapply(subject_levels, function(s) {
+                idx <- which(df$subject == s)
+                if (length(idx) >= 3) {
+                    .estimate_ar1_correlation(residuals_alt[idx])
+                } else NA_real_
+            }, FUN.VALUE = numeric(1))
+            rho_valid <- rho_per_subject[!is.na(rho_per_subject)]
+            if (length(rho_valid) > 0) {
+                z_vals <- atanh(pmin(pmax(rho_valid, -0.99), 0.99))
+                rho_ar1 <- tanh(mean(z_vals))
+            }
+        } else {
+            rho_ar1 <- .estimate_ar1_correlation(residuals_alt)
+        }
+
+        # Compute design effect if AR(1) significant
+        cluster_size <- length(unique(df$q))
+        if (!is.na(rho_ar1) && abs(rho_ar1) > 0.05) {
+            design_effect_value <- .compute_ar1_design_effect(rho_ar1, cluster_size)
+        }
+    }
+
+    # Apply Kauermann-Carroll bias correction if small clusters
+    if (bias_correction && n_clusters < 30) {
+        coefs_alt <- stats::coef(fit_alt)
+        ia_names <- names(coefs_alt)[grepl("^q:", names(coefs_alt), ignore.case = TRUE)]
+
+        if (length(ia_names) > 0) {
+            ia_name <- ia_names[1]
+            ia_idx <- which(names(coefs_alt) == ia_name)[1]
+            z_interact <- .compute_wald_statistic(fit_alt, ia_idx)
+
+            if (!is.na(z_interact)) {
+                vcov_sandwich <- try(vcov(fit_alt), silent = TRUE)
+                if (inherits(vcov_sandwich, "try-error")) vcov_sandwich <- NULL
+                if (!is.null(vcov_sandwich) &&
+                    (!is.matrix(vcov_sandwich) || any(!is.finite(vcov_sandwich)))) {
+                    vcov_sandwich <- NULL
+                }
+                coef_value <- coefs_alt[ia_idx]
+
+                kc_result <- .kc_bias_correct(p_value = p_interaction,
+                    z_statistic = z_interact, vcov_sandwich_raw = vcov_sandwich,
+                    coef_value = coef_value, coef_index = ia_idx,
+                    n_clusters = n_clusters, n_parameters = length(coefs_alt),
+                    rho_ar1 = rho_ar1, cluster_size = cluster_size,
+                    design_effect = design_effect_value,
+                    bias_correction_method = "hc1", use_t_distribution = TRUE,
+                    apply_correction = TRUE, verbose = FALSE)
+
+                p_interaction <- kc_result$p_value
+                kc_metadata <- list(kc_applied = TRUE, p_raw = kc_result$p_raw,
+                    p_corrected = kc_result$p_value, multiplier = kc_result$multiplier,
+                    n_effective = kc_result$n_effective,
+                    design_effect = kc_result$design_effect,
+                    rho_ar1 = kc_result$rho_ar1, method = kc_result$method_applied)
+            }
+        }
+    }
+
+    if (is.null(kc_metadata)) {
+        kc_metadata <- list(kc_applied = FALSE, design_effect = design_effect_value,
+            rho_ar1 = rho_ar1)
+    }
+
+    list(p_interaction = p_interaction, kc_metadata = kc_metadata)
+}
+
+# ============================================================================
+# P7 EXTRACTED: Assemble GEE result row (July 2026 refactoring)
+# ============================================================================
+# Extracted from .gee_interaction() to reduce cyclomatic complexity (75→~35).
+# Assembles all computed components into the final single-row data.frame.
+#
+#' @noRd
+.gee_assemble_result_row <- function(g, p_interaction, n_clusters, bias_correction,
+    selected_corstr, corstr, fit_alt, df, use_arima, kc_metadata) {
+    
+    # Shapiro-Wilk residual normality test
+    shapiro_result <- .test_residual_normality(model = fit_alt, model_type = "gee",
+        verbose = FALSE)
+    
+    # Extract slope difference
+    slope_diff <- .extract_slope_diff(fit_alt)
+    
+    # Compile base result
+    gee_result <- data.frame(
+        gene = g,
+        p_interaction = p_interaction,
+        n_clusters = n_clusters,
+        bias_correction_applied = bias_correction && n_clusters < 30,
+        correlation_structure = selected_corstr,
+        corstr_selection_method = if (corstr == "auto") "QIC_based" else "user_specified",
+        stringsAsFactors = FALSE
+    )
+    
+    # Shapiro-Wilk results
+    if (!is.na(shapiro_result$shapiro_p_value)) {
+        gee_result$shapiro_p_value <- shapiro_result$shapiro_p_value
+        gee_result$residuals_normal <- shapiro_result$residuals_normal
+        gee_result$n_residuals_tested <- shapiro_result$n_residuals
+    } else {
+        gee_result$shapiro_p_value <- NA_real_
+        gee_result$residuals_normal <- NA
+        gee_result$n_residuals_tested <- NA_integer_
+    }
+    
+    # Bootstrap CI weighting and slope
+    gee_result$ci_weighted <- !is.null(df$weight)
+    gee_result$slope_diff <- slope_diff
+    gee_result$arima_applied <- use_arima
+    
+    # K-C correction metadata
+    gee_result$kc_bias_correction_applied <- !is.null(kc_metadata) &&
+        isTRUE(kc_metadata$kc_applied)
+    gee_result$design_effect_ar1 <- if (!is.null(kc_metadata))
+        kc_metadata$design_effect else NA_real_
+    gee_result$rho_ar1_estimate <- if (!is.null(kc_metadata))
+        kc_metadata$rho_ar1 else NA_real_
+    
+    if (!is.null(kc_metadata) && isTRUE(kc_metadata$kc_applied)) {
+        gee_result$p_interaction_raw <- kc_metadata$p_raw
+        gee_result$kc_multiplier <- kc_metadata$multiplier
+        gee_result$n_effective <- kc_metadata$n_effective
+        gee_result$kc_method <- kc_metadata$method
+    } else {
+        gee_result$p_interaction_raw <- NA_real_
+        gee_result$kc_multiplier <- NA_real_
+        gee_result$n_effective <- NA_real_
+        gee_result$kc_method <- NA_character_
+    }
+    
+    gee_result
 }
 
 # ============================================================================

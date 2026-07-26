@@ -3368,3 +3368,74 @@ test_that(".validate_results_df errors when no gene identifier column", {
     "No gene identifier column found"
   )
 })
+
+# ============================================================================
+# P4: UNIFIED PALETTE DISPATCH TESTS (July 2026: metrics.json consolidation)
+# ============================================================================
+
+context("Plot Helpers: Unified Palette Dispatch (.tsenat_palette)")
+
+test_that(".tsenat_palette returns colors for all palette types", {
+  # blue_red
+  colors <- TSENAT:::.tsenat_palette("blue_red", n = 4)
+  expect_is(colors, "character")
+  expect_equal(length(colors), 4)
+  expect_true(all(grepl("^#[0-9A-Fa-f]{6}$", colors)))
+
+  # discrete
+  colors <- TSENAT:::.tsenat_palette("discrete", n = 6)
+  expect_is(colors, "character")
+  expect_equal(length(colors), 6)
+
+  # continuous_diverging
+  colors <- TSENAT:::.tsenat_palette("continuous_diverging", n = 50)
+  expect_is(colors, "character")
+  expect_equal(length(colors), 50)
+
+  # significance
+  colors <- TSENAT:::.tsenat_palette("significance")
+  expect_is(colors, "character")
+  expect_true("significant" %in% names(colors))
+  expect_true("non-significant" %in% names(colors))
+})
+
+test_that(".tsenat_palette uses correct defaults for n", {
+  # blue_red defaults to 8
+  colors <- TSENAT:::.tsenat_palette("blue_red")
+  expect_equal(length(colors), 8)
+
+  # discrete defaults to 8
+  colors <- TSENAT:::.tsenat_palette("discrete")
+  expect_equal(length(colors), 8)
+
+  # continuous_diverging defaults to 100
+  colors <- TSENAT:::.tsenat_palette("continuous_diverging")
+  expect_equal(length(colors), 100)
+})
+
+test_that(".tsenat_palette rejects invalid palette names", {
+  expect_error(
+    TSENAT:::.tsenat_palette("nonexistent"),
+    "should be one of"
+  )
+})
+
+test_that(".tsenat_palette validates n parameter", {
+  expect_error(
+    TSENAT:::.tsenat_palette("blue_red", n = "invalid"),
+    "single non-negative integer"
+  )
+  expect_error(
+    TSENAT:::.tsenat_palette("blue_red", n = -1),
+    "single non-negative integer"
+  )
+  expect_error(
+    TSENAT:::.tsenat_palette("blue_red", n = c(4, 5)),
+    "single non-negative integer"
+  )
+})
+
+test_that(".tsenat_palette with n=0 returns empty vector for discrete palettes", {
+  colors <- TSENAT:::.tsenat_palette("blue_red", n = 0)
+  expect_equal(length(colors), 0)
+})

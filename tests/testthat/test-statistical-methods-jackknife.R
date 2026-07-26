@@ -1599,3 +1599,46 @@ test_that("jackknife multi-q accepts Hill numbers (D)", {
     expect_length(result, 2)
     expect_true(all(sapply(result, function(r) !is.na(r$estimate))))
 })
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# AUDIT FIX C1: Tsallis (q≠1) jackknife is log_base-invariant
+# ═══════════════════════════════════════════════════════════════════════════════
+
+test_that("Tsallis jackknife estimates are invariant to log_base (C1 fix)", {
+  # Balanced distribution
+  p <- c(0.25, 0.25, 0.25, 0.25)
+  
+  # Tsallis q=2: estimates should be IDENTICAL regardless of log_base
+  result_e <- TSENAT:::.jackknife_compute_estimates(p = p, q = 2, log_base = exp(1), n = 4)
+  result_2 <- TSENAT:::.jackknife_compute_estimates(p = p, q = 2, log_base = 2, n = 4)
+  result_10 <- TSENAT:::.jackknife_compute_estimates(p = p, q = 2, log_base = 10, n = 4)
+  
+  # Tsallis entropy is scale-invariant — all should be identical
+  expect_equal(result_e, result_2, tolerance = 1e-12)
+  expect_equal(result_e, result_10, tolerance = 1e-12)
+})
+
+test_that("Shannon jackknife estimates differ with log_base (expected)", {
+  p <- c(0.25, 0.25, 0.25, 0.25)
+  
+  # Shannon q=1: estimates SHOULD differ with log_base
+  result_2 <- TSENAT:::.jackknife_compute_estimates(p = p, q = 1, log_base = 2, n = 4)
+  result_10 <- TSENAT:::.jackknife_compute_estimates(p = p, q = 1, log_base = 10, n = 4)
+  
+  expect_false(isTRUE(all.equal(result_2, result_10)))
+  # Base 10 should give smaller values
+  expect_true(all(result_10 < result_2))
+})
+
+test_that("Tsallis jackknife influence is consistent across log_base (C1 fix)", {
+  # Test via the full jackknife pipeline (norm=TRUE path)
+  x <- c(500, 200, 100, 50, 20)
+  
+  result_e <- suppressWarnings(.calculate_jeo(x, q = 2, log_base = exp(1), norm = TRUE, verbose = FALSE))
+  result_2 <- suppressWarnings(.calculate_jeo(x, q = 2, log_base = 2, norm = TRUE, verbose = FALSE))
+  
+  # Influence values should be nearly identical regardless of log_base for Tsallis
+  expect_equal(result_e$influence, result_2$influence, tolerance = 1e-10)
+  expect_equal(result_e$jackknife_se, result_2$jackknife_se, tolerance = 1e-10)
+  expect_equal(result_e$estimate, result_2$estimate, tolerance = 1e-10)
+})

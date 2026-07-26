@@ -2431,7 +2431,7 @@ test_that("block_bootstrap_compute_cpp_wrapper warns on NA values", {
       log_base = exp(1),
       pseudocount = 0
     ),
-    "contains NA values"
+    "contains.*NA values"
   )
 })
 
@@ -2764,7 +2764,7 @@ test_that(".bootstrap_resample_with_quality_control stops when valid_frac < 0.5 
       effective_length = NULL,
       min_valid_frac = 0.85  # Very high threshold
     ),
-    "CRITICAL|All-zero"  # Should stop with CRITICAL error
+    "All values.*are zero|CRITICAL"
   )
 })
 

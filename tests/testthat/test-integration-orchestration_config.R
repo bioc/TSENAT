@@ -1820,3 +1820,70 @@ test_that("TSENAT tips argument is accepted without error", {
         NA
     )
 })
+
+# ============================================================================
+# P1: PIPELINE DECOMPOSITION TESTS (July 2026: metrics.json refactoring)
+# ============================================================================
+
+context("Orchestration: Pipeline Stage Helpers (P1)")
+
+test_that(".merge_step_times merges named lists correctly", {
+  global <- list()
+  stage <- list(filtering = 1.5, diversity = 2.3)
+  global <- TSENAT:::.merge_step_times(global, stage)
+  
+  expect_equal(global$filtering, 1.5)
+  expect_equal(global$diversity, 2.3)
+})
+
+test_that(".merge_step_times appends to existing keys", {
+  global <- list(existing = 5.0)
+  stage <- list(new_key = 3.0)
+  global <- TSENAT:::.merge_step_times(global, stage)
+  
+  expect_equal(global$existing, 5.0)
+  expect_equal(global$new_key, 3.0)
+})
+
+test_that(".merge_step_times overwrites duplicate keys", {
+  global <- list(key = 1.0)
+  stage <- list(key = 2.0)
+  global <- TSENAT:::.merge_step_times(global, stage)
+  
+  expect_equal(global$key, 2.0)
+})
+
+test_that(".merge_step_times handles empty stage times", {
+  global <- list(existing = 1.0)
+  stage <- list()
+  global <- TSENAT:::.merge_step_times(global, stage)
+  
+  expect_equal(length(global), 1)
+  expect_equal(global$existing, 1.0)
+})
+
+test_that(".merge_step_times handles empty global times", {
+  global <- list()
+  stage <- list(a = 1.0, b = 2.0)
+  global <- TSENAT:::.merge_step_times(global, stage)
+  
+  expect_equal(length(global), 2)
+  expect_equal(global$a, 1.0)
+  expect_equal(global$b, 2.0)
+})
+
+test_that("pipeline stage functions exist and are callable", {
+  # Verify all 6 stage functions exist
+  stage_fns <- c(
+    ".pipeline_stage_preprocessing",
+    ".pipeline_stage_diversity",
+    ".pipeline_stage_qc",
+    ".pipeline_stage_sait",
+    ".pipeline_stage_jackknife",
+    ".pipeline_stage_comparison_validation"
+  )
+  for (fn in stage_fns) {
+    expect_true(exists(fn, envir = asNamespace("TSENAT"), inherits = FALSE),
+                info = paste(fn, "should exist"))
+  }
+})

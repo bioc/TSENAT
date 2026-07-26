@@ -267,11 +267,15 @@
     # control and treatment have equal sizes (required for divergence
     # computation)
     if (length(resampled_control) != length(resampled_treatment)) {
-        stop("Paired bootstrap produced unequal group sizes (", length(resampled_control),
-            " control vs ", length(resampled_treatment), " treatment). ", "Check for unbalanced or incomplete pairs in input data.")
+        warning("Paired bootstrap produced unequal group sizes (", length(resampled_control),
+            " control vs ", length(resampled_treatment), " treatment). ",
+            "Skipping this bootstrap replicate. Check for unbalanced or incomplete pairs in input data.")
+        return(list(control_resampled = numeric(0), treatment_resampled = numeric(0),
+            failed = TRUE))
     }
 
-    return(list(control_resampled = resampled_control, treatment_resampled = resampled_treatment))
+    return(list(control_resampled = resampled_control, treatment_resampled = resampled_treatment,
+        failed = FALSE))
 }
 
 

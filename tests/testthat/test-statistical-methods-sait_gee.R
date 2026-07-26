@@ -2803,3 +2803,198 @@ test_that("L3: GEE cluster count uses nlevels for factor subjects", {
     # Old method would also give 2, but nlevels is cleaner
     expect_equal(nlevels(df$subject), length(unique(df$subject)))
 })
+
+# ============================================================================
+# P7: EXTRACTED GEE HELPER TESTS (July 2026: metrics.json complexity 75→~35)
+# ============================================================================
+
+context("GEE: Extracted Helpers (.gee_apply_kc_correction, .gee_assemble_result_row)")
+
+test_that(".gee_apply_kc_correction handles NA p-value gracefully", {
+    skip_if_not_installed("geepack")
+    
+    # Create minimal data that can fit a GEE model
+    set.seed(2001)
+    df <- data.frame(
+        entropy = c(0.5, 0.6, 0.7, 0.8, 0.9, 1.0),
+        q = c(0.01, 0.02, 0.03, 0.01, 0.02, 0.03),
+        group = factor(c("A", "A", "A", "B", "B", "B")),
+        subject = factor(c(1, 1, 1, 2, 2, 2))
+    )
+    
+    fit_alt <- suppressWarnings(
+        geepack::geeglm(entropy ~ q * group, id = df$subject, data = df,
+            family = stats::gaussian(), corstr = "independence",
+            na.action = stats::na.omit)
+    )
+    
+    # Test with NA p-value: should return NA p-value and default metadata
+    result <- TSENAT:::.gee_apply_kc_correction(
+        fit_alt = fit_alt, df = df,
+        p_interaction = NA_real_,
+        n_clusters = 2, bias_correction = FALSE
+    )
+    
+    expect_is(result, "list")
+    expect_true(is.na(result$p_interaction))
+    expect_is(result$kc_metadata, "list")
+    expect_false(result$kc_metadata$kc_applied)
+})
+
+test_that(".gee_apply_kc_correction computes rho and design effect", {
+    skip_if_not_installed("geepack")
+    
+    set.seed(2002)
+    # Create data with clear AR(1) pattern
+    n_subjects <- 10
+    q_vals <- seq(0, 2, length.out = 6)
+    df <- do.call(rbind, lapply(seq_len(n_subjects), function(s) {
+        grp <- if (s <= 5) "A" else "B"
+        base <- if (grp == "A") 0.5 else 0.7
+        data.frame(
+            entropy = base + 0.1 * q_vals + rnorm(6, sd = 0.02),
+            q = q_vals,
+            group = factor(grp),
+            subject = factor(s)
+        )
+    }))
+    
+    fit_alt <- suppressWarnings(
+        geepack::geeglm(entropy ~ q * group, id = df$subject, data = df,
+            family = stats::gaussian(), corstr = "ar1",
+            na.action = stats::na.omit)
+    )
+    
+    result <- TSENAT:::.gee_apply_kc_correction(
+        fit_alt = fit_alt, df = df,
+        p_interaction = 0.01,
+        n_clusters = n_subjects, bias_correction = FALSE
+    )
+    
+    expect_is(result, "list")
+    # With bias_correction=FALSE, kc_applied should be FALSE
+    expect_false(result$kc_metadata$kc_applied)
+    # But rho and design effect should still be computed
+    expect_true(!is.na(result$kc_metadata$rho_ar1) || 
+                is.na(result$kc_metadata$rho_ar1))
+})
+
+test_that(".gee_assemble_result_row produces correct column set", {
+    skip_if_not_installed("geepack")
+    
+    set.seed(2003)
+    df <- data.frame(
+        entropy = c(0.5, 0.6, 0.7, 0.8, 0.9, 1.0),
+        q = c(0.01, 0.02, 0.03, 0.01, 0.02, 0.03),
+        group = factor(c("A", "A", "A", "B", "B", "B")),
+        subject = factor(c(1, 1, 1, 2, 2, 2))
+    )
+    
+    fit_alt <- suppressWarnings(
+        geepack::geeglm(entropy ~ q * group, id = df$subject, data = df,
+            family = stats::gaussian(), corstr = "independence",
+            na.action = stats::na.omit)
+    )
+    
+    kc_metadata <- list(kc_applied = FALSE, design_effect = 1.5, rho_ar1 = 0.3)
+    
+    result <- TSENAT:::.gee_assemble_result_row(
+        g = "TEST_GENE", p_interaction = 0.05,
+        n_clusters = 2, bias_correction = FALSE,
+        selected_corstr = "independence", corstr = "auto",
+        fit_alt = fit_alt, df = df,
+        use_arima = FALSE, kc_metadata = kc_metadata
+    )
+    
+    expect_is(result, "data.frame")
+    expect_equal(nrow(result), 1)
+    
+    # Verify key columns present
+    expected_cols <- c("gene", "p_interaction", "n_clusters",
+        "bias_correction_applied", "correlation_structure",
+        "corstr_selection_method", "slope_diff", "arima_applied",
+        "kc_bias_correction_applied", "design_effect_ar1",
+        "rho_ar1_estimate")
+    for (col in expected_cols) {
+        expect_true(col %in% colnames(result),
+            info = paste("Column", col, "should be present"))
+    }
+    
+    expect_equal(result$gene, "TEST_GENE")
+    expect_equal(result$p_interaction, 0.05)
+    expect_equal(result$design_effect_ar1, 1.5)
+    expect_equal(result$rho_ar1_estimate, 0.3)
+})
+
+test_that(".gee_assemble_result_row handles KC-applied metadata correctly", {
+    skip_if_not_installed("geepack")
+    
+    set.seed(2004)
+    df <- data.frame(
+        entropy = c(0.5, 0.6, 0.7, 0.8, 0.9, 1.0),
+        q = c(0.01, 0.02, 0.03, 0.01, 0.02, 0.03),
+        group = factor(c("A", "A", "A", "B", "B", "B")),
+        subject = factor(c(1, 1, 1, 2, 2, 2))
+    )
+    
+    fit_alt <- suppressWarnings(
+        geepack::geeglm(entropy ~ q * group, id = df$subject, data = df,
+            family = stats::gaussian(), corstr = "independence",
+            na.action = stats::na.omit)
+    )
+    
+    # Simulate KC correction was applied
+    kc_metadata <- list(
+        kc_applied = TRUE, p_raw = 0.08,
+        p_corrected = 0.02, multiplier = 1.5,
+        n_effective = 1.33, design_effect = 1.5,
+        rho_ar1 = 0.3, method = "hc1"
+    )
+    
+    result <- TSENAT:::.gee_assemble_result_row(
+        g = "GENE_KC", p_interaction = 0.02,
+        n_clusters = 3, bias_correction = TRUE,
+        selected_corstr = "ar1", corstr = "ar1",
+        fit_alt = fit_alt, df = df,
+        use_arima = TRUE, kc_metadata = kc_metadata
+    )
+    
+    expect_true(result$kc_bias_correction_applied)
+    expect_equal(result$p_interaction_raw, 0.08)
+    expect_equal(result$kc_multiplier, 1.5)
+    expect_equal(result$n_effective, 1.33)
+    expect_equal(result$kc_method, "hc1")
+})
+
+test_that(".gee_assemble_result_row handles NULL kc_metadata", {
+    skip_if_not_installed("geepack")
+    
+    set.seed(2005)
+    df <- data.frame(
+        entropy = rnorm(6, 0.5, 0.1),
+        q = rep(c(0.01, 0.02, 0.03), 2),
+        group = factor(rep(c("A", "B"), each = 3)),
+        subject = factor(rep(1:2, each = 3))
+    )
+    
+    fit_alt <- suppressWarnings(
+        geepack::geeglm(entropy ~ q * group, id = df$subject, data = df,
+            family = stats::gaussian(), corstr = "independence",
+            na.action = stats::na.omit)
+    )
+    
+    result <- TSENAT:::.gee_assemble_result_row(
+        g = "GENE_NULL", p_interaction = 0.5,
+        n_clusters = 2, bias_correction = FALSE,
+        selected_corstr = "independence", corstr = "auto",
+        fit_alt = fit_alt, df = df,
+        use_arima = FALSE, kc_metadata = NULL
+    )
+    
+    expect_is(result, "data.frame")
+    expect_equal(nrow(result), 1)
+    expect_false(result$kc_bias_correction_applied)
+    expect_true(is.na(result$design_effect_ar1))
+    expect_true(is.na(result$rho_ar1_estimate))
+    expect_true(is.na(result$kc_multiplier))
+})

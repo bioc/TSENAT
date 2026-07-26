@@ -600,6 +600,39 @@ test_that(".jis_resample_paired_data throws error for unequal groups", {
   
   # Should succeed with balanced groups
   expect_equal(length(result$control_resampled), length(result$treatment_resampled))
+  # AUDIT FIX M3: Should return failed=FALSE for successful resampling
+  expect_false(isTRUE(result$failed))
+})
+
+test_that(".jis_resample_paired_data returns failed=TRUE for impossible pairing (M3 fix)", {
+  # Create intentionally unbalanceable pairs: every pair is control-only or treatment-only
+  control_samples <- c(s1 = 10, s2 = 15)
+  treatment_samples <- c(s3 = 20)
+  
+  # All pairs are single-group
+  pair_ids <- c(s1 = "pair_A", s2 = "pair_B", s3 = "pair_C")
+  group_col <- c("Control", "Control", "Treatment")
+  control_group <- "Control"
+  
+  # With single-sample pairs, resampling will produce unequal groups.
+  # The function should return failed=TRUE instead of throwing stop().
+  # The warning is expected — this is the graceful behavior (was stop() before M3 fix).
+  set.seed(789)
+  expect_warning(
+    result <- TSENAT:::.jis_resample_paired_data(
+      control_samples,
+      treatment_samples,
+      pair_ids,
+      group_col,
+      control_group
+    ),
+    "Paired bootstrap produced unequal group sizes"
+  )
+  
+  # Should indicate failure gracefully (not stop())
+  expect_true(isTRUE(result$failed))
+  expect_true(length(result$control_resampled) == 0 || 
+              length(result$control_resampled) != length(result$treatment_resampled))
 })
 
 # =====================================================================

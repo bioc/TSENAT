@@ -408,11 +408,12 @@ test_that(".createResultsDataFrame generates correct columns for multi-q diverge
   expect_equal(nrow(df), 0)
   expect_true(all(c("gene", "p_value_interaction", "slope_diff") %in% colnames(df)))
   
-  # Check for all q-specific columns (with underscores as separators)
+  # Check for all q-specific columns (with underscores as separators).
+  # as.character() produces "1" for 1.0 and "2" for 2.0 (not "1_0", "2_0").
   expected_cols <- c(
     "effect_size_D_q0_5", "D_q0_5_lower_ci", "D_q0_5_upper_ci",
-    "effect_size_D_q1_0", "D_q1_0_lower_ci", "D_q1_0_upper_ci",
-    "effect_size_D_q2_0", "D_q2_0_lower_ci", "D_q2_0_upper_ci"
+    "effect_size_D_q1", "D_q1_lower_ci", "D_q1_upper_ci",
+    "effect_size_D_q2", "D_q2_lower_ci", "D_q2_upper_ci"
   )
   expect_true(all(expected_cols %in% colnames(df)))
 })
@@ -2780,4 +2781,38 @@ test_that(".process_effect_sizes_divergence_results errors on missing sort_by co
     ),
     "nonexistent_column"
   )
+})
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# AUDIT FIX L2: .createResultsDataFrame and .formatMultiQResult column name consistency
+# ═══════════════════════════════════════════════════════════════════════════════
+
+test_that("createResultsDataFrame and formatMultiQResult produce compatible columns (L2 fix)", {
+  # Test that column names from createResultsDataFrame match those from formatMultiQResult
+  q_values <- c(0.5, 1.0, 1.25, 2.0)
+  
+  # Create empty template (what createResultsDataFrame does)
+  template <- TSENAT:::.createResultsDataFrame(q_values, use_generic = FALSE)
+  
+  # The expected column name pattern: effect_size_D_q0_5, D_q0_5_lower_ci, D_q0_5_upper_ci
+  expected_q_labels <- gsub("\\.", "_", as.character(q_values))
+  expected_est_cols <- paste0("effect_size_D_q", expected_q_labels)
+  expected_lower_cols <- paste0("D_q", expected_q_labels, "_lower_ci")
+  expected_upper_cols <- paste0("D_q", expected_q_labels, "_upper_ci")
+  
+  all_expected <- c("gene", "p_value_interaction", "slope_diff",
+                     expected_est_cols, expected_lower_cols, expected_upper_cols)
+  
+  expect_true(all(all_expected %in% colnames(template)))
+  
+  # Verify that q=1.25 produces "1_25" label (not "1_2")
+  expect_true("effect_size_D_q1_25" %in% colnames(template))
+})
+
+test_that("createResultsDataFrame single-q (use_generic=TRUE) is correct", {
+  template <- TSENAT:::.createResultsDataFrame(q_values = c(1.5), use_generic = TRUE)
+  
+  expected_cols <- c("gene", "p_value_interaction", "slope_diff",
+                      "effect_size_D", "D_lower_ci", "D_upper_ci")
+  expect_true(all(expected_cols %in% colnames(template)))
 })

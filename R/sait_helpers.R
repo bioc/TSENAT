@@ -1168,6 +1168,16 @@ if (getOption("TSENAT.memoization", TRUE)) {
 
 #' @noRd
 .map_gene_annotations <- function(res, se, verbose) {
+    # P3 guard (July 2026): .finalize_sait_results may be called without SE
+    # for pure post-processing (e.g., unit tests, external result objects).
+    if (is.null(se)) {
+        # Ensure gene_name column exists even without annotations
+        if (!"gene_name" %in% colnames(res)) {
+            res$gene_name <- res$gene
+        }
+        return(res)
+    }
+
     rd <- SummarizedExperiment::rowData(se)
 
     # Look for gene_name column from calculate_diversity or build_se

@@ -96,6 +96,80 @@
 
 
 # ============================================================================
+# UNIFIED PALETTE DISPATCH (July 2026: metrics.json P4 consolidation)
+# ============================================================================
+
+#' Unified TSENAT Palette Dispatch
+#'
+#' Single entry point for all TSENAT color palettes. Replaces scattered
+#' calls to `.palette_blue_red()`, `.palette_discrete()`,
+#' `.palette_continuous_diverging()`, and `.significance_colors()` with
+#' a validated, centralized dispatch function. Reduces the attack surface
+#' for palette bugs (metrics.json: 6+ high-risk palette functions).
+#'
+#' @param palette Character. Palette name: one of
+#'   \code{c('blue_red', 'discrete', 'continuous_diverging', 'significance')}.
+#' @param n Integer. Number of colors to return (default: 8 for discrete,
+#'   100 for continuous).
+#'
+#' @return Character vector of hex color codes.
+#'
+#' @details
+#' **Available palettes:**
+#' - `'blue_red'`: Harmonized blue-red discrete palette (8 colors max)
+#' - `'discrete'`: Dark2-based qualitative palette (8 colors max)
+#' - `'continuous_diverging'`: Blue-white-red gradient for heatmaps
+#' - `'significance'`: Named vector (significant=red, non-significant=grey)
+#'
+#' **Why centralized dispatch matters:**
+#' Before this refactoring, 6 separate palette functions were called from
+#' 13+ locations across the package. A bug in any one of them could cause
+#' silent failures in plots. Centralized dispatch with validation catches
+#' errors at the entry point rather than deep in plot code.
+#'
+#' @examples
+#' # Discrete palette for group coloring
+#' colors <- .tsenat_palette("blue_red", n = 4)
+#'
+#' # Continuous gradient for heatmaps
+#' gradient <- .tsenat_palette("continuous_diverging", n = 100)
+#'
+#' # Significance colors for p-value highlighting
+#' sig <- .tsenat_palette("significance")
+#'
+#' @noRd
+.tsenat_palette <- function(palette = c("blue_red", "discrete", "continuous_diverging",
+    "significance"), n = NULL) {
+    palette <- match.arg(palette)
+
+    # Validate n parameter
+    if (!is.null(n)) {
+        if (!is.numeric(n) || length(n) != 1 || n < 0) {
+            stop("[.tsenat_palette] 'n' must be a single non-negative integer")
+        }
+        n <- as.integer(n)
+    }
+
+    switch(palette,
+        blue_red = {
+            if (is.null(n)) n <- 8L
+            .palette_blue_red(n = n)
+        },
+        discrete = {
+            if (is.null(n)) n <- 8L
+            .palette_discrete(n = n)
+        },
+        continuous_diverging = {
+            if (is.null(n)) n <- 100L
+            .palette_continuous_diverging(n = n)
+        },
+        significance = {
+            .significance_colors()
+        }
+    )
+}
+
+# ============================================================================
 
 #' Apply Publication-Ready Theme with Centered Titles
 #'

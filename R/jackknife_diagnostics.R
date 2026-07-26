@@ -538,7 +538,8 @@
             estimate <- if (length(p_nonzero) > 0)
                 -sum(p_nonzero * log(p_nonzero))/log(log_base) else 0
         } else {
-            estimate <- (1/(q - 1)) * (1 - sum(p^q))/log(log_base)
+            # Tsallis entropy is scale-invariant and does not use log_base
+            estimate <- (1/(q - 1)) * (1 - sum(p^q))
         }
     }
 
@@ -585,7 +586,8 @@
             # Guard against NA/NaN in denom before using in if() statement
             jackknife_estimates[i] <- if (!is.na(denom) && !is.nan(denom) && denom >
                 1e-10)
-                (1/(q - 1)) * (1 - sum((p/denom)^q))/log(log_base) else NA_real_
+                # Tsallis entropy is scale-invariant; no log_base division
+                (1/(q - 1)) * (1 - sum((p/denom)^q)) else NA_real_
         }
     }
     jackknife_estimates

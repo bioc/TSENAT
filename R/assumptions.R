@@ -53,301 +53,283 @@
     gee_params = list()) {
 
     # Expand convenience presets
-    if (is.character(checks) && length(checks) == 1) {
-        if (checks == "rank") {
-            checks <- c("exchangeability")
-        } else if (checks == "all") {
-            checks <- c("exchangeability", "monotonicity", "consistency", "gam_metrics",
-                "gee_metrics", "lmm_metrics", "fpca_metrics")
-        } else {
-            # Allow single metric names to pass through They will be used as-is
-            # in the checks below
-        }
-    } else if (!is.character(checks)) {
-        stop("checks must be a character string ('rank', 'all', metric name) or character vector")
-    }
+    checks <- .expand_assumptions_checks(checks)
 
     if (!is.matrix(data))
         data <- as.matrix(data)
 
+    # Guard against empty data
+    if (nrow(data) == 0 || ncol(data) == 0) {
+        return(.assumptions_empty_data(checks))
+    }
+
+    # Summary statistics
+    summary_stats <- list(
+        n_genes = nrow(data), n_samples = ncol(data),
+        entropy_min = min(data, na.rm = TRUE),
+        entropy_max = max(data, na.rm = TRUE),
+        entropy_mean = mean(data, na.rm = TRUE),
+        entropy_median = median(data, na.rm = TRUE),
+        n_missing = sum(is.na(data))
+    )
+
     results <- list()
 
-    # Guard against empty data input: check matrix dimensions This prevents
-    # errors when diversity calculation creates empty assays
-    if (nrow(data) == 0 || ncol(data) == 0) {
-        # Return default check structures even for empty data (prevents NULL
-        # access errors in vignettes) CRITICAL: Every check must have a p_value
-        # and details field for vignette compatibility
-        empty_checks <- list(exchangeability = list(description = "Sample exchangeability",
-            method = "N/A", status = "? SKIP", p_value = NA_real_, details = "Empty data"),
-            monotonicity = list(description = "Rank ordering stability", method = "N/A",
-                status = "? SKIP", mean_correlation = NA_real_, details = "Empty data"),
-            consistency = list(description = "Rank consistency", method = "N/A",
-                status = "? SKIP", w_statistic = NA_real_, icc = NA_real_, details = "Empty data"))
-
-        # Include empty metric placeholders if requested
-        if ("gam_metrics" %in% checks) {
-            empty_checks$gam_metrics <- list(concurvity = list(description = "Concurvity Index",
-                status = "? SKIP", overall_concurvity = NA_real_, details = "Empty data"),
-                edf = list(description = "Effective DoF", status = "? SKIP", edf_ratio = NA_real_,
-                  details = "Empty data"), nonlinearity = list(description = "Non-linearity",
-                  status = "? SKIP", r2_improvement_percent = NA_real_, details = "Empty data"),
-                basis_adequacy = list(description = "Basis Adequacy", status = "? SKIP",
-                  optimal_basis_dimension = NA_integer_, details = "Empty data"))
-        }
-        if ("gee_metrics" %in% checks) {
-            empty_checks$gee_metrics <- list(correlation_fit = list(description = "Correlation Structure",
-                status = "? SKIP", details = "Empty data"), cluster_variation = list(description = "Cluster Variation",
-                status = "? SKIP", details = "Empty data"), independence = list(description = "Independence",
-                status = "? SKIP", details = "Empty data"), scale_parameter = list(description = "Scale Parameter",
-                status = "? SKIP", scale = NA_real_, details = "Empty data"))
-        }
-        if ("lmm_metrics" %in% checks) {
-            empty_checks$lmm_metrics <- list(variance_components = list(description = "Variance Components",
-                status = "? SKIP", details = "Empty data"), normality = list(description = "Normality",
-                status = "? SKIP", details = "Empty data"), homogeneity = list(description = "Homogeneity",
-                status = "? SKIP", details = "Empty data"), influence = list(description = "Influence",
-                status = "? SKIP", details = "Empty data"))
-        }
-        if ("fpca_metrics" %in% checks) {
-            empty_checks$fpca_metrics <- list(variance_adequacy = list(description = "Variance Adequacy",
-                status = "? SKIP", details = "Empty data"), bootstrap_stability = list(description = "Bootstrap Stability",
-                status = "? SKIP", details = "Empty data"))
-        }
-
-        # Return `summary_stats` as part of the object (for $ access) and
-        # keep `checks` as an attribute for backward compatibility
-        obj <- list(overall_summary = "Cannot evaluate assumptions on empty data matrix",
-            summary_stats = list(n_genes = 0, n_samples = 0, entropy_min = NA_real_,
-                entropy_max = NA_real_, entropy_mean = NA_real_, entropy_median = NA_real_,
-                n_missing = 0))
-        class(obj) <- "rank_assumptions"
-        attr(obj, "checks") <- empty_checks
-        return(obj)
-    }
-
-    # Calculate summary statistics for entropy data Guard against empty data:
-    # check for valid values before min/max
-    has_valid_data <- (nrow(data) > 0 && ncol(data) > 0 && sum(!is.na(data)) > 0)
-
-    entropy_min <- if (has_valid_data)
-        min(data, na.rm = TRUE) else NA_real_
-    entropy_max <- if (has_valid_data)
-        max(data, na.rm = TRUE) else NA_real_
-
-    summary_stats <- list(n_genes = nrow(data), n_samples = ncol(data), entropy_min = entropy_min,
-        entropy_max = entropy_max, entropy_mean = mean(data, na.rm = TRUE), entropy_median = median(data,
-            na.rm = TRUE), n_missing = sum(is.na(data)))
-
-    # Check 1: Exchangeability (permutation test for serial correlation in
-    # samples)
+    # Rank-based checks
     if ("exchangeability" %in% checks) {
-        # Hypothesis: Under exchangeability, consecutive samples should show
-        # similar correlation to random sample pairs. Ordering effects would
-        # manifest as higher correlation in consecutive samples than expected
-        # by chance.
-
-        # Test statistic: mean Pearson correlation between consecutive samples
-        # (columns)
-        if (ncol(data) > 2) {
-            # Vectorized: compute correlations between consecutive samples Use
-            # diag(cor(X, Y)) to get paired correlations efficiently
-            data_1 <- data[, seq_len(ncol(data) - 1)]
-            data_2 <- data[, seq_len(ncol(data) - 1) + 1]
-            consecutive_cors <- vapply(seq_len(ncol(data) - 1), function(i) {
-                stats::cor(data[, i], data[, i + 1], method = "pearson", use = "complete.obs")
-            }, numeric(1))
-            original_stat <- mean(consecutive_cors, na.rm = TRUE)
-
-            # Permutation test: shuffle column order and recompute (vectorized)
-            n_perms <- 99
-            perm_stats <- numeric(n_perms)
-            # Seed handling left to caller for Bioconductor compliance
-            for (perm in seq_len(n_perms)) {
-                # Shuffle column (sample) order
-                perm_idx <- sample(seq_len(ncol(data)))
-                perm_data <- data[, perm_idx]
-
-                # Recompute consecutive correlations (vectorized)
-                perm_cors <- vapply(seq_len(ncol(perm_data) - 1), function(i) {
-                  stats::cor(perm_data[, i], perm_data[, i + 1], method = "pearson",
-                    use = "complete.obs")
-                }, numeric(1))
-                perm_stats[perm] <- mean(perm_cors, na.rm = TRUE)
-            }
-
-            # P-value: proportion of permutations with mean_consecutive >=
-            # original High p-value: original correlation within random
-            # variation (exchangeable) Low p-value: original shows ordering
-            # effect (NOT exchangeable)
-            p_exchangeability <- mean(perm_stats >= original_stat, na.rm = TRUE)
-
-            # Interpretation: if p > alpha, data is exchangeable (no ordering
-            # effect)
-            exchangeability_interpretation <- if (p_exchangeability > alpha)
-                "exchangeable" else "ordering detected"
-
-            results$exchangeability <- list(description = "Sample exchangeability (serial correlation in sequence)",
-                method = "Permutation test (consecutive sample correlations vs. shuffled)",
-                test_statistic = original_stat, p_value = p_exchangeability, status = exchangeability_interpretation,
-                details = sprintf("p=%s", format(p_exchangeability, scientific = TRUE)))
-        } else {
-            results$exchangeability <- list(description = "Sample exchangeability",
-                method = "Insufficient samples (need >= 3)", status = "? SKIP", details = "Requires at least 3 samples to test exchangeability")
-        }
+        results$exchangeability <- .check_exchangeability(data, alpha)
     }
-
-    # Check 2: Monotonicity (Spearman correlation stability across rows)
     if ("monotonicity" %in% checks) {
-        # Compute pairwise Spearman correlations between consecutive rows
-        spearman_cors <- numeric(max(1, nrow(data) - 1))
-
-        if (nrow(data) > 1) {
-            for (i in seq_len(nrow(data) - 1)) {
-                spearman_cors[i] <- stats::cor(data[i, ], data[i + 1, ], method = "spearman",
-                  use = "complete.obs")
-            }
-        }
-
-        # Summary statistics of correlation stability
-        mean_cor <- mean(spearman_cors, na.rm = TRUE)
-        sd_cor <- stats::sd(spearman_cors, na.rm = TRUE)
-
-        # Guard against empty correlation vector
-        has_valid_cors <- sum(!is.na(spearman_cors)) > 0
-        min_cor <- if (has_valid_cors)
-            min(spearman_cors, na.rm = TRUE) else NA_real_
-
-        # Status: high and stable correlations indicate good monotonicity
-        # Interpretation: degree of heterogeneity in rank ordering Guard
-        # against NA mean_cor (happens with single-column or empty data)
-        heterogeneity_interpretation <- if (!is.na(mean_cor) && mean_cor > 0.7) {
-            "homogeneous"
-        } else if (!is.na(mean_cor) && mean_cor > 0.4) {
-            "moderately heterogeneous"
-        } else if (!is.na(mean_cor)) {
-            "heterogeneous"
-        } else {
-            "? SKIP"
-        }
-
-        results$monotonicity <- list(description = "Rank ordering stability (Spearman correlation across rows)",
-            method = "Pairwise Spearman correlations between consecutive rows", mean_correlation = mean_cor,
-            sd_correlation = sd_cor, min_correlation = min_cor, status = heterogeneity_interpretation,
-            details = paste0("r=", .format_table_value(mean_cor)))
+        results$monotonicity <- .check_monotonicity(data)
     }
-
-    # Check 3: Consistency (ICC for replicate consistency)
     if ("consistency" %in% checks) {
-        # Calculate Kendall's W (concordance coefficient) across columns W
-        # ranges from 0 (no agreement) to 1 (perfect agreement)
-
-        if (ncol(data) >= 2 && nrow(data) >= 2) {
-            # Transpose for ICC calculation (samples as rows, variables as
-            # columns)
-            data_t <- t(data)
-
-            # Compute mean rank across each column (gene)
-            ranked_data <- apply(data_t, 2, function(x) rank(x, na.last = "keep"))
-
-            # Kendall's W = 12*S / (m^2 * (n^3 - n)) where S = sum of squared
-            # deviations from mean rank, m = judges (samples), n = objects
-            # (genes)
-            m <- nrow(ranked_data)
-            n <- ncol(ranked_data)
-
-            # Sum of squared deviations
-            col_means <- colMeans(ranked_data, na.rm = TRUE)
-            S <- sum((colSums(ranked_data, na.rm = TRUE) - m * col_means)^2, na.rm = TRUE)
-
-            # Kendall's W
-            kendall_w <- if (n > 1) {
-                12 * S/(m^2 * (n^3 - n))
-            } else {
-                NA_real_
-            }
-
-            # Alternative: compute intraclass correlation (ICC 2-way mixed) Use
-            # simplified two-way ICC calculation
-            grand_mean <- mean(data, na.rm = TRUE)
-            between_col_var <- sum((colMeans(data, na.rm = TRUE) - grand_mean)^2,
-                na.rm = TRUE)/(ncol(data) - 1)
-            within_var <- var(as.numeric(data), na.rm = TRUE)
-            icc_simplified <- between_col_var/(between_col_var + within_var)
-
-            status <- if (!is.na(kendall_w) && kendall_w > 0.7) {
-                "high"
-            } else if (!is.na(kendall_w) && kendall_w > 0.4) {
-                "moderate"
-            } else {
-                "low"
-            }
-
-            results$consistency <- list(description = "Rank consistency evaluation (Kendall's W & ICC)",
-                method = "Kendall's W concordance coefficient + ICC approximation",
-                kendall_w = kendall_w, icc_simplified = icc_simplified, status = status,
-                details = paste0("W=", .format_table_value(if (is.na(kendall_w)) 0 else kendall_w),
-                  ", ICC=", .format_table_value(if (is.na(icc_simplified)) 0 else icc_simplified)))
-        } else {
-            results$consistency <- list(description = "Rank consistency evaluation",
-                method = "Insufficient data for consistency test", status = "? SKIP",
-                details = "Requires at least 2 samples and 2 genes")
-        }
+        results$consistency <- .check_consistency(data)
     }
 
-    # Check 4: GAM metrics (new - April 2026)
+    # Method-specific checks
     if ("gam_metrics" %in% checks) {
-        gam_result <- tryCatch({
-            .get_gam_metrics(data, q_values = q_values, method_params = list())
-        }, error = function(e) {
-            list(error = TRUE, message = paste("GAM metrics computation failed:",
-                e$message), reason = "Check if mgcv package is installed and data has sufficient variation")
-        })
-        results$gam_metrics <- gam_result
+        results$gam_metrics <- tryCatch(
+            .get_gam_metrics(data, q_values = q_values, method_params = list()),
+            error = function(e) list(error = TRUE,
+                message = paste("GAM metrics computation failed:", e$message),
+                reason = "Check if mgcv package is installed and data has sufficient variation")
+        )
     }
-
-    # Check 5: GEE metrics (new - April 2026)
     if ("gee_metrics" %in% checks) {
-        gee_result <- tryCatch({
-            .get_gee_metrics(data, gee_params = gee_params)
-        }, error = function(e) {
-            list(error = TRUE, message = paste("GEE metrics computation failed:",
-                e$message), reason = "Check if geepack package is installed")
-        })
-        results$gee_metrics <- gee_result
+        results$gee_metrics <- tryCatch(
+            .get_gee_metrics(data, gee_params = gee_params),
+            error = function(e) list(error = TRUE,
+                message = paste("GEE metrics computation failed:", e$message),
+                reason = "Check if geepack package is installed")
+        )
     }
-
-    # Check 6: LMM metrics (new - April 2026)
     if ("lmm_metrics" %in% checks) {
-        lmm_result <- tryCatch({
-            lmm_params <- list(assumed_re_structure = "random_intercept", cluster_col = NULL)
-            .get_lmm_metrics(data, lmm_params = lmm_params)
-        }, error = function(e) {
-            list(error = TRUE, message = paste("LMM metrics computation failed:",
-                e$message), reason = "Check data structure and dimensionality")
-        })
-        results$lmm_metrics <- lmm_result
+        results$lmm_metrics <- tryCatch({
+            .get_lmm_metrics(data, lmm_params = list(
+                assumed_re_structure = "random_intercept", cluster_col = NULL))
+        }, error = function(e) list(error = TRUE,
+            message = paste("LMM metrics computation failed:", e$message),
+            reason = "Check data structure and dimensionality"))
     }
-
-    # Check 7: FPCA metrics (new - April 2026)
     if ("fpca_metrics" %in% checks) {
-        fpca_result <- tryCatch({
-            fpca_params <- list(max_components = NULL, n_bootstrap = 500, n_components = 3)
-            .get_fpca_metrics(data, fpca_params = fpca_params)
-        }, error = function(e) {
-            list(error = TRUE, message = paste("FPCA metrics computation failed:",
-                e$message), reason = "Check data dimensionality (need >1 observation and column)")
-        })
-        results$fpca_metrics <- fpca_result
+        results$fpca_metrics <- tryCatch({
+            .get_fpca_metrics(data, fpca_params = list(
+                max_components = NULL, n_bootstrap = 500, n_components = 3))
+        }, error = function(e) list(error = TRUE,
+            message = paste("FPCA metrics computation failed:", e$message),
+            reason = "Check data dimensionality (need >1 observation and column)"))
     }
 
-    # Return object with `summary_stats` available as a list element and
-    # `checks` set as an attribute (preserves previous access patterns)
-    obj <- list(overall_summary = paste("Rank-based assumptions evaluated with",
-        "rigorous statistical tests."), summary_stats = summary_stats)
+    obj <- list(
+        overall_summary = "Rank-based assumptions evaluated with rigorous statistical tests.",
+        summary_stats = summary_stats)
     class(obj) <- "rank_assumptions"
     attr(obj, "checks") <- results
     obj
+}
+
+# ============================================================================
+# EXTRACTED HELPERS (July 2026: 300-line → 80-line orchestrator)
+# ============================================================================
+
+#' Expand convenience presets into explicit check vectors
+#' @noRd
+.expand_assumptions_checks <- function(checks) {
+    if (is.character(checks) && length(checks) == 1) {
+        if (checks == "rank") {
+            return(c("exchangeability"))
+        } else if (checks == "all") {
+            return(c("exchangeability", "monotonicity", "consistency",
+                "gam_metrics", "gee_metrics", "lmm_metrics", "fpca_metrics"))
+        }
+        return(checks)  # single metric name passes through
+    }
+    if (!is.character(checks)) {
+        stop("checks must be a character string or character vector")
+    }
+    checks
+}
+
+#' Build empty placeholder object for empty data matrices
+#' @noRd
+.assumptions_empty_data <- function(checks) {
+    empty_checks <- list(
+        exchangeability = list(description = "Sample exchangeability",
+            method = "N/A", status = "? SKIP", p_value = NA_real_,
+            details = "Empty data"),
+        monotonicity = list(description = "Rank ordering stability",
+            method = "N/A", status = "? SKIP", mean_correlation = NA_real_,
+            details = "Empty data"),
+        consistency = list(description = "Rank consistency",
+            method = "N/A", status = "? SKIP", w_statistic = NA_real_,
+            icc = NA_real_, details = "Empty data"))
+
+    if ("gam_metrics" %in% checks) {
+        empty_checks$gam_metrics <- list(
+            concurvity = list(description = "Concurvity Index", status = "? SKIP",
+                overall_concurvity = NA_real_, details = "Empty data"),
+            edf = list(description = "Effective DoF", status = "? SKIP",
+                edf_ratio = NA_real_, details = "Empty data"),
+            nonlinearity = list(description = "Non-linearity", status = "? SKIP",
+                r2_improvement_percent = NA_real_, details = "Empty data"),
+            basis_adequacy = list(description = "Basis Adequacy", status = "? SKIP",
+                optimal_basis_dimension = NA_integer_, details = "Empty data"))
+    }
+    if ("gee_metrics" %in% checks) {
+        empty_checks$gee_metrics <- list(
+            correlation_fit = list(description = "Correlation Structure",
+                status = "? SKIP", details = "Empty data"),
+            cluster_variation = list(description = "Cluster Variation",
+                status = "? SKIP", details = "Empty data"),
+            independence = list(description = "Independence",
+                status = "? SKIP", details = "Empty data"),
+            scale_parameter = list(description = "Scale Parameter",
+                status = "? SKIP", scale = NA_real_, details = "Empty data"))
+    }
+    if ("lmm_metrics" %in% checks) {
+        empty_checks$lmm_metrics <- list(
+            variance_components = list(description = "Variance Components",
+                status = "? SKIP", details = "Empty data"),
+            normality = list(description = "Normality",
+                status = "? SKIP", details = "Empty data"),
+            homogeneity = list(description = "Homogeneity",
+                status = "? SKIP", details = "Empty data"),
+            influence = list(description = "Influence",
+                status = "? SKIP", details = "Empty data"))
+    }
+    if ("fpca_metrics" %in% checks) {
+        empty_checks$fpca_metrics <- list(
+            variance_adequacy = list(description = "Variance Adequacy",
+                status = "? SKIP", details = "Empty data"),
+            bootstrap_stability = list(description = "Bootstrap Stability",
+                status = "? SKIP", details = "Empty data"))
+    }
+
+    obj <- list(
+        overall_summary = "Cannot evaluate assumptions on empty data matrix",
+        summary_stats = list(n_genes = 0, n_samples = 0, entropy_min = NA_real_,
+            entropy_max = NA_real_, entropy_mean = NA_real_,
+            entropy_median = NA_real_, n_missing = 0))
+    class(obj) <- "rank_assumptions"
+    attr(obj, "checks") <- empty_checks
+    obj
+}
+
+#' Check sample exchangeability via permutation test
+#' @noRd
+.check_exchangeability <- function(data, alpha = 0.05) {
+    if (ncol(data) <= 2) {
+        return(list(description = "Sample exchangeability",
+            method = "Insufficient samples (need >= 3)",
+            status = "? SKIP",
+            details = "Requires at least 3 samples to test exchangeability"))
+    }
+
+    consecutive_cors <- vapply(seq_len(ncol(data) - 1), function(i) {
+        stats::cor(data[, i], data[, i + 1], method = "pearson", use = "complete.obs")
+    }, numeric(1))
+    original_stat <- mean(consecutive_cors, na.rm = TRUE)
+
+    n_perms <- 99
+    perm_stats <- numeric(n_perms)
+    for (perm in seq_len(n_perms)) {
+        perm_idx <- sample(seq_len(ncol(data)))
+        perm_data <- data[, perm_idx]
+        perm_cors <- vapply(seq_len(ncol(perm_data) - 1), function(i) {
+            stats::cor(perm_data[, i], perm_data[, i + 1],
+                method = "pearson", use = "complete.obs")
+        }, numeric(1))
+        perm_stats[perm] <- mean(perm_cors, na.rm = TRUE)
+    }
+
+    p_exchangeability <- mean(perm_stats >= original_stat, na.rm = TRUE)
+    interpretation <- if (p_exchangeability > alpha) "exchangeable" else "ordering detected"
+
+    list(description = "Sample exchangeability (serial correlation in sequence)",
+        method = "Permutation test (consecutive sample correlations vs. shuffled)",
+        test_statistic = original_stat, p_value = p_exchangeability,
+        status = interpretation,
+        details = sprintf("p=%s", format(p_exchangeability, scientific = TRUE)))
+}
+
+#' Check monotonicity via Spearman correlation stability
+#' @noRd
+.check_monotonicity <- function(data) {
+    if (nrow(data) <= 1) {
+        return(list(description = "Rank ordering stability",
+            method = "Insufficient rows (need >= 2)",
+            status = "? SKIP",
+            details = "Requires at least 2 rows"))
+    }
+
+    spearman_cors <- numeric(nrow(data) - 1)
+    for (i in seq_len(nrow(data) - 1)) {
+        spearman_cors[i] <- stats::cor(data[i, ], data[i + 1, ],
+            method = "spearman", use = "complete.obs")
+    }
+
+    mean_cor <- mean(spearman_cors, na.rm = TRUE)
+    sd_cor <- stats::sd(spearman_cors, na.rm = TRUE)
+    has_valid <- sum(!is.na(spearman_cors)) > 0
+    min_cor <- if (has_valid) min(spearman_cors, na.rm = TRUE) else NA_real_
+
+    interpretation <- if (!is.na(mean_cor) && is.finite(mean_cor) && mean_cor > 0.7) {
+        "homogeneous"
+    } else if (!is.na(mean_cor) && is.finite(mean_cor) && mean_cor > 0.4) {
+        "moderately heterogeneous"
+    } else if (!is.na(mean_cor) && is.finite(mean_cor)) {
+        "heterogeneous"
+    } else {
+        "? SKIP"
+    }
+
+    list(description = "Rank ordering stability (Spearman correlation across rows)",
+        method = "Pairwise Spearman correlations between consecutive rows",
+        mean_correlation = mean_cor, sd_correlation = sd_cor,
+        min_correlation = min_cor, status = interpretation,
+        details = paste0("r=", .format_table_value(mean_cor)))
+}
+
+#' Check consistency via Kendall's W and ICC
+#' @noRd
+.check_consistency <- function(data) {
+    if (ncol(data) < 2 || nrow(data) < 2) {
+        return(list(description = "Rank consistency evaluation",
+            method = "Insufficient data for consistency test",
+            status = "? SKIP",
+            details = "Requires at least 2 samples and 2 genes"))
+    }
+
+    data_t <- t(data)
+    ranked_data <- apply(data_t, 2, function(x) rank(x, na.last = "keep"))
+    m <- nrow(ranked_data)
+    n <- ncol(ranked_data)
+
+    col_means <- colMeans(ranked_data, na.rm = TRUE)
+    S <- sum((colSums(ranked_data, na.rm = TRUE) - m * col_means)^2, na.rm = TRUE)
+
+    kendall_w <- if (n > 1) 12 * S / (m^2 * (n^3 - n)) else NA_real_
+
+    grand_mean <- mean(data, na.rm = TRUE)
+    between_col_var <- sum((colMeans(data, na.rm = TRUE) - grand_mean)^2,
+        na.rm = TRUE) / (ncol(data) - 1)
+    within_var <- var(as.numeric(data), na.rm = TRUE)
+    icc_simplified <- between_col_var / (between_col_var + within_var)
+
+    status <- if (!is.na(kendall_w) && kendall_w > 0.7) {
+        "high"
+    } else if (!is.na(kendall_w) && kendall_w > 0.4) {
+        "moderate"
+    } else {
+        "low"
+    }
+
+    list(description = "Rank consistency evaluation (Kendall's W & ICC)",
+        method = "Kendall's W concordance coefficient + ICC approximation",
+        kendall_w = kendall_w, icc_simplified = icc_simplified,
+        status = status,
+        details = paste0("W=", .format_table_value(if (is.na(kendall_w)) 0 else kendall_w),
+            ", ICC=", .format_table_value(if (is.na(icc_simplified)) 0 else icc_simplified)))
 }
 
 #' Print method for rank-based assumptions check
