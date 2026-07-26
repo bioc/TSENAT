@@ -716,12 +716,21 @@ col_names <- c(
 )
 colnames(top_genes_display) <- col_names[1:ncol(top_genes_display)]
 
+# Format p-values with scientific notation to avoid displaying 0
+if ("P-value" %in% colnames(top_genes_display)) {
+    top_genes_display[["P-value"]] <- format(
+        top_genes_display[["P-value"]],
+        scientific = TRUE, digits = 3
+    )
+}
+
 # Display the result as a formatted table
 knitr::kable(
     top_genes_display, 
     caption = "**Table 7 | Top 6 Genes by Effect Size (Tsallis Divergence).** Genes ranked by interaction p-value; columns show divergence at key q-values (0.5, 1.0, 2.0) and inferred pattern type (rare-driven, abundant-driven, or balanced).",
     digits = 4,
-    row.names = FALSE
+    row.names = FALSE,
+    format.args = list(scientific = TRUE)
 )
 ```
 

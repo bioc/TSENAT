@@ -337,7 +337,8 @@ if (nrow(rank_sig) > 0) {
     knitr::kable(rank_display, 
                  caption = "**Supplementary Table 16 | Top genes identified by Aligned Rank Transform (ART).** Ranked by adjusted p-value; comparison with GAMM (main vignette Table 3) reveals method-specific sensitivities.",
                  col.names = c("Gene", "P-value", "Adj. P-value", "F-Statistic", 
-                               "Effect Size (η²)", "Interaction Class")[1:ncol(rank_display)])
+                               "Effect Size (η²)", "Interaction Class")[1:ncol(rank_display)],
+                 row.names = FALSE)
   }
 }
 ```
@@ -475,7 +476,8 @@ if ("p_interaction" %in% colnames(sait_results)) {
       knitr::kable(gam_display, 
                    caption = "**Supplementary Table 18 | Top 10 Genes by GAMM p-value (with Effect Size and Test Statistics).** Ranked by adjusted p-value; compare with ART results (Supplementary Table 16) for method agreement assessment.",
                    label = "gam-top-genes",
-                   align = c("l", rep("r", max(0, n_cols - 1))))
+                   align = c("l", rep("r", max(0, n_cols - 1))),
+                   row.names = FALSE)
     }
   }
 } else {
@@ -514,7 +516,8 @@ if (!is.null(concordance_results) && is.list(concordance_results)) {
   if (!is.null(concordance_results$summary_table) && nrow(concordance_results$summary_table) > 0) {
     print(knitr::kable(concordance_results$summary_table, 
                  caption = "**Supplementary Table 19 | Global Concordance Metrics: GAMM vs Aligned Rank Transform (ART).** Quantifies agreement between parametric (GAMM) and non-parametric (ART) approaches for detecting q × condition interactions.",
-                 align = c("l", "r")))
+                 align = c("l", "r"),
+                 row.names = FALSE))
   }
   
   # Display agreement distribution
@@ -522,7 +525,8 @@ if (!is.null(concordance_results) && is.list(concordance_results)) {
     cat("\n")
     print(knitr::kable(concordance_results$agreement_dist, 
                  caption = "**Supplementary Table 20 | Agreement Distribution: Concordance by Gene Category.** Distribution of genes across categories: both methods significant, GAMM only, ART only, and neither method.",
-                 align = c("l", "r", "r")))
+                 align = c("l", "r", "r"),
+                 row.names = FALSE))
   }
   
   # Display high-confidence genes (concordant in both methods)
@@ -531,7 +535,8 @@ if (!is.null(concordance_results) && is.list(concordance_results)) {
     n_hc <- nrow(concordance_results$high_conf_table)
     print(knitr::kable(concordance_results$high_conf_table, 
                  caption = paste0("**Supplementary Table 21 | Robust Entropic Order Index Interactions: High-Confidence Genes Detected by Both Methods (n=", n_hc, ", ranked by statistical significance).** Cross-method validation: genes significant in both GAMM and ART provide strongest evidence for q × condition effects."),
-                 align = c("l", "r", "r", "r", "r")))
+                 align = c("l", "r", "r", "r", "r"),
+                 row.names = FALSE))
   }
 } else {
   cat("Concordance results not available\n")
