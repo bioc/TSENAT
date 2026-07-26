@@ -752,6 +752,9 @@
         # AUDIT FIX #22 + R8: Use explicit paired flag (passed from caller)
         # rather than column-count heuristic. Equal ncol does not guarantee pairing.
         if (isTRUE(paired)) {
+            # Guard: paired bootstrap requires column-aligned matrices
+            # (col j in A must be same subject as col j in B)
+            stopifnot(ncol(counts_A) == ncol(counts_B))
             idx <- sample(seq_len(ncol(counts_A)), size = ncol(counts_A), replace = TRUE)
             idx_A <- idx
             idx_B <- idx

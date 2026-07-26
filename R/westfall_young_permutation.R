@@ -183,7 +183,12 @@
             }, FUN.VALUE = numeric(1))
         }, FUN.VALUE = numeric(length(lambda_grid))))
 
-        # Use bootstrap mean and find stable lambda
+        # Use bootstrap mean and find stable lambda.
+        # NOTE: This selects λ by minimum coefficient of variation (stability),
+        # not by the standard Storey bootstrap criterion (MSE of π₀(λ)).
+        # The stability criterion favors larger λ where the ratio is stable
+        # but may be biased. For the canonical Storey bootstrap, use the
+        # "smoother" method instead.
         pi0_boot_mean <- colMeans(pi0_boot_mat, na.rm = TRUE)
         pi0_boot_sd <- apply(pi0_boot_mat, 2, sd, na.rm = TRUE)
 
@@ -510,7 +515,11 @@
             if (is.list(perm_results) && !is.null(perm_results$statistics)) {
                 perm_stats <- perm_results$statistics
             } else if (is.numeric(perm_results)) {
-                # Fallback: if refit_fn returns just vector, treat as p-values
+                # Fallback: if refit_fn returns just vector, treat as p-values.
+                # WARNING: -log(p) is on a DIFFERENT SCALE than F-statistics.
+                # If any permutation returns F-stats and another returns p-values,
+                # the maxT null distribution will be corrupted. This fallback is
+                # a latent landmine; all callers currently return $statistics.
                 perm_stats <- -log(perm_results + 1e-300)  # Convert to monotonic scale
             } else {
                 stop("refit_fn must return numeric vector or list with $statistics")
@@ -549,7 +558,9 @@
             if (is.list(perm_results) && !is.null(perm_results$statistics)) {
                 perm_stats <- perm_results$statistics
             } else if (is.numeric(perm_results)) {
-                # Fallback: if refit_fn returns just vector, treat as p-values
+                # Fallback: if refit_fn returns just vector, treat as p-values.
+                # WARNING: -log(p) is on a DIFFERENT SCALE than F-statistics.
+                # See parallel-path comment above for full explanation.
                 perm_stats <- -log(perm_results + 1e-300)
             } else {
                 stop("refit_fn must return numeric vector or list with $statistics")

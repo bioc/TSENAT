@@ -244,6 +244,22 @@
         stop("Rank test results ('", rank_method, "') must be a data.frame", call. = FALSE)
     }
 
+    # Handle empty result sets: if either SAIT or rank test produced 0 genes,
+    # return a placeholder concordance result instead of erroring on missing columns
+    if (nrow(gam_results) == 0 || nrow(kw_results) == 0) {
+        warning("[calculate_concordance] One or both result sets are empty ",
+            "(SAIT: ", nrow(gam_results), " genes, rank: ", nrow(kw_results),
+            " genes). No concordance can be computed.", call. = FALSE)
+        return(list(
+            comparison_df = data.frame(),
+            spearman_rho = NA_real_,
+            high_conf = data.frame(),
+            agreement_table = data.frame(),
+            sait_method = sait_method,
+            rank_method = rank_method
+        ))
+    }
+
     # Determine the appropriate p-value column names based on available columns
     sait_p_col <- if ("p_interaction" %in% colnames(gam_results)) {
         "p_interaction"

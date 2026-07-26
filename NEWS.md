@@ -1,3 +1,24 @@
+# TSENAT 0.99.33
+
+* **Statistical implementation audit (July 2026)**: Fixed 22 bugs from systematic review of `sait_*`, `diversity_*`, `divergence_*`, and `entropy_*` modules.
+
+    * **Critical fixes (4)**:
+        * `.hochberg_stepup()` now uses correct Hochberg step-up (`rev(cummin(rev(...)))`) instead of Holm step-down (`cummax`). Matches `p.adjust(..., "hochberg")` exactly.
+        * GEE bias-correction thresholds unified from mixed `<20`/`<30` to consistent `<30`.
+        * Kauermann-Carroll HC1 multiplier now actually applied — `vcov(fit_alt)` and `coef_value` passed to `.kc_bias_correct()`.
+        * Bootstrap CIs no longer invalidated by cross-gene normalization — remain on raw divergence scale.
+
+    * **High-impact fixes (7)**:
+        * `(method, regularization)` validation prevents `match.arg` errors with incompatible combos.
+        * AR(1) design-effect replaced asymptotic formula with correct finite-m form; dead duplicate removed.
+        * Westfall-Young permutation preserves paired structure (permutes within subjects).
+        * ARIMA differencing uses `group[-1]` to preserve both condition levels.
+        * `log_base` threaded through diversity computation chain (was silently nats).
+        * `method="bca"` warns and reports `"percentile"` instead of silently substituting.
+        * `log_odds_ratio` uses data-driven column-maximum normalization.
+
+    * **Other fixes (11)**: Removed ~280 lines dead stationarity code; standardized `min_obs`; exposed `corstr="auto"`; FPCA MANOVA returns `NA` on failure; AR(1) ρ pooled within-cluster; q=0 divergence is support-difference; paired bootstrap warns on fallback; concordance handles empty results; plus 4 low-severity robustness fixes.
+
 # TSENAT 0.99.31
 
 * **Aligned Rank Transform (ART)**: `calculate_rank_transform()` now defaults to the Aligned Rank Transform via the ARTool package (Kay et al. 2021) for proper non-parametric interaction testing. ART strips main effects before ranking ("alignment"), preserving interaction structure — a known limitation of classical rank-transform methods. The Conover-Iman Rank Transform remains available via `method='rt'`. ARTool added to Imports.

@@ -100,14 +100,14 @@ test_that("estimate_pseudocount handles sparse counts", {
   expect_true(all(result$size_factors > 0))
 })
 
-test_that("estimate_pseudocount handles all-zero matrix", {
+test_that("estimate_pseudocount rejects all-zero matrix (P5 validation)", {
   counts <- matrix(0, nrow = 3, ncol = 3)
   
-  result <- .estimate_pseudocount(counts, verbose = FALSE)
-  
-  # Should still return valid structure
-  expect_equal(length(result$size_factors), 3)
-  expect_is(result$scalar_pseudocount, "numeric")
+  # July 2026: All-zero input now correctly rejected with defensive validation
+  expect_error(
+    .estimate_pseudocount(counts, verbose = FALSE),
+    "All counts are zero"
+  )
 })
 
 test_that("estimate_pseudocount rejects invalid input", {
@@ -144,6 +144,78 @@ test_that("estimate_pseudocount scales appropriately with sequencing depth", {
   
   # Larger library size should result in larger pseudocount
   expect_true(result_large$scalar_pseudocount > result_small$scalar_pseudocount)
+})
+
+# ============================================================================
+# P5 DEFENSIVE VALIDATION TESTS (July 2026: metrics.json risk=100 coverage)
+# ============================================================================
+
+context("Pseudocount Estimation: Defensive Validation (P5)")
+
+test_that("estimate_pseudocount rejects zero-dimension input", {
+  expect_error(
+    .estimate_pseudocount(matrix(numeric(0), nrow = 0, ncol = 3), verbose = FALSE),
+    "zero dimensions"
+  )
+  expect_error(
+    .estimate_pseudocount(matrix(numeric(0), nrow = 3, ncol = 0), verbose = FALSE),
+    "zero dimensions"
+  )
+})
+
+test_that("estimate_pseudocount rejects NA/NaN/Inf values", {
+  counts_na <- matrix(c(10, NA, 3, 20, 8, 3), nrow = 2, ncol = 3)
+  expect_error(
+    .estimate_pseudocount(counts_na, verbose = FALSE),
+    "NA and.*infinite"
+  )
+  
+  counts_inf <- matrix(c(10, Inf, 3, 20, 8, 3), nrow = 2, ncol = 3)
+  expect_error(
+    .estimate_pseudocount(counts_inf, verbose = FALSE),
+    "infinite"
+  )
+})
+
+test_that("estimate_pseudocount rejects negative values", {
+  counts_neg <- matrix(c(10, -5, 3, 20, 8, 3), nrow = 2, ncol = 3)
+  expect_error(
+    .estimate_pseudocount(counts_neg, verbose = FALSE),
+    "negative"
+  )
+})
+
+test_that("estimate_pseudocount rejects all-zero data", {
+  counts_zero <- matrix(0, nrow = 3, ncol = 3)
+  expect_error(
+    .estimate_pseudocount(counts_zero, verbose = FALSE),
+    "All counts are zero"
+  )
+})
+
+test_that("estimate_pseudocount rejects samples with zero total counts", {
+  # Column 3 is all zeros — must use byrow=TRUE for readable construction
+  counts <- matrix(c(10, 20, 5, 8, 0, 0), nrow = 2, ncol = 3)
+  expect_error(
+    .estimate_pseudocount(counts, verbose = FALSE),
+    "zero total counts"
+  )
+})
+
+test_that("estimate_pseudocount warns on singleton dimensions", {
+  # Single gene
+  counts_1gene <- matrix(c(10, 20, 30), nrow = 1, ncol = 3)
+  expect_warning(
+    .estimate_pseudocount(counts_1gene, verbose = FALSE),
+    "Only 1 gene"
+  )
+  
+  # Single sample
+  counts_1sample <- matrix(c(10, 20, 30), nrow = 3, ncol = 1)
+  expect_warning(
+    .estimate_pseudocount(counts_1sample, verbose = FALSE),
+    "Only 1 sample"
+  )
 })
 
 context("Diversity Normalization: Standardized Metrics (Feature #7)")
@@ -803,8 +875,9 @@ test_that(".normalize_log_odds_ratio handles zero values", {
     q = 1
   )
   
-  # Zero entropy doesn't meet s_vals > 0 condition, remains unchanged at 0
-  expect_equal(result[1, 1], 0.0)
+  # Zero entropy: floored at log(1e-10) ≈ -23 (L4 fix, July 2026)
+  # Previously left as raw 0, which silently mixed units in the output matrix
+  expect_equal(result[1, 1], log(1e-10), tolerance = 1e-6)
   expect_true(is.finite(result[2, 1]))
   expect_true(is.finite(result[3, 1]))
 })
@@ -1094,5 +1167,57 @@ test_that(".apply_original_coldata handles zero-column SE", {
   )
   result <- TSENAT:::.apply_original_coldata(result_se, original_se)
   expect_is(result, "SummarizedExperiment")
+})
+
+# ============================================================================
+# P5 DEFENSIVE VALIDATION: .suggest_min_count edge cases (July 2026)
+# ============================================================================
+
+context("Minimum Count Filtering: Defensive Validation (P5)")
+
+test_that("suggest_min_count rejects zero-dimension input", {
+  expect_error(
+    .suggest_min_count(matrix(numeric(0), nrow = 0, ncol = 3), verbose = FALSE),
+    "zero dimensions"
+  )
+  expect_error(
+    .suggest_min_count(matrix(numeric(0), nrow = 3, ncol = 0), verbose = FALSE),
+    "zero dimensions"
+  )
+})
+
+test_that("suggest_min_count warns when all genes have zero counts", {
+  counts_zero <- matrix(0, nrow = 5, ncol = 3)
+  expect_warning(
+    result <- .suggest_min_count(counts_zero, percentile = 0.5, verbose = FALSE),
+    "All genes have zero"
+  )
+  expect_equal(result, 0)
+})
+
+test_that("suggest_min_count warns when >50% genes have zero counts", {
+  # 4 out of 6 genes have zero counts (66.7%)
+  counts <- matrix(c(
+    rep(100, 9),   # 3 genes with data
+    rep(0, 9)      # 3 genes with zeros
+  ), nrow = 6, ncol = 3, byrow = TRUE)
+  # This is only 50% zeros, need >50%... let me adjust
+  counts <- matrix(c(
+    rep(100, 6),   # 2 genes with data
+    rep(0, 12)     # 4 genes with zeros
+  ), nrow = 6, ncol = 3, byrow = TRUE)
+  expect_warning(
+    .suggest_min_count(counts, percentile = 0.5, verbose = FALSE),
+    "zero total counts"
+  )
+})
+
+test_that("suggest_min_count warns on single-gene input", {
+  counts_1gene <- matrix(c(10, 20, 30), nrow = 1, ncol = 3)
+  expect_warning(
+    result <- .suggest_min_count(counts_1gene, percentile = 0.5, verbose = FALSE),
+    "Only 1 gene"
+  )
+  expect_equal(result, 60)  # 10 + 20 + 30
 })
 

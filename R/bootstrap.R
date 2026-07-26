@@ -1,4 +1,87 @@
 # ============================================================================
+# SHARED BOOTSTRAP INPUT VALIDATION (July 2026: metrics.json refactoring)
+# ============================================================================
+
+#' Validate bootstrap input data
+#'
+#' Centralized validation for all bootstrap C++ wrappers. Eliminates duplicated
+#' validation logic across `bootstrap.R` and `bootstrap_divergence.R`.
+#' Handles common checks: zero-length, NA/Inf, negative values, all-zero,
+#' paired even-length, and vector pseudocount validation.
+#'
+#' @param x Numeric vector. Primary data for validation.
+#' @param context Character. Label for error messages (e.g., "paired bootstrap").
+#' @param paired Logical. If TRUE, validates even-length requirement for paired designs.
+#' @param pseudocount Numeric vector or scalar. If vector, validated against x length.
+#' @param allow_empty Logical. If TRUE, empty vectors pass validation (for edge cases).
+#'
+#' @return Invisibly returns the (possibly adjusted) x. Throws on validation failure.
+#'
+#' @noRd
+.validate_bootstrap_input <- function(x, context = "bootstrap", paired = FALSE,
+    pseudocount = 0, allow_empty = FALSE) {
+    # NULL guard: treat as empty (as.numeric(NULL) → numeric(0))
+    if (is.null(x)) {
+        if (allow_empty) return(invisible(numeric(0)))
+        stop("For ", context, ", input vector cannot be empty")
+    }
+
+    # Type check: reject non-numeric before silent coercion
+    if (!is.numeric(x)) {
+        stop("For ", context, ", input must be numeric")
+    }
+
+    # Defensive copy to prevent accidental modification of caller's data
+    x <- as.numeric(x)
+
+    # Zero-length check (numeric(0) from empty numeric input)
+    if (length(x) == 0) {
+        if (allow_empty) return(invisible(x))
+        stop("For ", context, ", input vector cannot be empty")
+    }
+
+    # NA/Inf check
+    na_count <- sum(is.na(x))
+    inf_count <- sum(is.infinite(x))
+    if (na_count > 0) {
+        warning("Input vector contains ", na_count, " NA values. ",
+                "These will affect bootstrap resampling. ",
+                "Consider removing NA values before calling ", context, ".")
+    }
+    if (inf_count > 0) {
+        stop("For ", context, ", input vector contains ", inf_count,
+             " infinite values. Cannot compute meaningful estimates.")
+    }
+
+    # Negative values check
+    neg_count <- sum(x < 0, na.rm = TRUE)
+    if (neg_count > 0) {
+        stop("For ", context, ", input contains ", neg_count,
+             " negative values. Count data must be non-negative.")
+    }
+
+    # All-zero check
+    if (all(x == 0, na.rm = TRUE)) {
+        stop("All values in ", context, " data are zero. ",
+             "Cannot compute meaningful entropy/divergence estimates.")
+    }
+
+    # Paired: even-length requirement
+    if (paired && length(x) %% 2 != 0) {
+        stop("For ", context, " with paired=TRUE, input vector must have ",
+             "even length (pairs). Got length=", length(x),
+             ". Please verify pairing structure.")
+    }
+
+    # Vector pseudocount validation
+    if (length(pseudocount) > 1 && length(pseudocount) != length(x)) {
+        stop("For ", context, ", pseudocount must have length 1 or equal to x length")
+    }
+
+    invisible(x)
+}
+
+# ============================================================================
 # C++ BOOTSTRAP WRAPPERS (Optimized resampling)
 # ============================================================================
 
@@ -26,24 +109,10 @@
 #' @noRd
 block_bootstrap_compute_cpp_wrapper <- function(x, q = 1, normalize = TRUE, nboot = 1000L,
     log_base = exp(1), pseudocount = 0) {
-    # AUDIT FIX July 2026: Defensive copy (see bootstrap_compute_cpp_wrapper).
+    # Centralized validation via shared helper (July 2026 refactoring)
+    .validate_bootstrap_input(x, context = "paired block bootstrap", paired = TRUE,
+        pseudocount = pseudocount)
     x <- as.numeric(x)
-
-    # Comprehensive paired data validation
-    if (length(x) == 0) {
-        stop("For paired bootstrap, input vector cannot be empty")
-    }
-    if (length(x)%%2 != 0) {
-        stop("For paired bootstrap, input vector must have even length (pairs). Got length=",
-             length(x), ". Please verify pairing structure.")
-    }
-    if (any(is.na(x))) {
-        warning("Input vector contains NA values. These will affect bootstrap resampling. ",
-                "Consider removing NA values before calling paired bootstrap.")
-    }
-    if (all(x == 0, na.rm = TRUE)) {
-        stop("All values in paired bootstrap data are zero. Cannot compute meaningful entropy estimates.")
-    }
 
     # Handle vector pseudocount
     if (length(pseudocount) > 1) {
@@ -90,10 +159,9 @@ block_bootstrap_compute_cpp_wrapper <- function(x, q = 1, normalize = TRUE, nboo
 #' @noRd
 bootstrap_compute_cpp_wrapper <- function(x, q = 1, normalize = TRUE, nboot = 1000L,
     log_base = exp(1), pseudocount = 0) {
-    # AUDIT FIX July 2026: Defensive copy to prevent accidental modification
-    # of caller's data when vector pseudocount is applied. While R's
-    # copy-on-write semantics protect the caller in most cases, explicit
-    # copying makes the intent clear and prevents edge cases with references.
+    # Centralized validation via shared helper (July 2026 refactoring)
+    .validate_bootstrap_input(x, context = "standard bootstrap",
+        pseudocount = pseudocount)
     x <- as.numeric(x)
 
     # Handle vector pseudocount by converting to scalar (sum per-element
@@ -174,17 +242,9 @@ bootstrap_replicate_cpp_wrapper <- function(counts, q = 1, normalize = TRUE, nbo
 #' @noRd
 divergence_bootstrap_compute_cpp_wrapper <- function(x, y, q = 1, nboot = 1000L,
     paired = FALSE, pseudocount = 0, log_base = exp(1)) {
-    # Input validation
-    if (!is.numeric(x) || !is.numeric(y)) {
-        stop("x and y must be numeric vectors")
-    }
-    if (length(x) != length(y)) {
-        stop("x and y must have the same length. Got length(x)=", length(x),
-             ", length(y)=", length(y), ". ",
-             "For mixed paired/unpaired designs, use divergence_bootstrap_flexible_cpp_wrapper instead.")
-    }
-    if (any(x < 0, na.rm = TRUE) || any(y < 0, na.rm = TRUE)) {
-        stop("x and y must contain non-negative values only")
+    # Divergence-specific validation (must precede shared validation)
+    if (!is.logical(paired) || length(paired) != 1) {
+        stop("paired must be a single logical value")
     }
     if (!is.numeric(q) || q < 0) {
         stop("q must be a non-negative numeric value")
@@ -192,11 +252,18 @@ divergence_bootstrap_compute_cpp_wrapper <- function(x, y, q = 1, nboot = 1000L,
     if (!is.integer(nboot) || nboot < 1) {
         stop("nboot must be a positive integer")
     }
-    if (!is.logical(paired) || length(paired) != 1) {
-        stop("paired must be a single logical value")
-    }
-    if (paired && length(x)%%2 != 0) {
-        stop("For paired=TRUE, x and y must have even length (n_pairs * 2)")
+
+    # Centralized validation via shared helper (July 2026 refactoring)
+    .validate_bootstrap_input(x, context = "divergence bootstrap (x)", paired = paired,
+        pseudocount = pseudocount)
+    .validate_bootstrap_input(y, context = "divergence bootstrap (y)", paired = paired,
+        pseudocount = pseudocount)
+
+    # Cross-validation between x and y
+    if (length(x) != length(y)) {
+        stop("x and y must have the same length. Got length(x)=", length(x),
+             ", length(y)=", length(y), ". ",
+             "For mixed paired/unpaired designs, use divergence_bootstrap_flexible_cpp_wrapper instead.")
     }
 
     # Handle vector pseudocount

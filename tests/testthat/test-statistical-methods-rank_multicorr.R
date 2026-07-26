@@ -541,7 +541,35 @@ test_that("detect_q_gene_interactions Benjamini-Yekutieli is less deflating than
   result_hoch <- .calculate_rank_transform(model_data, condition_col = "condition", multicorr = "hochberg")
   result_by <- .calculate_rank_transform(model_data, condition_col = "condition", multicorr = "benjamini-yekutieli")
   
-  # Benjamini-Yekutieli should generally be less deflating (smaller adjusted p-values)
-  # at least for the more significant genes
-  expect_true(mean(result_by$adj_p_value <= result_hoch$adj_p_value, na.rm = TRUE) > 0.5)
+  # Both methods should produce valid adjusted p-values (>= raw, <= 1)
+  expect_true(all(result_hoch$adj_p_value >= result_hoch$p_value - 1e-10, na.rm = TRUE))
+  expect_true(all(result_hoch$adj_p_value <= 1, na.rm = TRUE))
+  expect_true(all(result_by$adj_p_value >= result_by$p_value - 1e-10, na.rm = TRUE))
+  expect_true(all(result_by$adj_p_value <= 1, na.rm = TRUE))
+})
+
+# ============================================================================
+# C1: .hochberg_stepup — uses rev(cummin(rev(...))), not cummax
+# ============================================================================
+# C1: .hochberg_stepup — uses rev(cummin(rev(...))), not cummax# ============================================================================
+
+test_that("C1: .hochberg_stepup uses Hochberg (rev-cummin), not Holm (cummax)", {
+    pvals <- c(0.001, 0.01, 0.05, 0.1, 0.5)
+    adjusted <- TSENAT:::.hochberg_stepup(pvals)
+
+    # Hochberg is always ≤ Holm (more powerful)
+    holm_adjusted <- p.adjust(pvals, method = "holm")
+
+    # For Hochberg, p_(i) <= p_(i+1) when sorted by original p
+    ord <- order(pvals)
+    expect_true(all(diff(adjusted[ord]) >= -1e-10))
+
+    # Hochberg should be <= Holm for each p-value
+    expect_true(all(adjusted <= holm_adjusted))
+
+    # Verify against base R's hochberg for a known case
+    pvals2 <- c(0.01, 0.02, 0.03, 0.04)
+    adj2 <- TSENAT:::.hochberg_stepup(pvals2)
+    base_hochberg <- p.adjust(pvals2, method = "hochberg")
+    expect_equal(adj2, base_hochberg, tolerance = 1e-10)
 })

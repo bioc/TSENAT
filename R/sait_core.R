@@ -246,7 +246,7 @@
     "gam", "fpca", "gee"), pvalue = c("satterthwaite", "lrt", "both"), subject_col = NULL,
     paired = FALSE, nthreads = 1, assay_name = "diversity", pcorr = "BH", verbose = FALSE,
     bias_correction = TRUE, regularization = c("pca", "lasso", "elasticnet", "gamsel",
-        "spline"), corstr = c("ar1", "exchangeable", "independence"), multicorr = c("hochberg",
+        "spline"), corstr = c("ar1", "exchangeable", "independence", "auto"), multicorr = c("hochberg",
         "westfall-young", "benjamini-yekutieli"), storey = FALSE, wy_randomizations = 1000,
     adaptive_knots = TRUE, return_model_data = FALSE) {
     
@@ -339,11 +339,44 @@
     # STAGE 4: RESULTS PROCESSING & RETURN
     # ========================================================================
     
+    .finalize_sait_results(res = res, mat = mat, se = se, metadata = metadata,
+        method = method, pvalue = pvalue, subject_col = subject_col,
+        paired = paired, min_obs = min_obs, nthreads = nthreads,
+        bias_correction = bias_correction, regularization = regularization,
+        corstr = corstr, adaptive_knots = adaptive_knots,
+        multicorr = multicorr, wy_randomizations = wy_randomizations,
+        storey = storey, verbose = verbose,
+        return_model_data = return_model_data, assay_name = assay_name)
+}
+
+# ============================================================================
+# STAGE 4 (EXTRACTED): Finalize SAIT results
+# ============================================================================
+
+#' Finalize SAIT results: validate, adjust p-values, sort, annotate, post-process
+#'
+#' Extracted from `.calculate_sait()` to reduce cyclomatic complexity
+#' (July 2026 refactoring per metrics.json health=53.2, complexity=56.3).
+#' Handles all post-fitting operations in a single testable unit.
+#'
+#' @noRd
+.finalize_sait_results <- function(res, mat, se, metadata, method, pvalue,
+    subject_col, paired, min_obs, nthreads, bias_correction, regularization,
+    corstr, adaptive_knots, multicorr, wy_randomizations, storey, verbose,
+    return_model_data, assay_name) {
+    
     if (!is.data.frame(res)) {
         stop(".fit_all_genes() should return a data.frame", call. = FALSE)
     }
     
     if (nrow(res) == 0) {
+        # Ensure empty results still have standard SAIT columns for downstream compatibility
+        empty_cols <- c("gene", "p_interaction", "adj_p_interaction", "n_clusters",
+            "bias_correction_applied", "design_effect_ar1", "kc_bias_correction_applied",
+            "kc_multiplier", "n_effective", "ci_weighted", "slope_diff")
+        for (col in setdiff(empty_cols, colnames(res))) {
+            res[[col]] <- logical(0)
+        }
         return(res)
     }
     

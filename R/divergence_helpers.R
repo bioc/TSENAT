@@ -267,11 +267,15 @@
     # control and treatment have equal sizes (required for divergence
     # computation)
     if (length(resampled_control) != length(resampled_treatment)) {
-        stop("Paired bootstrap produced unequal group sizes (", length(resampled_control),
-            " control vs ", length(resampled_treatment), " treatment). ", "Check for unbalanced or incomplete pairs in input data.")
+        warning("Paired bootstrap produced unequal group sizes (", length(resampled_control),
+            " control vs ", length(resampled_treatment), " treatment). ",
+            "Skipping this bootstrap replicate. Check for unbalanced or incomplete pairs in input data.")
+        return(list(control_resampled = numeric(0), treatment_resampled = numeric(0),
+            failed = TRUE))
     }
 
-    return(list(control_resampled = resampled_control, treatment_resampled = resampled_treatment))
+    return(list(control_resampled = resampled_control, treatment_resampled = resampled_treatment,
+        failed = FALSE))
 }
 
 
@@ -447,9 +451,11 @@
             lower_ci <- stats::quantile(bootstrap_dist, probs = alpha, names = FALSE)
             upper_ci <- stats::quantile(bootstrap_dist, probs = 1 - alpha, names = FALSE)
         } else if (method == "bca") {
-            # BCA not appropriate for divergence (requires two-sample
-            # jackknife) Fall back to percentile method which is valid for any
-            # divergence
+            # BCa not appropriate for divergence (requires two-sample
+            # jackknife). Fall back to percentile method with warning.
+            warning("BCa bootstrap not available for divergence (requires ",
+                "two-sample jackknife acceleration). Falling back to percentile method.",
+                call. = FALSE)
             lower_ci <- stats::quantile(bootstrap_dist, probs = alpha, names = FALSE)
             upper_ci <- stats::quantile(bootstrap_dist, probs = 1 - alpha, names = FALSE)
         }
@@ -459,7 +465,10 @@
     }
 
     return(list(estimate = point_est, lower_ci = lower_ci, upper_ci = upper_ci, q = q,
-        nboot = nboot, method = if (nboot > 0) method else NA_character_))
+        nboot = nboot,
+        method = if (nboot > 0) {
+            if (method == "bca") "percentile" else method
+        } else NA_character_))
 }
 
 
@@ -510,11 +519,17 @@
     # applied correctly for all q values
 
     if (abs(q_val) < 0.01) {
-        # q=0: Tsallis divergence D_0(p||r) = (1/(0-1)) * (1 - sum(p^0 * r^1))
-        # = -1 * (1 - sum(1 * r)) = -1 * (1 - 1) = 0 (always 0 for any
-        # distributions) This is mathematically correct: at q=0, all
-        # probability distributions have equal 'divergence'
-        div <- 0
+        # q=0: Support-difference divergence.
+        # D_0(p||r) = |supp(p) Δ supp(r)| / |supp(p) ∪ supp(r)|
+        # where supp(·) = {i : prob_i > 0} after pseudocount threshold.
+        # This measures what fraction of isoforms are present in one
+        # distribution but not the other (Jaccard-style).
+        min_pos <- 1e-10
+        supp_p <- p > min_pos
+        supp_r <- r > min_pos
+        n_sym_diff <- sum(xor(supp_p, supp_r))
+        n_union <- sum(supp_p | supp_r)
+        div <- if (n_union > 0) n_sym_diff / n_union else 0
     } else if (abs(q_val - 1) < 0.01) {
         # KL divergence (special case q -> 1): lim_{q->1} D_q = sum(p*log(p/r))
         div <- sum(p * log(p/r), na.rm = TRUE)
@@ -631,8 +646,13 @@
 
         # Special cases
         if (abs(q_val) < 0.01) {
-            # q=0: Always 0
-            result[j] <- 0
+            # q=0: Support-difference divergence (Jaccard-style)
+            min_pos <- 1e-10
+            supp_p <- p > min_pos
+            supp_r <- r > min_pos
+            n_sym_diff <- sum(xor(supp_p, supp_r))
+            n_union <- sum(supp_p | supp_r)
+            result[j] <- if (n_union > 0) n_sym_diff / n_union else 0
         } else if (abs(q_val - 1) < 0.01) {
             # q=1: KL divergence
             result[j] <- sum(p * log(p/r), na.rm = TRUE)

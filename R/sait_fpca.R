@@ -489,10 +489,12 @@
             if (!inherits(man, "try-error") && length(man) >= 4) {
                 p_interaction <- man[[4]][1, "Pr(>F)"]
             } else {
-                p_interaction <- if (length(pc_pvals_valid) > 0) min(pc_pvals_valid) else 1
+                # MANOVA failed: return NA rather than invalid min-p across correlated PCs
+                p_interaction <- NA_real_
             }
         } else {
-            p_interaction <- if (length(pc_pvals_valid) > 0) min(pc_pvals_valid) else 1
+            # Insufficient samples for MANOVA: return NA
+            p_interaction <- NA_real_
         }
     } else {
         # >2 groups: use MANOVA
@@ -504,10 +506,12 @@
             if (!inherits(man, "try-error") && length(man) >= 4) {
                 p_interaction <- man[[4]][1, "Pr(>F)"]
             } else {
-                p_interaction <- if (length(pc_pvals_valid) > 0) min(pc_pvals_valid) else 1
+                # MANOVA failed: return NA
+                p_interaction <- NA_real_
             }
         } else {
-            p_interaction <- if (length(pc_pvals_valid) > 0) min(pc_pvals_valid) else 1
+            # Insufficient samples for MANOVA: return NA
+            p_interaction <- NA_real_
         }
     }
     p_interaction <- min(p_interaction, 1)

@@ -52,10 +52,11 @@
         adjusted_valid[na_idx] <- 1
     }
 
-    # Monotone increasing constraint (Hochberg stepup)
-    # Vectorized using cummax per Bioconductor efficiency standards
+    # Hochberg stepup: \tilde p_{(i)} = min_{k >= i} (m - k + 1) * p_{(k)}
+    # This is a REVERSE cumulative minimum (not forward cummax which is Holm)
+    # Reference: Hochberg (1988), "A sharper Bonferroni procedure"
     if (valid_m > 1) {
-        adjusted_valid <- cummax(adjusted_valid)
+        adjusted_valid <- rev(cummin(rev(adjusted_valid)))
     }
 
     # Map adjusted back to original positions

@@ -674,6 +674,10 @@
     # thresholds (0.01 small, 0.06 medium, 0.14 large) apply to original-scale
     # eta-squared, not rank-scale.
     # AUDIT FIX July 2026: Compute eta2 on raw entropy via separate ANOVA.
+    # NOTE: This uses lm() without a subject/block term. For paired designs,
+    # the eta² from this model is NOT comparable to the (paired) F-test because
+    # it ignores within-subject correlation. The "Strongly q-dependent"
+    # classification (eta² > 0.10) uses this un-paired effect size.
     gene_data$q_factor <- factor(gene_data$q)
     gene_data$condition_factor <- factor(gene_data$condition)
     raw_model <- tryCatch(

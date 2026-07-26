@@ -475,7 +475,9 @@
             slope_diff = numeric(0), effect_size_D = numeric(0), D_lower_ci = numeric(0),
             D_upper_ci = numeric(0), stringsAsFactors = FALSE)
     } else {
-        q_labels <- gsub("\\.", "_", sprintf("%.1f", q_values))
+        # Use as.character() for consistency with .formatMultiQResult() column naming.
+        # This ensures column names match between empty template and populated rows.
+        q_labels <- gsub("\\.", "_", as.character(q_values))
         estimate_cols <- paste0("effect_size_D_q", q_labels)
         lower_cols <- paste0("D_q", q_labels, "_lower_ci")
         upper_cols <- paste0("D_q", q_labels, "_upper_ci")

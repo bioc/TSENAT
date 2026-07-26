@@ -1147,9 +1147,14 @@ print.assumptions_text <- function(x, ...) {
     comparison_df <- result$comparison_df
     spearman_rho <- result$spearman_rho %||% NA
     high_conf <- result$high_conf %||% data.frame()
-    agreement_table <- result$agreement_table %||% table()
+    agreement_table <- result$agreement_table %||% data.frame()
 
     n_total <- nrow(comparison_df)
+
+    # Guard: empty comparison means no concordance was computable
+    if (n_total == 0 || !is.data.frame(comparison_df)) {
+        return("[calculate_concordance] No genes available for comparison. Ensure SAIT and rank test results contain common genes.")
+    }
 
     # Calculate agreement statistics
     both_sig <- sum(comparison_df$agreement == "Both significant", na.rm = TRUE)

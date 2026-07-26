@@ -32,7 +32,8 @@
 #'   If NULL, uses method from @config or base function defaults.
 #' @param corstr \code{character} or  \code{NULL}.  Correlation structure for 
 #' GEE models.
-#'   Options: 'ar1', 'exchangeable', 'independence'.
+#'   Options: 'ar1', 'exchangeable', 'independence', 'auto'.
+#'   'auto' selects the best structure via QIC.
 #'   If NULL, uses method from @config or base function defaults.
 #' @param pcorr \code{character} or \code{NULL}. P-value correction method.
 #'   Default: 'BH' (Benjamini-Hochberg).

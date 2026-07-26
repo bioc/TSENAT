@@ -1371,22 +1371,6 @@ test_that("GAM bias correction is applied for small samples", {
     })
 })
 
-test_that(".gam_bias_correct removed — bias correction deleted (audit fix #8)", {
-    skip(".gam_bias_correct was removed — the ad-hoc p-value multiplier had no theoretical basis")
-})
-
-test_that("GAM bias correction removed — scaling test skipped", {
-    skip(".gam_bias_correct was removed (audit fix #8)")
-})
-
-test_that("GAM bias correction removed — NA p-value test skipped", {
-    skip(".gam_bias_correct was removed (audit fix #8)")
-})
-
-test_that("GAM bias correction removed — FALSE parameter test skipped", {
-    skip(".gam_bias_correct was removed (audit fix #8)")
-})
-
 # =============================================================================
 # TESTS: .prepare_gam_preprocessing (NEW HELPER FUNCTION)
 # =============================================================================
@@ -1916,18 +1900,6 @@ test_that("Bias correction consistency with paired GAM", {
         expect_is(result, "data.frame")
         expect_true(nrow(result) >= 0)
     })
-})
-
-test_that("GAM bias correction removed — p-value capping test skipped", {
-    skip(".gam_bias_correct was removed (audit fix #8)")
-})
-
-test_that("GAM bias correction removed — metadata test skipped", {
-    skip(".gam_bias_correct was removed (audit fix #8)")
-})
-
-test_that("GAM bias correction removed — method ID test skipped", {
-    skip(".gam_bias_correct was removed (audit fix #8)")
 })
 
 # ==============================================================================

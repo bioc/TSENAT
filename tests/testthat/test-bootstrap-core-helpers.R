@@ -875,3 +875,109 @@ test_that("calculate_divergence with pseudocount parameter", {
   expect_result_structure(result, "SummarizedExperiment", n_rows = 2)
 })
 
+# ============================================================================
+# P2: SHARED BOOTSTRAP VALIDATION TESTS (July 2026: metrics.json refactoring)
+# ============================================================================
+
+context("Bootstrap: Shared Input Validation (.validate_bootstrap_input)")
+
+test_that(".validate_bootstrap_input accepts valid input silently", {
+  x <- c(10, 20, 30, 40)
+  expect_no_error(
+    TSENAT:::.validate_bootstrap_input(x, context = "test")
+  )
+  expect_no_error(
+    TSENAT:::.validate_bootstrap_input(x, context = "test", paired = TRUE)
+  )
+})
+
+test_that(".validate_bootstrap_input returns invisible x", {
+  x <- c(10, 20, 30, 40)
+  result <- TSENAT:::.validate_bootstrap_input(x, context = "test")
+  expect_equal(result, x)
+})
+
+test_that(".validate_bootstrap_input rejects empty vector", {
+  expect_error(
+    TSENAT:::.validate_bootstrap_input(numeric(0), context = "test"),
+    "input vector cannot be empty"
+  )
+})
+
+test_that(".validate_bootstrap_input allows empty with allow_empty=TRUE", {
+  expect_no_error(
+    TSENAT:::.validate_bootstrap_input(numeric(0), context = "test", allow_empty = TRUE)
+  )
+})
+
+test_that(".validate_bootstrap_input warns on NA values", {
+  x <- c(10, NA, 30, 40)
+  expect_warning(
+    TSENAT:::.validate_bootstrap_input(x, context = "test"),
+    "NA values"
+  )
+})
+
+test_that(".validate_bootstrap_input rejects Inf values", {
+  x <- c(10, Inf, 30, 40)
+  expect_error(
+    TSENAT:::.validate_bootstrap_input(x, context = "test"),
+    "infinite"
+  )
+})
+
+test_that(".validate_bootstrap_input rejects negative values", {
+  x <- c(10, -5, 30, 40)
+  expect_error(
+    TSENAT:::.validate_bootstrap_input(x, context = "test"),
+    "negative"
+  )
+})
+
+test_that(".validate_bootstrap_input rejects all-zero vector", {
+  x <- c(0, 0, 0, 0)
+  expect_error(
+    TSENAT:::.validate_bootstrap_input(x, context = "test"),
+    "All values.*are zero"
+  )
+})
+
+test_that(".validate_bootstrap_input rejects odd-length paired input", {
+  x <- c(10, 20, 30)  # odd length
+  expect_error(
+    TSENAT:::.validate_bootstrap_input(x, context = "test", paired = TRUE),
+    "even length"
+  )
+})
+
+test_that(".validate_bootstrap_input accepts even-length paired input", {
+  x <- c(10, 20, 30, 40)
+  expect_no_error(
+    TSENAT:::.validate_bootstrap_input(x, context = "test", paired = TRUE)
+  )
+})
+
+test_that(".validate_bootstrap_input validates pseudocount vector length", {
+  x <- c(10, 20, 30, 40)
+  expect_error(
+    TSENAT:::.validate_bootstrap_input(x, context = "test",
+        pseudocount = c(1, 2, 3)),  # wrong length
+    "pseudocount must have length 1 or equal to x length"
+  )
+})
+
+test_that(".validate_bootstrap_input accepts scalar pseudocount", {
+  x <- c(10, 20, 30, 40)
+  expect_no_error(
+    TSENAT:::.validate_bootstrap_input(x, context = "test", pseudocount = 1)
+  )
+})
+
+test_that(".validate_bootstrap_input accepts vector pseudocount of correct length", {
+  x <- c(10, 20, 30, 40)
+  expect_no_error(
+    TSENAT:::.validate_bootstrap_input(x, context = "test",
+        pseudocount = c(1, 2, 3, 4))
+  )
+})
+

@@ -530,3 +530,59 @@ test_that("Metadata correctly reports LM filtering statistics", {
   # Number of filtered genes should be > 0
   expect_gte(meta$sait_genes_filtered, 1)
 })
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# AUDIT FIX H3: Paired bootstrap requires column-aligned matrices
+# ═══════════════════════════════════════════════════════════════════════════════
+
+test_that("compute_delta_statistics asserts equal ncol for paired bootstrap (H3 fix)", {
+  skip_on_bioc()
+  
+  # Create counts with different column counts for A and B
+  counts_A <- matrix(rpois(30, lambda = 15), nrow = 3, ncol = 10)
+  counts_B <- matrix(rpois(24, lambda = 15), nrow = 3, ncol = 8)
+  delta_influence <- c(0.1, -0.05, 0.2)
+  
+  # Should error when paired=TRUE but ncol differs.
+  # stopifnot produces: "ncol(counts_A) == ncol(counts_B) is not TRUE"
+  expect_error(
+    TSENAT:::.compute_delta_statistics(
+      counts_A = counts_A,
+      counts_B = counts_B,
+      delta_influence = delta_influence,
+      nboot = 10,
+      confidence = 0.95,
+      q = 1,
+      norm = FALSE,
+      log_base = exp(1),
+      pseudocount = 0.5,
+      paired = TRUE
+    ),
+    "is not TRUE"
+  )
+})
+
+test_that("compute_delta_statistics works with equal ncol paired bootstrap", {
+  skip_on_bioc()
+  
+  counts_A <- matrix(rpois(24, lambda = 15), nrow = 3, ncol = 8)
+  counts_B <- matrix(rpois(24, lambda = 15), nrow = 3, ncol = 8)
+  delta_influence <- c(0.1, -0.05, 0.2)
+  
+  # Should NOT error when paired=TRUE and ncol matches
+  expect_error(
+    TSENAT:::.compute_delta_statistics(
+      counts_A = counts_A,
+      counts_B = counts_B,
+      delta_influence = delta_influence,
+      nboot = 10,
+      confidence = 0.95,
+      q = 1,
+      norm = FALSE,
+      log_base = exp(1),
+      pseudocount = 0.5,
+      paired = TRUE
+    ),
+    NA  # Expect no error
+  )
+})

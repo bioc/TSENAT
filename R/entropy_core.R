@@ -194,6 +194,12 @@
 #' @noRd
 .entropy_single <- function(counts, q = 1, norm = TRUE, log_base = exp(1), pseudocount = 0,
     q_tol = 1e-06) {
+    # Pseudocount contract: .entropy_single adds pseudocount and normalizes to
+    # proportions before calling .entropy_core. .entropy_core expects already-
+    # proportioned input with no pseudocount handling. .entropy_vectorized also
+    # adds pseudocount at the row level. All three functions form a stack where
+    # pseudocount is applied at the entry points (.entropy_single, .entropy_vectorized)
+    # but not in the core computation (.entropy_core).
     # Normalize to proportions with pseudocount
     total <- sum(counts) + length(counts) * pseudocount
     if (total <= 0)

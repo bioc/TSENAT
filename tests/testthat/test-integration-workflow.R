@@ -53,8 +53,8 @@ setup_workflow_data <- function() {
         effective_length = effective_length
     )
     
-    # Filter with severe stringency (reproducible with seed set above)
-    analysis <- filter_analysis(analysis, stringency = "severe")
+    # Filter with medium stringency (severe removes too many genes for SAIT on readcounts)
+    analysis <- filter_analysis(analysis, stringency = "medium")
     
     list(analysis = analysis, se = se(analysis), readcounts = readcounts)
 }

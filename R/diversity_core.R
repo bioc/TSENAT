@@ -205,7 +205,7 @@
     pseudocount = 0, min_valid_frac = 0.75, shrinkage = "none", effective_length = NULL,
     metadata = NULL, bootstrap = FALSE, bootstrap_nboot = NULL, bootstrap_method = "percentile",
     bootstrap_ci = 0.95, bootstrap_include_diagnostics = TRUE, sample_col = "sample",
-    condition_col = NULL, subject_col = NULL) {
+    condition_col = NULL, subject_col = NULL, log_base = exp(1)) {
 
     # Store original input and validate parameters
     original_x <- x
@@ -221,7 +221,7 @@
     # Prepare input and calculate diversity
     prep <- .prepare_diversity_data(x, genes, original_x, effective_length, norm,
         q, what, nthreads, shrinkage, pseudocount, verbose, tpm, assayno, show_messages,
-        min_valid_frac)
+        min_valid_frac, log_base = log_base)
     result <- prep$result
     x <- prep$x
     genes <- prep$genes
@@ -385,7 +385,7 @@
 #' @noRd
 .prepare_diversity_data <- function(x, genes, original_x, effective_length, norm,
     q, what, nthreads, shrinkage, pseudocount, verbose, tpm, assayno, show_messages = FALSE,
-    min_valid_frac = 0.75) {
+    min_valid_frac = 0.75, log_base = exp(1)) {
 
     # Prepare input data
     inp <- .prepare_diversity_input(x = x, genes = genes, tpm = tpm, assayno = assayno,
@@ -427,7 +427,7 @@
 
     result <- .calculate_method(x, genes, use_range_norm, verbose = verbose, show_messages = show_messages,
         q = q, what = what, nthreads = nthreads, pseudocount = pseudocount, min_valid_frac = min_valid_frac,
-        shrinkage = shrinkage, effective_length = effective_length)
+        shrinkage = shrinkage, effective_length = effective_length, log_base = log_base)
 
 
 

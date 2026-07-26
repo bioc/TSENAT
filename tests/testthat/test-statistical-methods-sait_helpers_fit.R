@@ -1879,10 +1879,12 @@ test_that(".fit_one_interaction ensures gene column in result", {
     group_vec <- rep(c("A", "B"), 4)
     sample_names <- paste0("s", 1:n_total)
 
-    result <- .fit_one_interaction("GeneX", se=NULL, mat=mat, q_vals=q_vals,
-        sample_names=sample_names, group_vec=group_vec,
-        method="lmm", pvalue="lrt", subject_col=NULL, paired=FALSE,
-        min_obs=2, verbose=FALSE, suppress_lme4_warnings=TRUE, progress=FALSE)
+    result <- suppressWarnings(
+        .fit_one_interaction("GeneX", se=NULL, mat=mat, q_vals=q_vals,
+            sample_names=sample_names, group_vec=group_vec,
+            method="lmm", pvalue="lrt", subject_col=NULL, paired=FALSE,
+            min_obs=2, verbose=FALSE, suppress_lme4_warnings=TRUE, progress=FALSE)
+    )
     expect_true(is.data.frame(result))
     expect_equal(result$gene, "GeneX")
 })
@@ -1981,4 +1983,31 @@ test_that(".check_lmm_sample_sizes returns NULL for single subject", {
     df <- data.frame(subject = factor(rep("X", 10)), stringsAsFactors = FALSE)
     result <- suppressWarnings(TSENAT:::.check_lmm_sample_sizes(df, min_obs = 1))
     expect_null(result)
+})
+# M2: min_obs — LMM default matches public default (5)
+# ============================================================================ 
+# ============================================================================
+# M2: min_obs — LMM default matches public default (5)# ============================================================================
+
+test_that("M2: .check_lmm_sample_sizes uses default min_obs = 5", {
+    # Create a data frame with just enough observations
+    df <- data.frame(
+        entropy = rnorm(5),
+        q = 1:5,
+        group = factor(rep(c("A", "B"), length.out = 5)),
+        subject = factor(rep(c("s1", "s2"), length.out = 5)),
+        stringsAsFactors = FALSE
+    )
+
+    # With nrow=5 and 2 subjects, should pass with default min_obs=5
+    result <- TSENAT:::.check_lmm_sample_sizes(df)
+    expect_true(result)
+
+    # With nrow=3, should fail with explicit min_obs=5 (warning expected)
+    df_small <- df[1:3, ]
+    expect_warning(
+        result_small <- TSENAT:::.check_lmm_sample_sizes(df_small, min_obs = 5),
+        "Insufficient observations"
+    )
+    expect_null(result_small)
 })

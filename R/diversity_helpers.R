@@ -297,13 +297,23 @@
         # Vectorized log-odds computation for entire column
         s_vals <- result[, col_idx]
         valid_mask <- !is.na(n_iso_vec) & n_iso_vec > 1 & !is.na(col_q) & !is.na(s_vals) &
-            is.finite(s_vals) & s_max_vec > 0 & s_vals > 0
+            is.finite(s_vals) & s_max_vec > 0
 
         # AUDIT FIX July 2026: Use log(..., base = log_base) instead of hardcoded
         # natural log to maintain consistency with the entropy calculation's
         # logarithm base.
-        result[valid_mask, col_idx] <- log(s_vals[valid_mask]/s_max_vec[valid_mask],
+        # Also handle s_vals ≤ 0: these are non-positive entropy estimates
+        # (numerical edge cases). Floor at a small positive value to avoid
+        # silent unit mixing (raw entropy vs log-odds in same column).
+        pos_mask <- valid_mask & s_vals > 0
+        neg_mask <- valid_mask & s_vals <= 0
+        
+        result[pos_mask, col_idx] <- log(s_vals[pos_mask]/s_max_vec[pos_mask],
             base = log_base)
+        if (any(neg_mask)) {
+            # Floor at log(1e-10) to indicate near-zero entropy
+            result[neg_mask, col_idx] <- log(1e-10, base = log_base)
+        }
     }
 
     return(result)
@@ -637,6 +647,11 @@
 #' @noRd
 
 .suggest_min_count <- function(count_matrix, percentile = 0.5, verbose = TRUE) {
+    # ==========================================================================
+    # DEFENSIVE VALIDATION (July 2026: metrics.json risk=100, PageRank #2)
+    # Called from diversity computation, bootstrap, and filtering pipelines.
+    # ==========================================================================
+
     # Extract counts if SummarizedExperiment
     if (methods::is(count_matrix, "SummarizedExperiment")) {
         counts <- SummarizedExperiment::assay(count_matrix)
@@ -646,6 +661,13 @@
         stop("count_matrix must be a matrix, data.frame, or SummarizedExperiment")
     }
 
+    # Check for empty input
+    if (nrow(counts) == 0 || ncol(counts) == 0) {
+        stop("[.suggest_min_count] Input has zero dimensions (",
+             nrow(counts), " x ", ncol(counts),
+             "). Cannot suggest threshold from empty data.", call. = FALSE)
+    }
+
     if (!is.numeric(percentile) || percentile < 0 || percentile > 1) {
         stop("percentile must be numeric in [0, 1]")
     }
@@ -653,8 +675,31 @@
     # Compute total count per gene
     gene_totals <- rowSums(counts, na.rm = TRUE)
 
-    # Get percentile threshold
-    min_count <- as.numeric(quantile(gene_totals, probs = percentile, type = 7, na.rm = TRUE))
+    # Check for all-zero genes
+    n_zero_genes <- sum(gene_totals <= 0, na.rm = TRUE)
+    if (n_zero_genes == length(gene_totals)) {
+        warning("[.suggest_min_count] All genes have zero total counts. ",
+                "Cannot compute meaningful threshold. Returning 0.", call. = FALSE)
+        return(0)
+    }
+    if (n_zero_genes > 0 && n_zero_genes > length(gene_totals) * 0.5) {
+        warning("[.suggest_min_count] ", n_zero_genes, " out of ", length(gene_totals),
+                " genes (", round(100 * n_zero_genes / length(gene_totals), 1),
+                "%) have zero total counts. ",
+                "The suggested threshold may be zero. ",
+                "Consider reviewing your input data quality.", call. = FALSE)
+    }
+
+    # Check for single gene
+    if (length(gene_totals) == 1) {
+        warning("[.suggest_min_count] Only 1 gene in input. ",
+                "Percentile-based threshold with a single gene is degenerate. ",
+                "Returning the gene's total count.", call. = FALSE)
+        min_count <- gene_totals[1]
+    } else {
+        # Get percentile threshold
+        min_count <- as.numeric(quantile(gene_totals, probs = percentile, type = 7, na.rm = TRUE))
+    }
 
     if (verbose) {
         message("Minimum Count Auto-Detection:")
@@ -752,6 +797,64 @@
         raw_counts <- se
     } else {
         stop("se must be a SummarizedExperiment or matrix")
+    }
+
+    # ==========================================================================
+    # DEFENSIVE VALIDATION (July 2026: metrics.json risk=100, PageRank highest)
+    # This function is a single point of failure called from the entire pipeline.
+    # ==========================================================================
+
+    # Check for empty input
+    if (nrow(raw_counts) == 0 || ncol(raw_counts) == 0) {
+        stop("[.estimate_pseudocount] Input matrix has zero dimensions (",
+             nrow(raw_counts), " x ", ncol(raw_counts),
+             "). Cannot estimate pseudocount from empty data.", call. = FALSE)
+    }
+
+    # Check for NA/NaN/Inf in counts
+    na_count <- sum(is.na(raw_counts))
+    inf_count <- sum(is.infinite(raw_counts))
+    if (na_count > 0 || inf_count > 0) {
+        stop("[.estimate_pseudocount] Input contains ", na_count, " NA and ",
+             inf_count, " infinite values. Raw counts must not contain NA or Inf.",
+             call. = FALSE)
+    }
+
+    # Check for negative values
+    neg_count <- sum(raw_counts < 0, na.rm = TRUE)
+    if (neg_count > 0) {
+        stop("[.estimate_pseudocount] Input contains ", neg_count,
+             " negative values. Raw count data must be non-negative.", call. = FALSE)
+    }
+
+    # Check for all-zero data (cannot compute size factors)
+    total_counts <- sum(raw_counts)
+    if (total_counts <= 0) {
+        stop("[.estimate_pseudocount] All counts are zero. ",
+             "Cannot estimate pseudocount from all-zero data. ",
+             "Check that your input contains valid expression data.", call. = FALSE)
+    }
+
+    # Check for all-zero columns (samples with no reads)
+    col_sums <- colSums(raw_counts)
+    zero_cols <- which(col_sums <= 0)
+    if (length(zero_cols) > 0) {
+        stop("[.estimate_pseudocount] ", length(zero_cols), " sample(s) have zero total counts: ",
+             paste(colnames(raw_counts)[zero_cols], collapse = ", "),
+             ". These samples cannot be used for size-factor normalization. ",
+             "Remove these samples before analysis.", call. = FALSE)
+    }
+
+    # Check for singleton dimensions
+    if (nrow(raw_counts) == 1) {
+        warning("[.estimate_pseudocount] Only 1 gene/transcript in input. ",
+                "Pseudocount estimation with a single feature may be unreliable. ",
+                "Consider using a fixed pseudocount instead.", call. = FALSE)
+    }
+    if (ncol(raw_counts) == 1) {
+        warning("[.estimate_pseudocount] Only 1 sample in input. ",
+                "Size-factor normalization with a single sample is meaningless. ",
+                "Consider using a fixed pseudocount instead.", call. = FALSE)
     }
 
     # Data validation and diagnostics
@@ -1249,7 +1352,7 @@
 #' @noRd
 .calculate_method <- function(x, genes, norm = TRUE, verbose = FALSE, show_messages = FALSE,
     q = 2, what = c("S", "D"), nthreads = 1, pseudocount = 0, min_valid_frac = 0.75,
-    shrinkage = c("none", "empirical_bayes"), effective_length = NULL) {
+    shrinkage = c("none", "empirical_bayes"), effective_length = NULL, log_base = exp(1)) {
     what <- match.arg(what)
     shrinkage <- match.arg(shrinkage)
     # validate q (q=0 represents species richness)
@@ -1274,7 +1377,7 @@
     # compute requested quantity ('S' or 'D') in parallel
     result_list <- .bplapply(gene_levels, function(gene) {
         .tsallis_row(x = x, genes = genes, gene = gene, q = q, norm = norm, what = what,
-            pseudocount = pseudocount, effective_length = effective_length)
+            pseudocount = pseudocount, effective_length = effective_length, log_base = log_base)
     }, nthreads = nthreads)
 
     # Convert list to matrix (each element is a named vector) result_list is a
@@ -1343,7 +1446,8 @@
 
 # Internal helpers for calculate_method
 
-.tsallis_row <- function(x, genes, gene, q, norm, what, pseudocount = 0, effective_length = NULL) {
+.tsallis_row <- function(x, genes, gene, q, norm, what, pseudocount = 0, effective_length = NULL,
+    log_base = exp(1)) {
     idx <- which(genes == gene)
     n_q <- length(q)
     n_samples <- ncol(x)
@@ -1376,7 +1480,7 @@
         }
 
         # Calculate entropy on the adjusted counts
-        v <- .calculate_tsallis_entropy(counts, q = q, norm = norm, what = what)
+        v <- .calculate_tsallis_entropy(counts, q = q, norm = norm, what = what, log_base = log_base)
         out_idx <- (j - 1) * n_q + seq_len(n_q)
         if (length(v) == n_q && all(is.finite(v) | is.na(v))) {
             out[out_idx] <- v
