@@ -47,16 +47,9 @@ jobs:
             if [ -f /usr/bin/gcov-13 ] && [ ! -f /usr/bin/gcov ]; then
               ln -s /usr/bin/gcov-13 /usr/bin/gcov
             fi
-      - run:
-          name: Compute dependency hash for cache key
-          command: |
-            # Hash only dependency lines, not version/description metadata
-            grep -E '^(Imports|Depends|Suggests|LinkingTo):' DESCRIPTION | md5sum | cut -d' ' -f1 > /tmp/dep_hash
-            echo "Dependency hash: $(cat /tmp/dep_hash)"
       - restore_cache:
           keys:
-            - v1-r-packages-{{ checksum "/tmp/dep_hash" }}-r4.5.2
-            - v1-r-packages-r4.5.2
+            - v1-r-packages-{{ checksum "DESCRIPTION" }}-r4.5.2
       - run:
           name: Configure R for faster package installation
           command: |
@@ -64,8 +57,8 @@ jobs:
             cat >> ~/.Rprofile \<<'EOF'
             # Prefer binary packages over source compilation (speeds up installation)
             options(install.packages.check.source = "no")
-            # Use parallel compilation (auto-detect cores)
-            options(Ncpus = max(2L, parallel::detectCores() - 1L))
+            # Use parallel compilation (faster vignette & package builds)
+            options(Ncpus = 8)
             # Increase timeout for slow CRAN mirrors
             options(timeout = 300)
             EOF
@@ -79,15 +72,13 @@ jobs:
             }
             cran_pkgs <- c("remotes", "rcmdcheck", "covr")
             install.packages(cran_pkgs, repos = "https://cloud.r-project.org")
-            # Use BiocManager to install ALL dependencies (handles both CRAN + Bioconductor)
-            BiocManager::install(version = "3.22", ask = FALSE, update = FALSE)
-            BiocManager::install(dependencies = TRUE, ask = FALSE, update = FALSE)
+            remotes::install_deps(dependencies = TRUE, upgrade = "never")
             EOF
           no_output_timeout: 30m
       - save_cache:
           paths:
             - /usr/local/lib/R/site-library
-          key: v1-r-packages-{{ checksum "/tmp/dep_hash" }}-r4.5.2
+          key: v1-r-packages-{{ checksum "DESCRIPTION" }}-r4.5.2
       - run:
           name: Build package
           command: |
