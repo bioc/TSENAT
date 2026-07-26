@@ -19,19 +19,34 @@ TSENAT captures isoform-usage complexity  throught Tsallis entropy, whose entrop
 
 - **High q** (e.g., 2.0): Focuses on dominant isoforms - detects dominance shifts
 
-By examining diversity across multiple entropic indices (q-values), TSENAT allows to identify scale-dependent diversity changes, **the hallmark of coordinate isoform switching**.
+By examining diversity across multiple entropic indices (q-values), TSENAT allows to identify scale-dependent diversity changes - the hallmark of coordinate isoform switching.
 
-## Contents
+## The Mathematics Behind Tsallis Entropy
 
-- [Installation](#installation)
-- [Quick Start](#quick-start)
-- [The Mathematics Behind Tsallis Entropy](#the-mathematics-behind-tsallis-entropy)
-- [Statistical Inference Methods](#statistical-inference-methods)
-- [Related Packages](#related-packages)
-- [Native Salmon Integration](#native-salmon-integration)
-- [Tests Coverage](#tests-coverage)
-- [Citation](#citation)
-- [License and Attribution](#license-and-attribution)
+Tsallis entropy is a parametric family of diversity measures that generalizes Shannon entropy and enables tuning sensitivity to different scales of isoform organization.
+
+**Mathematical Definition**: For a discrete probability vector $p = (p_1, \ldots, p_n)$ representing isoform proportions within a gene, Tsallis entropy is:
+
+$$S_q = \frac{1 - \sum_{i=1}^{n} p_i^q}{q - 1}$$
+
+This elegant formula unifies diverse diversity concepts at specific entropic indices (q-values):
+
+- **q = 0**: Richness — Simple count of expressed isoforms; emphasizes rare variants most strongly.
+- **q = 1**: Shannon entropy — Standard information-theoretic measure; balanced weighting across scales.
+- **q = 2**: Gini-Simpson index — Probability that two randomly-drawn transcripts are different; robust to rare variants.
+
+### Divergence Analysis: Measuring Information-Theoretic Distance Between Conditions
+
+While Tsallis entropy quantifies diversity *within* a single distribution, **Tsallis divergence** $D_q$ measures the information-theoretic distance *between* two distributions. 
+
+**Mathematical Definition** (Furuichi formula): For two probability distributions $P$ and $Q$ representing isoform proportions in control and treatment conditions, Tsallis divergence is:
+
+$$D_q(P||Q) = \frac{1 - \sum_i p_i^q \cdot q_i^{1-q}}{q-1}$$
+
+where $p_i$ and $q_i$ are the probability values at position $i$.
+
+Tsallis divergence enables the quantification of how fundamentally different the isoform complexity patterns are between experimental conditions.
+
 
 ## Installation
 
@@ -131,32 +146,6 @@ print(diversity_plot)
 ![Isoform diversity profiles across q-values: TSENAT detects scale-dependent diversity patterns](https://raw.githubusercontent.com/gallardoalba/TSENAT/gh-pages/articles/TSENAT_files/figure-html/fig-1-isoform-diversity-profiles-1.png)
 
 For a complete walkthrough of the analysis pipeline with real biological examples, see the [main package vignette](https://gallardoalba.github.io/TSENAT/articles/TSENAT.html). This includes theory background, step-by-step explanations of each analysis function, and interpretation guidance for understanding your results.
-
-## The Mathematics Behind Tsallis Entropy
-
-Tsallis entropy is a parametric family of diversity measures that generalizes Shannon entropy and enables tuning sensitivity to different scales of isoform organization.
-
-**Mathematical Definition**: For a discrete probability vector $p = (p_1, \ldots, p_n)$ representing isoform proportions within a gene, Tsallis entropy is:
-
-$$S_q = \frac{1 - \sum_{i=1}^{n} p_i^q}{q - 1}$$
-
-This elegant formula unifies diverse diversity concepts at specific entropic indices (q-values):
-
-- **q = 0**: Richness — Simple count of expressed isoforms; emphasizes rare variants most strongly.
-- **q = 1**: Shannon entropy — Standard information-theoretic measure; balanced weighting across scales.
-- **q = 2**: Gini-Simpson index — Probability that two randomly-drawn transcripts are different; robust to rare variants.
-
-### Divergence Analysis: Measuring Information-Theoretic Distance Between Conditions
-
-While Tsallis entropy quantifies diversity *within* a single distribution, **Tsallis divergence** $D_q$ measures the information-theoretic distance *between* two distributions. 
-
-**Mathematical Definition** (Furuichi formula): For two probability distributions $P$ and $Q$ representing isoform proportions in control and treatment conditions, Tsallis divergence is:
-
-$$D_q(P||Q) = \frac{1 - \sum_i p_i^q \cdot q_i^{1-q}}{q-1}$$
-
-where $p_i$ and $q_i$ are the probability values at position $i$.
-
-Tsallis divergence enables the quantification of how fundamentally different the isoform complexity patterns are between experimental conditions.
 
 
 ## Statistical Inference Methods 
