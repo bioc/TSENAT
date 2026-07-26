@@ -199,8 +199,13 @@
 
                 if (!is.na(z_interact)) {
                   # Get robust sandwich variance and coefficient for K-C correction
-                  vcov_sandwich <- try(vcov(fit_alt), silent = TRUE)
+                  vcov_sandwich <- try(suppressWarnings(vcov(fit_alt)), silent = TRUE)
                   if (inherits(vcov_sandwich, "try-error")) vcov_sandwich <- NULL
+                  # Validate vcov: must be a finite numeric matrix
+                  if (!is.null(vcov_sandwich) &&
+                      (!is.matrix(vcov_sandwich) || any(!is.finite(vcov_sandwich)))) {
+                    vcov_sandwich <- NULL
+                  }
                   coef_value <- coefs_alt[ia_idx]
 
                   # Apply K-C correction with design effect and actual sandwich variance
@@ -326,11 +331,14 @@
             subj_idx <- which(subject_sorted == subj)
             if (length(subj_idx) >= 2) {
                 subj_data <- df_sorted[subj_idx, ]
-                # Use the first group value for the subject (should be constant within subject)
-                subj_group <- as.character(subj_data$group[1])
+                # Use the group of the later row in each difference pair.
+                # This preserves both group levels for geeglm when subjects
+                # span conditions (paired designs), unlike group[1] which
+                # collapses to a single level.
+                subj_group <- as.character(subj_data$group[-1])
                 n_diff <- nrow(subj_data) - 1
                 df_diff_list[[as.character(subj)]] <- data.frame(entropy = diff(subj_data$entropy),
-                  q = subj_data$q[-nrow(subj_data)], group = rep(subj_group, n_diff),
+                  q = subj_data$q[-nrow(subj_data)], group = subj_group,
                   stringsAsFactors = FALSE)
             }
         }
@@ -831,6 +839,10 @@
     vcov_corrected <- NULL
     if (!is.null(vcov_sandwich_raw)) {
         vcov_corrected <- multiplier * vcov_sandwich_raw
+        # Guard against NaN/Inf in sandwich variance (singular fits)
+        if (any(!is.finite(vcov_corrected))) {
+            vcov_corrected <- NULL
+        }
     }
 
     # ========================================================================
@@ -846,8 +858,9 @@
         if (!is.null(vcov_corrected) && all(dim(vcov_corrected) >= 1)) {
             # Recompute z using the bias-corrected variance
             se_corrected <- sqrt(diag(vcov_corrected))
-            if (length(se_corrected) >= 1 && se_corrected[1] > 0) {
-                z_corrected <- coef_value / se_corrected[1]
+            if (length(se_corrected) >= 1 && is.finite(se_corrected[1]) && se_corrected[1] > 0) {
+                z_new <- coef_value / se_corrected[1]
+                if (is.finite(z_new)) z_corrected <- z_new
             }
         }
 

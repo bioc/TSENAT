@@ -344,6 +344,13 @@
     }
     
     if (nrow(res) == 0) {
+        # Ensure empty results still have standard SAIT columns for downstream compatibility
+        empty_cols <- c("gene", "p_interaction", "adj_p_interaction", "n_clusters",
+            "bias_correction_applied", "design_effect_ar1", "kc_bias_correction_applied",
+            "kc_multiplier", "n_effective", "ci_weighted", "slope_diff")
+        for (col in setdiff(empty_cols, colnames(res))) {
+            res[[col]] <- logical(0)
+        }
         return(res)
     }
     

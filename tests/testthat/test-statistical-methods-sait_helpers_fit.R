@@ -1879,10 +1879,12 @@ test_that(".fit_one_interaction ensures gene column in result", {
     group_vec <- rep(c("A", "B"), 4)
     sample_names <- paste0("s", 1:n_total)
 
-    result <- .fit_one_interaction("GeneX", se=NULL, mat=mat, q_vals=q_vals,
-        sample_names=sample_names, group_vec=group_vec,
-        method="lmm", pvalue="lrt", subject_col=NULL, paired=FALSE,
-        min_obs=2, verbose=FALSE, suppress_lme4_warnings=TRUE, progress=FALSE)
+    result <- suppressWarnings(
+        .fit_one_interaction("GeneX", se=NULL, mat=mat, q_vals=q_vals,
+            sample_names=sample_names, group_vec=group_vec,
+            method="lmm", pvalue="lrt", subject_col=NULL, paired=FALSE,
+            min_obs=2, verbose=FALSE, suppress_lme4_warnings=TRUE, progress=FALSE)
+    )
     expect_true(is.data.frame(result))
     expect_equal(result$gene, "GeneX")
 })

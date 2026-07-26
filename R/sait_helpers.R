@@ -404,7 +404,7 @@
 
         df_diff_list[[subj]] <- data.frame(entropy_diff = diff(subj_data$entropy),
             q = subj_data$q[-1], q_prev = subj_data$q[-nrow(subj_data)],
-            group = rep(as.character(subj_data$group[1]), n_diff),
+            group = as.character(subj_data$group[-1]),
             subject = rep(subj, n_diff), stringsAsFactors = FALSE)
     }
 

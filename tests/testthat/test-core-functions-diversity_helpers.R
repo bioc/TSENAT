@@ -803,8 +803,9 @@ test_that(".normalize_log_odds_ratio handles zero values", {
     q = 1
   )
   
-  # Zero entropy doesn't meet s_vals > 0 condition, remains unchanged at 0
-  expect_equal(result[1, 1], 0.0)
+  # Zero entropy: floored at log(1e-10) ≈ -23 (L4 fix, July 2026)
+  # Previously left as raw 0, which silently mixed units in the output matrix
+  expect_equal(result[1, 1], log(1e-10), tolerance = 1e-6)
   expect_true(is.finite(result[2, 1]))
   expect_true(is.finite(result[3, 1]))
 })
