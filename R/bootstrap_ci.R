@@ -17,6 +17,10 @@
         use_job, nthreads, paired, resample_by, counts_matrix)
     if (!is.null(result)) return(invisible(result))
 
+    # If SE/result path returned NULL (e.g., no genes with sufficient counts),
+    # the warning was already issued; do not fall through to single-vector path
+    if (is.null(x)) return(invisible(NULL))
+
     # Single vector path: validate, compute, print
     ._bootstrap_single_vector(x, q, nboot, ci, paired, show_messages,
         effective_length, pseudocount, norm, method, log_base, what,
