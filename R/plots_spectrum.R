@@ -163,7 +163,7 @@
 
     # Use helper to create line + point plot (fixed color, no grouping)
     p <- .create_simple_line_plot(plot_df, x_col = "q", y_col = "divergence", group_col = NULL,
-        points = TRUE, line_width = 1.2, point_size = 3.5, line_color = .palette_blue_red()[1])
+        points = TRUE, line_width = 1.2, point_size = 3.5, line_color = .tsenat_palette("blue_red", n = 1))
 
     p <- .apply_publication_theme(p, base_theme = "theme_base", base_size = 11, title = paste("Divergence Spectrum:",
         gene_name))

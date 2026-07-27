@@ -941,3 +941,29 @@ test_that("extract_multiq_table uses custom extraction function", {
     expect_true(is.data.frame(output))
     expect_equal(nrow(output), 1)
 })
+
+# ============================================================================
+# RIGID COMPONENT: .get_palette_colors edge cases (July 2026: risk=93.3)
+# ============================================================================
+
+context("Rigid: .get_palette_colors edge cases")
+
+test_that(".get_palette_colors handles empty color vector", {
+  result <- TSENAT:::.get_palette_colors(character(0))
+  expect_type(result, "character")
+  expect_length(result, 0)
+})
+
+test_that(".get_palette_colors passes through multi-color vector", {
+  result <- TSENAT:::.get_palette_colors(c("#FF0000", "#00FF00", "#0000FF"))
+  expect_type(result, "character")
+  expect_length(result, 3)
+  expect_equal(result, c("#FF0000", "#00FF00", "#0000FF"))
+})
+
+test_that(".get_palette_colors errors on single hex string (not a palette)", {
+  expect_error(
+    TSENAT:::.get_palette_colors("#FF0000"),
+    "not found"
+  )
+})

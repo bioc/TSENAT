@@ -145,8 +145,6 @@ print(diversity_plot)
 
 ![Isoform diversity profiles across q-values: TSENAT detects scale-dependent diversity patterns](https://raw.githubusercontent.com/gallardoalba/TSENAT/gh-pages/articles/TSENAT_files/figure-html/fig-1-isoform-diversity-profiles-1.png)
 
-TSENAT identifies **scale-dependent genes** — genes whose entropy changes are driven by specific isoform abundance ranges. For example, a gene may show strong entropy differences at low q (rare isoforms) but not at high q (dominant isoforms), revealing *which* isoforms drive the biological signal:
-
 ```r
 # Extract the scale-dependent genes plot
 sait_plot <- results(result, type = "sait", plot = TRUE)
@@ -154,6 +152,8 @@ print(sait_plot)
 ```
 
 ![Scale-dependent genes: entropy differences vary across q-values, revealing which isoform abundance ranges drive condition-specific changes](https://raw.githubusercontent.com/gallardoalba/TSENAT/gh-pages/articles/TSENAT_files/figure-html/fig-2-scale-dependent-genes-1.png)
+
+
 
 ## Documentation
 

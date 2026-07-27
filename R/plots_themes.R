@@ -731,7 +731,7 @@
 
         # Combine title + subtitle
         title_grob <- cowplot::plot_grid(title_grob, subtitle_grob, nrow = 2, rel_heights = c(1,
-            0.4))
+            0.55))
     }
 
     title_grob
@@ -760,7 +760,7 @@
     if (!is.null(facet_var)) {
         facet_formula <- stats::as.formula(paste0("~", facet_var))
         plot <- plot + ggplot2::facet_wrap(facet_formula, ncol = ncol, nrow = nrow,
-            scales = scales)
+            scales = scales, labeller = ggplot2::label_wrap_gen(22))
     }
 
     # Apply panel and strip styling
@@ -994,7 +994,7 @@
 .finalize_plot <- function(plot, output_file = NULL, width = 12, aspect = "standard") {
     if (!is.null(output_file)) {
         .save_plot_standard(plot, output_file, width_inches = width,
-            aspect_type = aspect, dpi_output = 100)
+            aspect_type = aspect, dpi_output = 300)
     }
     invisible(plot)
 }

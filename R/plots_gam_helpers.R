@@ -401,7 +401,7 @@
     # Add main title and subtitle above the grid
     title_plot <- .create_title_grob("q-curve: Top genes with group interaction",
         subtitle = "Fitted smooth curves by group",
-        title_size = 20, subtitle_size = 13)
+        title_size = 24, subtitle_size = 17)
 
     # Combine title, plots, and single legend at bottom
     final_plot <- cowplot::plot_grid(title_plot, combined_plot, legend, nrow = 3,

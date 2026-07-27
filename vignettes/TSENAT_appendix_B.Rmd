@@ -409,9 +409,9 @@ if ("p_interaction" %in% colnames(sait_results)) {
     gam_sig <- gam_sig[order(gam_sig$p_interaction), ]
     gam_sig <- gam_sig[1:min(10, nrow(gam_sig)), ]
     
-    # Select columns for display: gene, p-values, effect size, test statistic, df
+    # Select columns for display: gene, p-values, effect size, test statistic
     cols_to_show <- intersect(c("gene", "p_interaction", "adj_p_interaction", "effect_size", 
-                                "test_statistic", "df_residual"), 
+                                "test_statistic"), 
                               colnames(gam_sig))
     if (length(cols_to_show) > 0) {
       gam_display <- gam_sig[, cols_to_show, drop = FALSE]
@@ -452,21 +452,13 @@ if ("p_interaction" %in% colnames(sait_results)) {
         })
       }
       
-      # Format df as integer
-      if ("df_residual" %in% colnames(gam_display)) {
-        gam_display$df_residual <- sapply(gam_display$df_residual, function(x) {
-          if (is.na(x)) "NA" else as.integer(x)
-        })
-      }
-      
       # Rename columns for better readability — dynamic to match actual columns present
       col_name_map <- c(
         "gene" = "Gene",
         "p_interaction" = "p (interaction)",
         "adj_p_interaction" = "Adjusted p",
         "effect_size" = "Effect size",
-        "test_statistic" = "Test statistic",
-        "df_residual" = "df"
+        "test_statistic" = "Test statistic"
       )
       present_cols <- intersect(names(col_name_map), colnames(gam_display))
       gam_display <- gam_display[, present_cols, drop = FALSE]

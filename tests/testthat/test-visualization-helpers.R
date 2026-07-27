@@ -3442,3 +3442,37 @@ test_that(".tsenat_palette with n=0 returns empty vector for discrete palettes",
   colors <- TSENAT:::.tsenat_palette("blue_red", n = 0)
   expect_equal(length(colors), 0)
 })
+
+# ============================================================================
+# RIGID COMPONENT: .create_simple_line_plot edge cases (July 2026: risk=95.0)
+# ============================================================================
+
+context("Rigid: .create_simple_line_plot edge cases")
+
+test_that(".create_simple_line_plot handles empty data without error", {
+  empty_data <- data.frame(
+    x = numeric(0),
+    y = numeric(0),
+    group = character(0)
+  )
+  plot <- TSENAT:::.create_simple_line_plot(empty_data, x_col = "x", y_col = "y",
+                                             group_col = "group")
+  expect_s3_class(plot, "ggplot")
+})
+
+test_that(".create_simple_line_plot handles single data point", {
+  single_data <- data.frame(
+    x = c(1),
+    y = c(5),
+    group = c("A")
+  )
+  plot <- TSENAT:::.create_simple_line_plot(single_data, x_col = "x", y_col = "y",
+                                             group_col = "group")
+  expect_s3_class(plot, "ggplot")
+})
+
+test_that(".create_simple_line_plot handles missing group column", {
+  data <- data.frame(x = 1:5, y = c(2, 4, 3, 5, 4))
+  plot <- TSENAT:::.create_simple_line_plot(data, x_col = "x", y_col = "y")
+  expect_s3_class(plot, "ggplot")
+})
