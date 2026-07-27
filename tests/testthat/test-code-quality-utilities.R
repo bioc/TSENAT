@@ -967,3 +967,30 @@ test_that(".get_palette_colors errors on single hex string (not a palette)", {
     "not found"
   )
 })
+
+# ============================================================================
+# COVERAGE IMPROVEMENT: .check_required_packages (75%)
+# ============================================================================
+
+test_that(".check_required_packages passes for available package", {
+    expect_silent(TSENAT:::.check_required_packages("methods"))
+    expect_true(TSENAT:::.check_required_packages("methods"))
+})
+
+test_that(".check_required_packages passes for multiple available packages", {
+    expect_silent(TSENAT:::.check_required_packages(c("methods", "stats", "utils")))
+})
+
+test_that(".check_required_packages errors for non-existent package", {
+    expect_error(
+        TSENAT:::.check_required_packages("nonexistent_pkg_xyz123"),
+        "required"
+    )
+})
+
+test_that(".check_required_packages errors on first missing package", {
+    expect_error(
+        TSENAT:::.check_required_packages(c("methods", "nonexistent_pkg_xyz123", "stats")),
+        "nonexistent_pkg_xyz123 required"
+    )
+})

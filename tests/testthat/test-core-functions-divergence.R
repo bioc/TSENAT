@@ -1695,3 +1695,64 @@ test_that("M6: q=0 divergence is support-difference (not constant zero)", {
     )
     expect_equal(div_same_smoothed, 0)
 })
+
+# ============================================================================
+# COVERAGE IMPROVEMENT: .print_divergence_summary (66.7%)
+# ============================================================================
+
+test_that(".print_divergence_summary prints summary with no errors", {
+    row_data <- data.frame(
+        gene_name = paste0("GENE_", 1:5),
+        error = NA_character_,
+        stringsAsFactors = FALSE
+    )
+    
+    expect_message(
+        TSENAT:::.print_divergence_summary(5, 0, 10.5, row_data, progress = TRUE),
+        "DIVERGENCE COMPUTATION COMPLETE"
+    )
+})
+
+test_that(".print_divergence_summary prints failed genes when errors exist", {
+    row_data <- data.frame(
+        gene_name = paste0("GENE_", 1:5),
+        error = c("err1", NA, "err2", NA, NA),
+        stringsAsFactors = FALSE
+    )
+    
+    output <- capture_messages(
+        TSENAT:::.print_divergence_summary(5, 2, 10.5, row_data, progress = TRUE)
+    )
+    
+    expect_true(any(grepl("Failed genes", output)))
+    expect_true(any(grepl("err1", output)))
+    expect_true(any(grepl("err2", output)))
+})
+
+test_that(".print_divergence_summary truncates when more than 10 errors", {
+    genes <- paste0("GENE_", 1:15)
+    errors <- c(rep("fail", 15))
+    row_data <- data.frame(
+        gene_name = genes,
+        error = errors,
+        stringsAsFactors = FALSE
+    )
+    
+    output <- capture_messages(
+        TSENAT:::.print_divergence_summary(15, 15, 30.0, row_data, progress = TRUE)
+    )
+    
+    expect_true(any(grepl("and.*more", output)))
+})
+
+test_that(".print_divergence_summary silent when progress=FALSE", {
+    row_data <- data.frame(
+        gene_name = paste0("GENE_", 1:5),
+        error = NA_character_,
+        stringsAsFactors = FALSE
+    )
+    
+    expect_silent(
+        TSENAT:::.print_divergence_summary(5, 0, 10.5, row_data, progress = FALSE)
+    )
+})

@@ -2917,6 +2917,67 @@ test_that(".prepare_long_format converts matrix to long format with NAs", {
 })
 
 # ============================================================================
+# COVERAGE IMPROVEMENT: .prepare_long_format (63.6%)
+# ============================================================================
+
+test_that(".prepare_long_format works with SummarizedExperiment input", {
+    assay_mat <- matrix(rnorm(20), nrow = 4)
+    rownames(assay_mat) <- paste0("Gene", 1:4)
+    
+    se <- SummarizedExperiment::SummarizedExperiment(
+        assays = list(diversity = assay_mat),
+        colData = data.frame(
+            sample_type = c("A", "A", "B", "B", "B"),
+            row.names = paste0("S", 1:5)
+        )
+    )
+    
+    result <- TSENAT:::.prepare_long_format(se, assay_name = "diversity")
+    
+    expect_true(is.data.frame(result))
+    expect_true(all(c("q", "tsallis", "group", "Gene") %in% colnames(result)))
+})
+
+test_that(".prepare_long_format uses condition_col from metadata", {
+    assay_mat <- matrix(rnorm(12), nrow = 3)
+    rownames(assay_mat) <- paste0("Gene", 1:3)
+    
+    se <- SummarizedExperiment::SummarizedExperiment(
+        assays = list(diversity = assay_mat),
+        colData = data.frame(
+            custom_cond = c("X", "X", "Y", "Y"),
+            row.names = paste0("S", 1:4)
+        )
+    )
+    S4Vectors::metadata(se)$condition_col <- "custom_cond"
+    
+    result <- TSENAT:::.prepare_long_format(se, assay_name = "diversity")
+    
+    expect_true(is.data.frame(result))
+    expect_true("group" %in% colnames(result))
+})
+
+test_that(".prepare_long_format with explicit condition_col", {
+    assay_mat <- matrix(rnorm(12), nrow = 3)
+    rownames(assay_mat) <- paste0("Gene", 1:3)
+    
+    se <- SummarizedExperiment::SummarizedExperiment(
+        assays = list(diversity = assay_mat),
+        colData = data.frame(
+            treatment = c("ctl", "ctl", "trt", "trt"),
+            row.names = paste0("S", 1:4)
+        )
+    )
+    
+    result <- TSENAT:::.prepare_long_format(
+        se, assay_name = "diversity", condition_col = "treatment"
+    )
+    
+    expect_true(is.data.frame(result))
+    expect_true("group" %in% colnames(result))
+})
+
+# ============================================================================
 # TEST: create_simple_line_plot - high uncovered (lines 2985-2997)
 # ============================================================================
 
@@ -3475,4 +3536,31 @@ test_that(".create_simple_line_plot handles missing group column", {
   data <- data.frame(x = 1:5, y = c(2, 4, 3, 5, 4))
   plot <- TSENAT:::.create_simple_line_plot(data, x_col = "x", y_col = "y")
   expect_s3_class(plot, "ggplot")
+})
+
+# ============================================================================
+# COVERAGE: .apply_publication_theme font scaling (July 2026)
+# ============================================================================
+
+test_that(".apply_publication_theme scales fonts with non-default base_size", {
+  p <- ggplot2::ggplot(data.frame(x = 1, y = 1), ggplot2::aes(x, y)) +
+    ggplot2::geom_point()
+
+  # base_size=15 triggers font_scale branch (15/11 ≈ 1.36)
+  p_scaled <- TSENAT:::.apply_publication_theme(p, base_theme = "theme_base",
+    base_size = 15, title = "T", subtitle = "S")
+  expect_s3_class(p_scaled, "ggplot")
+  expect_equal(p_scaled$labels$title, "T")
+  expect_equal(p_scaled$labels$subtitle, "S")
+})
+
+# ============================================================================
+# COVERAGE: .create_title_grob with subtitle (July 2026)
+# ============================================================================
+
+test_that(".create_title_grob renders title and subtitle on single canvas", {
+  tg <- TSENAT:::.create_title_grob("Main Title",
+    subtitle = "Subtitle text",
+    title_size = 20, subtitle_size = 14)
+  expect_s3_class(tg, "ggplot")
 })

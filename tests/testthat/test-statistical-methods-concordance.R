@@ -448,3 +448,117 @@ test_that("BUG 7: calculate_concordance warns when adjusted p-values missing", {
     "Cannot compute Spearman correlation"
   )
 })
+
+# ============================================================================
+# COVERAGE IMPROVEMENT: .calculate_concordance edge cases
+# ============================================================================
+
+test_that(".calculate_concordance handles empty result sets", {
+    analysis_sait <- test_analysis_concordance
+    analysis_rank <- test_analysis_concordance
+
+    # Empty SAIT results
+    analysis_sait@sait_results$sait_interaction <- 
+        data.frame(gene = character(0), p_interaction = numeric(0), 
+                   adj_p_interaction = numeric(0))
+    analysis_rank@rank_test_results$rank_test <- 
+        data.frame(gene = paste0("GENE_", 1:5), p_value = runif(5),
+                   adj_p_value = runif(5))
+
+    expect_warning(
+        result <- TSENAT::calculate_concordance(analysis_sait, analysis_rank, verbose = FALSE),
+        "empty"
+    )
+    expect_equal(nrow(result@metadata$method_concordance$comparison_df), 0)
+})
+
+test_that(".calculate_concordance handles p_value fallback column in SAIT results", {
+    analysis_sait <- test_analysis_concordance
+    analysis_rank <- test_analysis_concordance
+
+    # SAIT results with p_value instead of p_interaction
+    analysis_sait@sait_results$sait_interaction <- 
+        data.frame(
+            gene = paste0("GENE_", 1:10),
+            p_value = runif(10, 0, 0.5),
+            adj_p_value = runif(10, 0, 0.5),
+            stringsAsFactors = FALSE
+        )
+    analysis_rank@rank_test_results$rank_test <- 
+        data.frame(
+            gene = paste0("GENE_", 1:10),
+            p_value = runif(10, 0, 0.5),
+            adj_p_value = runif(10, 0, 0.5),
+            stringsAsFactors = FALSE
+        )
+
+    result <- TSENAT::calculate_concordance(analysis_sait, analysis_rank, verbose = FALSE)
+    
+    expect_true(is(result, "TSENATAnalysis"))
+    expect_true(!is.null(result@metadata$method_concordance))
+    expect_true(nrow(result@metadata$method_concordance$comparison_df) > 0)
+})
+
+test_that(".calculate_concordance handles rank test p_interaction fallback column", {
+    analysis_sait <- test_analysis_concordance
+    analysis_rank <- test_analysis_concordance
+
+    # SAIT with p_interaction, rank with p_interaction instead of p_value
+    analysis_sait@sait_results$sait_interaction <- 
+        data.frame(
+            gene = paste0("GENE_", 1:10),
+            p_interaction = runif(10, 0, 0.5),
+            adj_p_interaction = runif(10, 0, 0.5),
+            stringsAsFactors = FALSE
+        )
+    analysis_rank@rank_test_results$rank_test <- 
+        data.frame(
+            gene = paste0("GENE_", 1:10),
+            p_interaction = runif(10, 0, 0.5),
+            adj_p_interaction = runif(10, 0, 0.5),
+            stringsAsFactors = FALSE
+        )
+
+    result <- TSENAT::calculate_concordance(analysis_sait, analysis_rank, verbose = FALSE)
+    
+    expect_true(is(result, "TSENATAnalysis"))
+    expect_true(!is.null(result@metadata$method_concordance))
+})
+
+test_that(".calculate_concordance produces high_conf genes when both significant", {
+    analysis_sait <- test_analysis_concordance
+    analysis_rank <- test_analysis_concordance
+
+    # Create results where some genes are significant in both methods
+    genes <- paste0("GENE_", 1:20)
+    # Genes 1-5: significant in both (low adj p-values)
+    # Genes 6-10: significant in SAIT only
+    # Genes 11-15: significant in rank only
+    # Genes 16-20: not significant in either
+    
+    padj_sait <- c(rep(0.01, 5), rep(0.03, 5), rep(0.5, 5), rep(0.5, 5))
+    padj_rank <- c(rep(0.02, 5), rep(0.5, 5), rep(0.03, 5), rep(0.5, 5))
+    
+    analysis_sait@sait_results$sait_interaction <- 
+        data.frame(
+            gene = genes,
+            p_interaction = runif(20, 0, 0.1),
+            adj_p_interaction = padj_sait,
+            stringsAsFactors = FALSE
+        )
+    analysis_rank@rank_test_results$rank_test <- 
+        data.frame(
+            gene = genes,
+            p_value = runif(20, 0, 0.1),
+            adj_p_value = padj_rank,
+            stringsAsFactors = FALSE
+        )
+
+    result <- TSENAT::calculate_concordance(analysis_sait, analysis_rank, verbose = FALSE)
+    
+    meta <- result@metadata$method_concordance
+    expect_true(!is.null(meta$high_conf))
+    expect_true(nrow(meta$high_conf) >= 1)
+    expect_true(all(c("Both significant", "SAIT only", "Rank test only", "Neither significant") %in%
+                    names(meta$agreement_table)))
+})

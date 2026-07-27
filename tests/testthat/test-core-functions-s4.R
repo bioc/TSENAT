@@ -3503,3 +3503,150 @@ test_that("plot_expression with explicit gene parameter", {
     
     expect_true(is.null(result) || is(result, "ggplot") || is.character(result))
 })
+
+# ===========================================================================
+# COVERAGE IMPROVEMENT: .apply_diversity_post_hoc_norm (log_odds_ratio, relative_reference)
+# ===========================================================================
+
+test_that(".apply_diversity_post_hoc_norm applies log_odds_ratio normalization", {
+    # Matrix: 2 genes x 4 samples
+    assay_matrix <- matrix(c(0.5, 1.0, 1.5, 2.0), nrow = 2)
+    rownames(assay_matrix) <- c("gene1", "gene2")
+    colnames(assay_matrix) <- c("S1_q=1.0", "S2_q=1.0")
+    result_se <- SummarizedExperiment(assays = list(diversity = assay_matrix))
+    
+    # params$genes must be non-NULL for log_odds_ratio
+    # Names must match rownames and length must match ncol
+    params <- list(
+        genes = c("gene1", "gene2"),
+        reference_group = NULL
+    )
+    
+    result_se_out <- TSENAT:::.apply_diversity_post_hoc_norm(
+        result_se,
+        norm_method = "log_odds_ratio",
+        params,
+        q_val = 1.0,
+        verbose = FALSE
+    )
+    
+    expect_true(is(result_se_out, "SummarizedExperiment"))
+    expect_true("diversity" %in% names(SummarizedExperiment::assays(result_se_out)))
+    normalized_assay <- SummarizedExperiment::assay(result_se_out, "diversity")
+    expect_true(is.numeric(normalized_assay))
+})
+
+test_that(".apply_diversity_post_hoc_norm applies log_odds_ratio with CI assays", {
+    assay_matrix <- matrix(c(0.5, 1.0, 1.5, 2.0), nrow = 2)
+    rownames(assay_matrix) <- c("gene1", "gene2")
+    colnames(assay_matrix) <- c("S1_q=1.0", "S2_q=1.0")
+    ci_lower <- assay_matrix * 0.9
+    ci_upper <- assay_matrix * 1.1
+    colnames(ci_lower) <- colnames(assay_matrix)
+    colnames(ci_upper) <- colnames(assay_matrix)
+    
+    result_se <- SummarizedExperiment(
+        assays = list(diversity = assay_matrix, ci_lower = ci_lower, ci_upper = ci_upper)
+    )
+    
+    params <- list(
+        genes = c("gene1", "gene2"),
+        reference_group = NULL
+    )
+    
+    result_se_out <- TSENAT:::.apply_diversity_post_hoc_norm(
+        result_se,
+        norm_method = "log_odds_ratio",
+        params,
+        q_val = 1.0,
+        verbose = TRUE
+    )
+    
+    expect_true(is(result_se_out, "SummarizedExperiment"))
+    expect_true(all(c("diversity", "ci_lower", "ci_upper") %in%
+                    names(SummarizedExperiment::assays(result_se_out))))
+})
+
+test_that(".apply_diversity_post_hoc_norm applies relative_reference normalization", {
+    assay_matrix <- matrix(c(1.0, 1.5, 2.0, 2.5), nrow = 2)
+    rownames(assay_matrix) <- c("gene1", "gene2")
+    
+    # colData must have same number of rows as assay columns
+    result_se <- SummarizedExperiment(
+        assays = list(diversity = assay_matrix),
+        colData = data.frame(
+            group = c("control", "control"),
+            row.names = paste0("S", 1:2)
+        )
+    )
+    
+    params <- list(
+        genes = NULL,
+        reference_group = "control"
+    )
+    
+    result_se_out <- TSENAT:::.apply_diversity_post_hoc_norm(
+        result_se,
+        norm_method = "relative_reference",
+        params,
+        q_val = 1.0,
+        verbose = FALSE
+    )
+    
+    expect_true(is(result_se_out, "SummarizedExperiment"))
+    expect_true("diversity" %in% names(SummarizedExperiment::assays(result_se_out)))
+})
+
+test_that(".apply_diversity_post_hoc_norm relative_reference with CI assays", {
+    assay_matrix <- matrix(c(1.0, 1.5, 2.0, 2.5), nrow = 2)
+    rownames(assay_matrix) <- c("gene1", "gene2")
+    ci_lower <- assay_matrix * 0.8
+    ci_upper <- assay_matrix * 1.2
+    
+    result_se <- SummarizedExperiment(
+        assays = list(diversity = assay_matrix, ci_lower = ci_lower, ci_upper = ci_upper),
+        colData = data.frame(
+            group = c("ref", "test"),
+            row.names = paste0("S", 1:2)
+        )
+    )
+    
+    params <- list(genes = NULL, reference_group = "ref")
+    
+    result_se_out <- TSENAT:::.apply_diversity_post_hoc_norm(
+        result_se,
+        norm_method = "relative_reference",
+        params,
+        q_val = 1.0,
+        verbose = TRUE
+    )
+    
+    expect_true(is(result_se_out, "SummarizedExperiment"))
+    expect_true(all(c("diversity", "ci_lower", "ci_upper") %in%
+                    names(SummarizedExperiment::assays(result_se_out))))
+})
+
+test_that(".apply_diversity_post_hoc_norm zscore with CI assays", {
+    assay_matrix <- matrix(c(1.0, 2.0, 3.0, 4.0, 5.0, 6.0), nrow = 2)
+    rownames(assay_matrix) <- c("gene1", "gene2")
+    ci_lower <- assay_matrix * 0.9
+    ci_upper <- assay_matrix * 1.1
+    
+    result_se <- SummarizedExperiment(
+        assays = list(diversity = assay_matrix, ci_lower = ci_lower, ci_upper = ci_upper)
+    )
+    
+    params <- list(genes = NULL, reference_group = NULL)
+    
+    result_se_out <- TSENAT:::.apply_diversity_post_hoc_norm(
+        result_se,
+        norm_method = "zscore",
+        params,
+        q_val = 1.0,
+        verbose = FALSE
+    )
+    
+    expect_true(is(result_se_out, "SummarizedExperiment"))
+    expect_true(all(c("diversity", "ci_lower", "ci_upper") %in%
+                    names(SummarizedExperiment::assays(result_se_out))))
+})

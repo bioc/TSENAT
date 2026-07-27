@@ -1213,3 +1213,43 @@ test_that(".create_summary_stats uses custom p-value columns", {
   expect_is(result, "data.frame")
   expect_equal(nrow(result), 2)
 })
+
+# ============================================================================
+# COVERAGE IMPROVEMENT: .map_metadata_expand_coldata (50%) — equal-dimensions branch
+# ============================================================================
+
+test_that(".map_metadata_expand_coldata sets rownames when dimensions match", {
+    assay_mat <- matrix(1:10, nrow = 5)
+    colnames(assay_mat) <- c("S1", "S2")
+    
+    se <- SummarizedExperiment::SummarizedExperiment(
+        assays = list(diversity = assay_mat),
+        colData = S4Vectors::DataFrame(
+            condition = c("A", "B"),
+            row.names = c("S1", "S2")
+        )
+    )
+    
+    result <- TSENAT:::.map_metadata_expand_coldata(se, c("S1", "S2"))
+    
+    expect_equal(nrow(SummarizedExperiment::colData(result)), 2)
+    expect_equal(rownames(SummarizedExperiment::colData(result)), c("S1", "S2"))
+})
+
+test_that(".map_metadata_expand_coldata preserves colData when more rows than cols", {
+    assay_mat <- matrix(1:10, nrow = 5)
+    colnames(assay_mat) <- c("S1", "S2")
+    
+    se <- SummarizedExperiment::SummarizedExperiment(
+        assays = list(diversity = assay_mat),
+        colData = S4Vectors::DataFrame(
+            condition = c("A", "B"),
+            row.names = c("S1", "S2")
+        )
+    )
+    
+    result <- TSENAT:::.map_metadata_expand_coldata(se, c("S1", "S2"))
+    
+    expect_equal(nrow(SummarizedExperiment::colData(result)), 2)
+    expect_equal(SummarizedExperiment::colData(result)$condition, c("A", "B"))
+})

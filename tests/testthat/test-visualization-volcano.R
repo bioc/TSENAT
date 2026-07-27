@@ -413,3 +413,19 @@ test_that("faceted plot grid consistency", {
   expect_is(p, "ggplot")
 })
 
+# ============================================================================
+# COVERAGE: .plot_divergence_distribution threshold annotation (July 2026)
+# ============================================================================
+
+test_that(".plot_divergence_distribution adds threshold annotation", {
+  set.seed(123)
+  interaction_results <- data.frame(
+    gene = paste0("gene_", 1:20),
+    effect_size_D_q0_5 = runif(20, 0, 0.3),
+    effect_size_D_q1_0 = runif(20, 0, 0.2),
+    effect_size_D_q1_5 = runif(20, 0, 0.25)
+  )
+  p <- TSENAT:::.plot_divergence_distribution(interaction_results, threshold = 0.1)
+  expect_s3_class(p, "ggplot")
+})
+
