@@ -469,12 +469,15 @@
 .test_q_condition_interaction_art <- function(data, value_col, q_col, condition_col,
                                                paired, subject_col, pre_factored = FALSE) {
     tryCatch({
-        # OPTIMIZATION: Skip factor conversion if caller already did it
-        # (saves ~5% per gene call, significant at scale: 200 genes × 500 permutations)
-        if (!pre_factored) {
+        # Ensure factors (skip only if already factor, never skip for character)
+        if (!pre_factored || !is.factor(data[[q_col]])) {
             data[[q_col]] <- factor(data[[q_col]])
+        }
+        if (!pre_factored || !is.factor(data[[condition_col]])) {
             data[[condition_col]] <- factor(data[[condition_col]])
-            if (paired && !is.null(subject_col)) {
+        }
+        if (paired && !is.null(subject_col)) {
+            if (!pre_factored || !is.factor(data[[subject_col]])) {
                 data[[subject_col]] <- factor(data[[subject_col]])
             }
         }
