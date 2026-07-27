@@ -344,7 +344,8 @@ plot_diversity_spectrum <- function(se, assay_name = "diversity", condition_col 
         line_width = 1.2, show_points = FALSE)
     p <- .apply_group_aesthetics(p, palette = "palette_blue_red", legend_name = "Group")
     p <- .apply_publication_theme(p, base_theme = "theme_spectrum", base_size = 11,
-        title = "Tsallis Entropy Across Diversity Scales (q-spectrum)", subtitle = "Observed median (line) with bootstrap 95% percentile CI (shaded band)")
+        title = "Tsallis Entropy q-Spectrum: Scale-Dependent Diversity Patterns",
+        subtitle = "Lines trace median normalized entropy from rare (low q) to dominant (high q) isoforms")
     p <- p + ggplot2::labs(x = "q value", y = expression("Tsallis entropy (" * S[q] *
         ")"), color = "Group", fill = "Group")
 
@@ -526,7 +527,8 @@ plot_diversity_spectrum <- function(se, assay_name = "diversity", condition_col 
         spread, ymax = median + spread), alpha = 0.2, color = NA)
     p <- .apply_group_aesthetics(p, palette = "palette_blue_red", legend_name = "Group")
     p <- .apply_publication_theme(p, base_theme = "theme_spectrum", base_size = 11,
-        title = "Tsallis Entropy Across Diversity Scales (q-spectrum)", subtitle = subtitle)
+        title = "Tsallis Entropy q-Spectrum: Scale-Dependent Diversity Patterns",
+        subtitle = "Lines trace median normalized entropy from rare (low q) to dominant (high q) isoforms")
     p <- p + ggplot2::labs(x = "q value", y = expression("Tsallis entropy (" * S[q] *
         ")"))
 
