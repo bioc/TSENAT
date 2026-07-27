@@ -151,79 +151,65 @@ calculate_sait <- function(analysis, fdr_threshold = NULL, formula = NULL, condi
     method = "gam", paired = NULL, subject_col = NULL, nthreads = NULL, multicorr = NULL,
     corstr = NULL, pcorr = NULL, verbose = NULL, return_model_data = NULL, output_file = NULL,
     ...) {
-    # Validate input
     if (!is(analysis, "TSENATAnalysis")) {
         stop("'analysis' must be a TSENATAnalysis object", call. = FALSE)
     }
-
-    # Clear cache for fresh calculations
     .clear_sait_helper_cache()
-
-    # Check prerequisites
     if (length(analysis@diversity_results) == 0) {
         stop("Diversity results required. Run calculate_diversity() first.", call. = FALSE)
     }
 
-    # Sync colData from diversity results
     analysis <- .sync_coldata_from_diversity(analysis, verbose = verbose)
+    resolved <- ._sait_resolve_params(analysis, fdr_threshold, formula, condition_col,
+        method, paired, subject_col, nthreads, multicorr, corstr, pcorr, verbose,
+        return_model_data, output_file)
+    analysis <- ._sait_execute_and_store(analysis, resolved, ...)
+    if (!is.null(resolved$output_file) && is.data.frame(analysis@sait_results$sait_interaction)) {
+        save_analysis_output(analysis@sait_results$sait_interaction, resolved$output_file,
+            object = analysis, verbose = resolved$verbose, func_name = "calculate_sait")
+    }
+    analysis
+}
 
-    # Resolve parameters from config first
-    fdr_threshold <- resolve_slot_param(fdr_threshold, analysis@config, "fdr_threshold",
-        NULL)
+#' Resolve all SAIT parameters from config and auto-detection
+#' @noRd
+._sait_resolve_params <- function(analysis, fdr_threshold, formula, condition_col,
+    method, paired, subject_col, nthreads, multicorr, corstr, pcorr, verbose,
+    return_model_data, output_file) {
+    fdr_threshold <- resolve_slot_param(fdr_threshold, analysis@config, "fdr_threshold", NULL)
     formula <- resolve_slot_param(formula, analysis@config, "formula", NULL)
-    output_file <- resolve_slot_param(output_file, analysis@config, "output_file",
-        NULL)
+    output_file <- resolve_slot_param(output_file, analysis@config, "output_file", NULL)
     verbose <- resolve_slot_param(verbose, analysis@config, "verbose", FALSE)
     paired <- resolve_slot_param(paired, analysis@config, "paired", FALSE)
-    return_model_data <- resolve_slot_param(return_model_data, analysis@config, "return_model_data",
-        TRUE)
+    return_model_data <- resolve_slot_param(return_model_data, analysis@config, "return_model_data", TRUE)
 
-    # Extract and resolve remaining parameters Note: .extract_sait_params()
-    # receives resolved paired value
     params <- .extract_sait_params(analysis, condition_col = condition_col, method = method,
-        subject_col = subject_col, nthreads = nthreads, multicorr = multicorr, corstr = corstr,
-        pcorr = pcorr, paired = paired, verbose = verbose)
+        subject_col = subject_col, nthreads = nthreads, multicorr = multicorr,
+        corstr = corstr, pcorr = pcorr, paired = paired, verbose = verbose)
 
-    # Combine diversity results across q-values
+    list(fdr_threshold = fdr_threshold, formula = formula, output_file = output_file,
+        verbose = verbose, paired = paired, return_model_data = return_model_data,
+        params = params)
+}
+
+#' Execute SAIT computation and store results
+#' @noRd
+._sait_execute_and_store <- function(analysis, resolved, ...) {
     diversity_combined <- .combine_diversity_results_for_sait(analysis@diversity_results)
-
-    # REQUIREMENT: Check that we have at least 5 unique q-values ARIMA(1,1,0)
-    # differencing removes 1 observation per subject, leaving (n_q - 1) unique
-    # values With 5 q-values: after ARIMA -> 4 unique q-values This provides
-    # sufficient degrees of freedom for GAM spline fitting (k=3 or k=4 works
-    # with 4 unique values)
     q_values <- sort(as.numeric(unique(sub(".*q=", "", colnames(diversity_combined)))))
     if (length(q_values) < 5) {
-        stop(sprintf("[calculate_sait] At least 5 unique q-values are required for interaction analysis. Current data has only %d unique q-value(s). Ensure diversity_results contains >=5 distinct q values. After ARIMA(1,1,0) differencing, this leaves sufficient degrees of freedom for GAM fitting.",
+        stop(sprintf("[calculate_sait] At least 5 unique q-values are required for interaction analysis. Current data has only %d unique q-value(s).",
             length(q_values)), call. = FALSE)
     }
-
-    # Build arguments for SAIT calculation
-    args <- .build_sait_args(diversity_combined, params, return_model_data = return_model_data,
-        verbose = verbose, ...)
-
-    # Run SAIT analysis directly; propagate real errors so the caller sees a
-    # genuine failure instead of a silently empty result object.
+    args <- .build_sait_args(diversity_combined, resolved$params,
+        return_model_data = resolved$return_model_data, verbose = resolved$verbose, ...)
     result <- do.call(.calculate_sait, args)
-
-    # Validate and extract results
     extracted <- .validate_and_extract_sait_result(result)
     if (nrow(extracted$results) == 0) {
-        # Return early with empty results
         analysis@sait_results <- list(sait_interaction = data.frame())
         return(analysis)
     }
-
-    # Store results in analysis object
-    analysis <- .store_sait_results_in_analysis(analysis, extracted$results, extracted$model_data)
-
-    # Save output if requested
-    if (!is.null(output_file) && is.data.frame(extracted$results)) {
-        save_analysis_output(extracted$results, output_file, object = analysis, verbose = verbose,
-            func_name = "calculate_sait")
-    }
-
-    analysis
+    .store_sait_results_in_analysis(analysis, extracted$results, extracted$model_data)
 }
 
 # Helper: Sync colData from diversity results to analysis@se @param analysis

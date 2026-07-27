@@ -173,7 +173,7 @@
 calculate_jis <- function(analysis, condition_col = NULL, subject_col = NULL, gene_col = NULL,
     isoform_col = NULL, q = c(0, 0.5, 1, 1.5, 2), norm = NULL, log_base = NULL, threshold = 90,
     nboot = 1000, pseudocount = NULL, sait_results = NULL, sait_p_threshold = 0.05, use_sait_fdr = TRUE,
-    output_file = NULL, verbose = FALSE, ...) {
+    nthreads = NULL, output_file = NULL, verbose = FALSE, ...) {
     # Validate input and extract SummarizedExperiment
     se <- .validate_jis_input(analysis)
 
@@ -191,7 +191,7 @@ calculate_jis <- function(analysis, condition_col = NULL, subject_col = NULL, ge
     # Resolve and validate all parameters (including threshold and
     # sait_p_threshold)
     params <- .resolve_and_validate_jis_params(q, norm, log_base, pseudocount, nboot,
-        threshold, sait_p_threshold, analysis, verbose)
+        threshold, sait_p_threshold, nthreads, analysis, verbose)
 
     # Call base jackknife function
     result <- tryCatch({
@@ -199,7 +199,8 @@ calculate_jis <- function(analysis, condition_col = NULL, subject_col = NULL, ge
             gene_col = gene_col, isoform_col = isoform_col, q = params$q, norm = params$norm,
             log_base = params$log_base, threshold = params$threshold, nboot = params$nboot,
             pseudocount = params$pseudocount, verbose = verbose, sait_results = sait_results,
-            sait_p_threshold = params$sait_p_threshold, use_sait_fdr = use_sait_fdr)
+            sait_p_threshold = params$sait_p_threshold, use_sait_fdr = use_sait_fdr,
+            nthreads = params$nthreads)
     }, error = function(e) {
         stop("[calculate_jis] Jackknife analysis failed:\n", conditionMessage(e),
             call. = FALSE)
@@ -400,7 +401,8 @@ calculate_jis <- function(analysis, condition_col = NULL, subject_col = NULL, ge
 #'
 #' @noRd
 .resolve_and_validate_jis_params <- function(q, norm = NULL, log_base = NULL, pseudocount = NULL,
-    nboot = 1000, threshold = NULL, sait_p_threshold = NULL, analysis, verbose = FALSE) {
+    nboot = 1000, threshold = NULL, sait_p_threshold = NULL, nthreads = NULL,
+    analysis, verbose = FALSE) {
     # Resolve q: use config if available, otherwise use the provided value
     # (which has function default)
     if (is.null(q) && "q" %in% names(analysis@config)) {
@@ -421,6 +423,7 @@ calculate_jis <- function(analysis, condition_col = NULL, subject_col = NULL, ge
     threshold <- resolve_slot_param(threshold, analysis@config, "threshold", 90)
     sait_p_threshold <- resolve_slot_param(sait_p_threshold, analysis@config, "sait_p_threshold",
         0.05)
+    nthreads <- resolve_slot_param(nthreads, analysis@config, "nthreads", 1)
 
     # Validate nboot
     if (!is.numeric(nboot) || length(nboot) != 1 || nboot < 1) {
@@ -442,7 +445,8 @@ calculate_jis <- function(analysis, condition_col = NULL, subject_col = NULL, ge
     }
 
     list(q = q, q_vals = q_vals, norm = norm, log_base = log_base, pseudocount = pseudocount,
-        nboot = nboot, threshold = threshold, sait_p_threshold = sait_p_threshold)
+        nboot = nboot, threshold = threshold, sait_p_threshold = sait_p_threshold,
+        nthreads = nthreads)
 }
 
 #' Store jackknife results in analysis object

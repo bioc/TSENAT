@@ -375,3 +375,107 @@ test_that("Helper: .store_sait_results_in_analysis tracks function call", {
   # Check that function call was tracked
   expect_true("calculate_sait" %in% result@metadata$function_calls)
 })
+
+# ============================================================================
+# TESTS FOR REFACTORED HELPERS: ._sait_resolve_params, ._sait_execute_and_store
+# ============================================================================
+
+test_that("._sait_resolve_params resolves all parameters from config", {
+    analysis <- .create_test_analysis()
+    analysis@config$fdr_threshold <- 0.1
+    analysis@config$verbose <- TRUE
+    analysis@config$paired <- FALSE
+    analysis@config$return_model_data <- FALSE
+    
+    SummarizedExperiment::colData(analysis@se)$condition <- c("A", "A", "B", "B")
+    analysis@config$condition_col <- "condition"
+    
+    resolved <- TSENAT:::._sait_resolve_params(
+        analysis, fdr_threshold = NULL, formula = NULL,
+        condition_col = NULL, method = "lmm", paired = NULL,
+        subject_col = NULL, nthreads = NULL, multicorr = NULL,
+        corstr = NULL, pcorr = NULL, verbose = NULL,
+        return_model_data = NULL, output_file = NULL
+    )
+    
+    expect_equal(resolved$fdr_threshold, 0.1)
+    expect_true(resolved$verbose)
+    expect_false(resolved$paired)
+    expect_false(resolved$return_model_data)
+    expect_equal(resolved$params$method, "lmm")
+})
+
+test_that("._sait_execute_and_store returns analysis with results", {
+    analysis <- .create_test_analysis()
+    SummarizedExperiment::colData(analysis@se)$condition <- c("A", "A", "B", "B")
+    
+    # Add diversity results: one SE per q-value, each with 4 genes x 4 samples
+    n_genes <- 4
+    n_samples <- 4
+    q_vals <- c(0.1, 0.5, 1.0, 1.5, 2.0)
+    div_results <- list()
+    for (q in q_vals) {
+        div_mat <- matrix(rnorm(n_genes * n_samples, mean = 0.8, sd = 0.1), nrow = n_genes)
+        colnames(div_mat) <- paste0("S", 1:n_samples)
+        rownames(div_mat) <- paste0("Gene", 1:n_genes)
+        q_key <- paste0("q_", sprintf("%.2f", q))
+        div_results[[q_key]] <- SummarizedExperiment::SummarizedExperiment(
+            assays = list(diversity = div_mat),
+            colData = data.frame(condition = rep(c("A", "B"), each = 2),
+                                 row.names = paste0("S", 1:n_samples))
+        )
+    }
+    analysis@diversity_results <- div_results
+    
+    resolved <- list(
+        fdr_threshold = NULL, formula = NULL, output_file = NULL,
+        verbose = FALSE, paired = FALSE, return_model_data = TRUE,
+        params = list(
+            condition_col = "condition", method = "lmm", subject_col = NULL,
+            nthreads = 1, multicorr = "hochberg", corstr = NULL, pcorr = "BH",
+            paired = FALSE
+        )
+    )
+    
+    result <- TSENAT:::._sait_execute_and_store(analysis, resolved)
+    
+    expect_s4_class(result, "TSENATAnalysis")
+    expect_true("sait_interaction" %in% names(result@sait_results))
+})
+
+test_that("._sait_execute_and_store handles empty results gracefully", {
+    analysis <- .create_test_analysis()
+    SummarizedExperiment::colData(analysis@se)$condition <- c("A", "A", "B", "B")
+    
+    # Add diversity results: one SE per q-value
+    n_genes <- 4
+    n_samples <- 4
+    q_vals <- c(0.1, 0.5, 1.0, 1.5, 2.0)
+    div_results <- list()
+    for (q in q_vals) {
+        div_mat <- matrix(rnorm(n_genes * n_samples), nrow = n_genes)
+        colnames(div_mat) <- paste0("S", 1:n_samples)
+        rownames(div_mat) <- paste0("Gene", 1:n_genes)
+        q_key <- paste0("q_", sprintf("%.2f", q))
+        div_results[[q_key]] <- SummarizedExperiment::SummarizedExperiment(
+            assays = list(diversity = div_mat),
+            colData = data.frame(condition = rep(c("A", "B"), each = 2),
+                                 row.names = paste0("S", 1:n_samples))
+        )
+    }
+    analysis@diversity_results <- div_results
+    
+    resolved <- list(
+        fdr_threshold = NULL, formula = NULL, output_file = NULL,
+        verbose = FALSE, paired = FALSE, return_model_data = FALSE,
+        params = list(
+            condition_col = "condition", method = "lmm", subject_col = NULL,
+            nthreads = 1, multicorr = "hochberg", corstr = NULL, pcorr = "BH",
+            paired = FALSE
+        )
+    )
+    
+    result <- TSENAT:::._sait_execute_and_store(analysis, resolved)
+    
+    expect_s4_class(result, "TSENATAnalysis")
+})

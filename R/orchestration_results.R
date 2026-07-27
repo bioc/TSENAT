@@ -155,50 +155,59 @@
 results <- function(analysis, type, q = NULL, rankBy = "none", n = NA, filterFDR = NULL,
     format = "text", n_genes = 4, q_values_table = c(0, 0.5, 1, 1.5, 2), top_n = NULL,
     sort_by = "adj_p_interaction", sample = NULL, plot = FALSE) {
-    # Handle plot extraction first (takes precedence over other parameters)
-    if (isTRUE(plot)) {
-        # Map analysis type to plot cache name
-        plot_name_map <- list(diversity = "q_curve", lm = "sait_interaction", sait = "sait_interaction", influence = "influence_heatmap",
-            jackknife = "top_transcripts", divergence = "divergence_distribution",
-            rank_test = "rank_test", concordance = "concordance")
 
-        plot_name <- plot_name_map[[type]]
-        if (!is.null(plot_name) && plot_name %in% names(analysis@plots)) {
-            return(analysis@plots[[plot_name]])
-        } else if (type %in% names(analysis@plots)) {
-            # Fallback: if type directly matches a cached plot name
-            return(analysis@plots[[type]])
-        } else {
-            available <- if (length(analysis@plots) > 0)
-                paste(names(analysis@plots), collapse = ", ") else "none"
-            warning("Plot for type '", type, "' not found. Available plot types: diversity, sait, influence, jackknife, divergence. Available plots: ",
-                available)
-            return(NULL)
-        }
-    }
+    # Plot extraction takes precedence
+    if (isTRUE(plot)) return(._results_extract_plot(analysis, type))
 
-    # Validate parameters
+    # Validate and extract
     .validate_results_params(analysis, type, rankBy, format, filterFDR)
-
-    # Extract result based on type
     result <- .extract_result_by_type(analysis, type)
+    if (is.null(result)) return(NULL)
 
-    if (is.null(result)) {
-        return(NULL)
-    }
-
-    # Warn about unsupported parameter combinations
     .warn_unsupported_params(type, filterFDR, rankBy)
 
-    # Route to type-specific processor
-    switch(type, diversity = .process_diversity_results(result, q, analysis, n_genes,
-        q_values_table, sample, format), divergence = .process_divergence_results(result,
-        filterFDR, format), sait = , jackknife = , rank_test = .process_statistical_results(result,
-        type, filterFDR, rankBy, n, format), effect_sizes_divergence = .process_effect_sizes_divergence_results(result,
-        top_n, sort_by, analysis), assumptions = .process_assumptions_results(result,
-        format = format), switching_tables = .process_switching_tables_results(result,
-        format = format), concordance = .process_concordance_results(result, format = format),
-        metadata = result, result)
+    # Dispatch to type-specific processor
+    ._results_dispatch(analysis, type, result, q, rankBy, n, filterFDR, format,
+        n_genes, q_values_table, top_n, sort_by, sample)
+}
+
+#' Extract cached plot from analysis
+#' @noRd
+._results_extract_plot <- function(analysis, type) {
+    plot_name_map <- list(
+        diversity = "q_curve", lm = "sait_interaction", sait = "sait_interaction",
+        influence = "influence_heatmap", jackknife = "top_transcripts",
+        divergence = "divergence_distribution", rank_test = "rank_test",
+        concordance = "concordance"
+    )
+    plot_name <- plot_name_map[[type]]
+    if (!is.null(plot_name) && plot_name %in% names(analysis@plots))
+        return(analysis@plots[[plot_name]])
+    if (type %in% names(analysis@plots))
+        return(analysis@plots[[type]])
+    available <- if (length(analysis@plots) > 0)
+        paste(names(analysis@plots), collapse = ", ") else "none"
+    warning("Plot for type '", type, "' not found. Available: ", available)
+    NULL
+}
+
+#' Dispatch result to type-specific processor
+#' @noRd
+._results_dispatch <- function(analysis, type, result, q, rankBy, n, filterFDR,
+    format, n_genes, q_values_table, top_n, sort_by, sample) {
+    switch(type,
+        diversity = .process_diversity_results(result, q, analysis, n_genes,
+            q_values_table, sample, format),
+        divergence = .process_divergence_results(result, filterFDR, format),
+        sait = , jackknife = , rank_test =
+            .process_statistical_results(result, type, filterFDR, rankBy, n, format),
+        effect_sizes_divergence =
+            .process_effect_sizes_divergence_results(result, top_n, sort_by, analysis),
+        assumptions = .process_assumptions_results(result, format = format),
+        switching_tables = .process_switching_tables_results(result, format = format),
+        concordance = .process_concordance_results(result, format = format),
+        metadata = result,
+        result)
 }
 
 # ============================================================================

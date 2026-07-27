@@ -75,7 +75,7 @@
 .calculate_jis <- function(se = NULL, condition_col = "condition", subject_col = NULL,
     gene_col = NULL, isoform_col = NULL, q = 1, norm = TRUE, log_base = exp(1), pseudocount = 0,
     threshold = 90, nboot = 1000, verbose = TRUE, sait_results = NULL, sait_p_threshold = 0.05,
-    use_sait_fdr = TRUE) {
+    use_sait_fdr = TRUE, nthreads = 1) {
     # 1. Validate input
     conditions <- .jis_validate_input(se, condition_col, gene_col, isoform_col)
 
@@ -102,7 +102,8 @@
 
     # 5. Process genes
     gene_results <- .jis_process_all_genes(se, gene_ids, gene_col, isoform_col, condition_col,
-        conditions, paired_info, q, norm, log_base, pseudocount, nboot, sait_gene_mapping)
+        conditions, paired_info, q, norm, log_base, pseudocount, nboot, sait_gene_mapping,
+        nthreads = nthreads)
 
     # 6. Build results
     summary_results <- .jis_build_summary_results(se, gene_results$results_per_gene,
@@ -336,23 +337,27 @@
 }
 
 #' Process all genes for isoform switching analysis
-
+#'
+#' @param nthreads Number of threads for parallel gene processing (default: 1).
+#'   Genes are independent and can be processed in parallel for significant
+#'   speedup on multi-core systems.
+#'
 #' @noRd
 .jis_process_all_genes <- function(se, gene_ids, gene_col, isoform_col, condition_col,
-    conditions, paired_info, q, norm, log_base, pseudocount, nboot, sait_gene_mapping) {
-    results_per_gene <- list()
-    all_pvalues <- list()
-    gene_processing_log <- data.frame(gene = character(), n_transcripts = numeric(),
-        has_2_transcripts = logical(), in_results = logical(), stringsAsFactors = FALSE)
+    conditions, paired_info, q, norm, log_base, pseudocount, nboot, sait_gene_mapping,
+    nthreads = 1) {
 
-    for (gene in gene_ids) {
+    # Worker function: process a single gene, returns NULL for skipped genes
+    .jis_process_single_gene <- function(gene) {
         gene_mask <- rowData(se)[[gene_col]] == gene
         gene_isos <- rowData(se)[gene_mask, isoform_col]
 
         if (length(gene_isos) < 2) {
-            gene_processing_log <- rbind(gene_processing_log, data.frame(gene = gene,
-                n_transcripts = length(gene_isos), has_2_transcripts = FALSE, in_results = FALSE))
-            next
+            return(list(
+                gene = gene, n_transcripts = length(gene_isos),
+                has_2_transcripts = FALSE, in_results = FALSE,
+                gene_result = NULL, pvalues = NULL
+            ))
         }
 
         # Extract condition-specific counts
@@ -395,51 +400,64 @@
             q = q, norm = norm, log_base = log_base, pseudocount = pseudocount, nboot = nboot,
             confidence = 0.95, method = "percentile", n_transcripts = nrow(counts_A))
 
-        # AUDIT FIX #31: Determine switching status using CI, not just point estimate.
-        # If CI crosses zero, the direction is uncertain → "neutral".
-        # If CI is entirely above zero → "up"; entirely below zero → "down".
         ci_lo <- delta_stats$ci_lower
         ci_hi <- delta_stats$ci_upper
         switching_status <- ifelse(!is.na(ci_lo) & !is.na(ci_hi) & ci_lo > 0, "up",
             ifelse(!is.na(ci_lo) & !is.na(ci_hi) & ci_hi < 0, "down", "neutral"))
 
-        # Compute effect size
         max_abs_influence <- max(abs(c(.jis_jackknife_influences_fast(counts_A, q,
             norm, log_base, pseudocount, nrow(counts_A)), .jis_jackknife_influences_fast(counts_B,
             q, norm, log_base, pseudocount, nrow(counts_A)))), na.rm = TRUE)
-        effect_size <- ifelse(max_abs_influence > 0, abs(delta_influence)/max_abs_influence,
-            0)
+        effect_size <- ifelse(max_abs_influence > 0, abs(delta_influence)/max_abs_influence, 0)
         ci_width <- delta_stats$ci_upper - delta_stats$ci_lower
-        relative_ci_width <- ifelse(abs(delta_influence) > 1e-10, ci_width/(abs(delta_influence) +
-            1e-10), NA)
+        relative_ci_width <- ifelse(abs(delta_influence) > 1e-10, ci_width/(abs(delta_influence) + 1e-10), NA)
 
-        # Build gene result
         gene_result <- list(gene_id = gene, transcript_ids = as.character(gene_isos),
             delta_influence = delta_influence, delta_se = delta_stats$se, delta_ci_lower = delta_stats$ci_lower,
             delta_ci_upper = delta_stats$ci_upper, delta_pvalue = delta_stats$pvalue,
             switching_status = switching_status, effect_size = effect_size, ci_width = ci_width,
             relative_ci_width = relative_ci_width, power_assessment = delta_stats$power_assessment)
 
-        # Add SAIT results if available
         if (!is.null(sait_gene_mapping)) {
             sait_row <- sait_gene_mapping[sait_gene_mapping$gene == gene, ]
             if (nrow(sait_row) > 0) {
                 gene_result$sait_p_interaction <- if ("p_interaction" %in% colnames(sait_row))
-                  sait_row$p_interaction[1] else NA
-                gene_result$sait_adj_p_interaction <- if ("adj_p_interaction" %in%
-                  colnames(sait_row))
-                  sait_row$adj_p_interaction[1] else NA
+                    sait_row$p_interaction[1] else NA
+                gene_result$sait_adj_p_interaction <- if ("adj_p_interaction" %in% colnames(sait_row))
+                    sait_row$adj_p_interaction[1] else NA
             }
         }
 
-        results_per_gene[[gene]] <- gene_result
-        gene_processing_log <- rbind(gene_processing_log, data.frame(gene = gene,
-            n_transcripts = length(gene_isos), has_2_transcripts = TRUE, in_results = TRUE))
+        pvalues <- lapply(seq_along(gene_isos), function(i) {
+            list(gene = gene, transcript = gene_isos[i], pvalue = delta_stats$pvalue[i])
+        })
 
-        # Record p-values
-        for (i in seq_along(gene_isos)) {
-            all_pvalues[[length(all_pvalues) + 1]] <- list(gene = gene, transcript = gene_isos[i],
-                pvalue = delta_stats$pvalue[i])
+        list(
+            gene = gene, n_transcripts = length(gene_isos),
+            has_2_transcripts = TRUE, in_results = TRUE,
+            gene_result = gene_result, pvalues = pvalues
+        )
+    }
+
+    # Process all genes (parallel if nthreads > 1)
+    raw_results <- .bplapply(gene_ids, .jis_process_single_gene, nthreads = nthreads)
+
+    # Aggregate results from workers
+    results_per_gene <- list()
+    all_pvalues <- list()
+    gene_processing_log <- data.frame(gene = character(), n_transcripts = numeric(),
+        has_2_transcripts = logical(), in_results = logical(), stringsAsFactors = FALSE)
+
+    for (r in raw_results) {
+        gene_processing_log <- rbind(gene_processing_log, data.frame(
+            gene = r$gene, n_transcripts = r$n_transcripts,
+            has_2_transcripts = r$has_2_transcripts, in_results = r$in_results,
+            stringsAsFactors = FALSE))
+        if (!is.null(r$gene_result)) {
+            results_per_gene[[r$gene]] <- r$gene_result
+        }
+        if (!is.null(r$pvalues)) {
+            all_pvalues <- c(all_pvalues, r$pvalues)
         }
     }
 

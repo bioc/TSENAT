@@ -981,3 +981,108 @@ test_that(".validate_bootstrap_input accepts vector pseudocount of correct lengt
   )
 })
 
+# ============================================================================
+# TESTS FOR REFACTORED HELPERS: ._bootstrap_resolve_nboot, ._bootstrap_dispatch_input,
+# ._bootstrap_single_vector, ._bootstrap_multi_q
+# ============================================================================
+
+test_that("._bootstrap_resolve_nboot returns provided nboot when not 'auto'", {
+    result <- TSENAT:::._bootstrap_resolve_nboot(500, x = NULL, se = NULL, method = "percentile", nthreads = 1)
+    expect_equal(result, 500)
+})
+
+test_that("._bootstrap_resolve_nboot auto-selects when nboot='auto' with matrix", {
+    x <- matrix(1:12, nrow = 3)
+    result <- TSENAT:::._bootstrap_resolve_nboot("auto", x = x, se = NULL, method = "percentile", nthreads = 1)
+    expect_true(is.numeric(result))
+    expect_true(result > 0)
+})
+
+test_that("._bootstrap_resolve_nboot auto-selects when nboot='auto' with SE", {
+    se <- SummarizedExperiment::SummarizedExperiment(
+        assays = list(counts = matrix(1:20, nrow = 5))
+    )
+    result <- TSENAT:::._bootstrap_resolve_nboot("auto", x = NULL, se = se, method = "bca", nthreads = 1)
+    expect_true(is.numeric(result))
+    expect_true(result > 0)
+})
+
+test_that("._bootstrap_dispatch_input returns result for matrix input", {
+    x <- matrix(1:12, nrow = 3)
+    rownames(x) <- c("g1", "g2", "g3")
+    result <- TSENAT:::._bootstrap_dispatch_input(
+        x = x, se = NULL, res = NULL, top_n = 1, q = 1, norm = TRUE, nboot = 10,
+        ci = 0.95, method = "percentile", log_base = exp(1), pseudocount = 0,
+        what = "S", gene_name = NULL, verbose = FALSE, include_diagnostics = FALSE,
+        use_job = FALSE, nthreads = 1, paired = FALSE, resample_by = "read",
+        counts_matrix = NULL
+    )
+    expect_type(result, "list")
+    expect_s3_class(result, "tsenat_bootstrap_ci_list")
+})
+
+test_that("._bootstrap_dispatch_input returns NULL for vector input", {
+    x <- c(10, 20, 30)
+    result <- TSENAT:::._bootstrap_dispatch_input(
+        x = x, se = NULL, res = NULL, top_n = 1, q = 1, norm = TRUE, nboot = 10,
+        ci = 0.95, method = "percentile", log_base = exp(1), pseudocount = 0,
+        what = "S", gene_name = NULL, verbose = FALSE, include_diagnostics = FALSE,
+        use_job = FALSE, nthreads = 1, paired = FALSE, resample_by = "read",
+        counts_matrix = NULL
+    )
+    expect_null(result)
+})
+
+test_that("._bootstrap_dispatch_input errors when no x and no se+res", {
+    expect_error(
+        TSENAT:::._bootstrap_dispatch_input(
+            x = NULL, se = NULL, res = NULL, top_n = 1, q = 1, norm = TRUE, nboot = 10,
+            ci = 0.95, method = "percentile", log_base = exp(1), pseudocount = 0,
+            what = "S", gene_name = NULL, verbose = FALSE, include_diagnostics = FALSE,
+            use_job = FALSE, nthreads = 1, paired = FALSE, resample_by = "read",
+            counts_matrix = NULL
+        ),
+        "must be provided"
+    )
+})
+
+test_that("._bootstrap_single_vector produces a valid bootstrap CI", {
+    x <- c(100, 50, 25, 10)
+    result <- TSENAT:::._bootstrap_single_vector(
+        x = x, q = 1, nboot = 50, ci = 0.95, paired = FALSE, show_messages = FALSE,
+        effective_length = NULL, pseudocount = 0, norm = TRUE, method = "percentile",
+        log_base = exp(1), what = "S", min_valid_frac = 0.5, resample_by = "read",
+        counts_matrix = NULL, include_diagnostics = FALSE, use_job = FALSE,
+        gene_name = "test_gene", verbose = FALSE
+    )
+    expect_type(result, "list")
+    expect_true("estimate" %in% names(result))
+    expect_true("lower_ci" %in% names(result))
+    expect_true("upper_ci" %in% names(result))
+})
+
+test_that("._bootstrap_single_vector handles multi-q input", {
+    x <- c(100, 50, 25, 10)
+    result <- TSENAT:::._bootstrap_single_vector(
+        x = x, q = c(0.5, 1, 2), nboot = 30, ci = 0.95, paired = FALSE,
+        show_messages = FALSE, effective_length = NULL, pseudocount = 0,
+        norm = TRUE, method = "percentile", log_base = exp(1), what = "S",
+        min_valid_frac = 0.5, resample_by = "read", counts_matrix = NULL,
+        include_diagnostics = FALSE, use_job = FALSE,
+        gene_name = "test_gene", verbose = FALSE
+    )
+    expect_type(result, "list")
+})
+
+test_that("._bootstrap_multi_q returns named list with CI for each q", {
+    x <- c(100, 50, 25, 10)
+    result <- TSENAT:::._bootstrap_multi_q(
+        x = x, q = c(1, 2), norm = TRUE, nboot = 30, ci = 0.95,
+        method = "percentile", log_base = exp(1), pseudocount = 0, what = "S",
+        gene_name = "test", verbose = FALSE, include_diagnostics = FALSE,
+        use_job = FALSE, paired = FALSE, effective_length = NULL,
+        min_valid_frac = 0.5, resample_by = "read", counts_matrix = NULL
+    )
+    expect_type(result, "list")
+})
+

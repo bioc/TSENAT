@@ -9,73 +9,97 @@
     what <- match.arg(what)
     resample_by <- match.arg(resample_by)
 
-    # Auto-select nboot if requested
-    if (identical(nboot, "auto")) {
-        n_genes <- if (!is.null(x) && is.matrix(x))
-            nrow(x) else if (!is.null(se))
-            nrow(se) else 1
-        nboot <- .bootstrap_auto_select_nboot(n_genes, method == "bca", nthreads)
-    }
+    nboot <- ._bootstrap_resolve_nboot(nboot, x, se, method, nthreads)
 
-    # PHASE 1: Handle matrix input (vectorized processing)
+    # Dispatch by input type: matrix → bulk, SE+res → single-SE, vector → single
+    result <- ._bootstrap_dispatch_input(x, se, res, top_n, q, norm, nboot, ci,
+        method, log_base, pseudocount, what, gene_name, verbose, include_diagnostics,
+        use_job, nthreads, paired, resample_by, counts_matrix)
+    if (!is.null(result)) return(invisible(result))
+
+    # Single vector path: validate, compute, print
+    ._bootstrap_single_vector(x, q, nboot, ci, paired, show_messages,
+        effective_length, pseudocount, norm, method, log_base, what,
+        min_valid_frac, resample_by, counts_matrix,
+        include_diagnostics, use_job, gene_name, verbose)
+}
+
+#' Resolve nboot: auto-select or use provided value
+#' @noRd
+._bootstrap_resolve_nboot <- function(nboot, x, se, method, nthreads) {
+    if (!identical(nboot, "auto")) return(nboot)
+    n_genes <- if (!is.null(x) && is.matrix(x)) nrow(x)
+               else if (!is.null(se)) nrow(se) else 1
+    .bootstrap_auto_select_nboot(n_genes, method == "bca", nthreads)
+}
+
+#' Dispatch: matrix (bulk), SE+res, or return NULL for single-vector path
+#' @noRd
+._bootstrap_dispatch_input <- function(x, se, res, top_n, q, norm, nboot, ci,
+    method, log_base, pseudocount, what, gene_name, verbose, include_diagnostics,
+    use_job, nthreads, paired, resample_by, counts_matrix) {
     if (!is.null(x) && is.matrix(x)) {
-        return(invisible(.bootstrap_process_matrix(x, q, norm, nboot, ci, method,
+        return(.bootstrap_process_matrix(x, q, norm, nboot, ci, method,
             log_base, pseudocount, what, gene_name, verbose, include_diagnostics,
             use_job, nthreads, paired, resample_by = resample_by,
-            counts_matrix = counts_matrix)))
+            counts_matrix = counts_matrix))
     }
-
-    # PHASE 2: Handle SummarizedExperiment + results data.frame input
     if (!is.null(se) && !is.null(res)) {
-        result <- .bootstrap_process_se(se, res, top_n, q, norm, nboot, ci, method,
+        return(.bootstrap_process_se(se, res, top_n, q, norm, nboot, ci, method,
             log_base, pseudocount, what, gene_name, verbose, include_diagnostics,
-            use_job, paired)
-        return(invisible(result))
+            use_job, paired))
     }
+    if (is.null(x)) stop("Either 'x' or both 'se' and 'res' must be provided")
+    NULL
+}
 
-    # PHASE 3: Verify we have x (required for remaining paths)
-    if (is.null(x)) {
-        stop("Either 'x' or both 'se' and 'res' must be provided")
-    }
-
-    # PHASE 4: Validate inputs
+#' Single-vector bootstrap pipeline: validate → compute → print
+#' @noRd
+._bootstrap_single_vector <- function(x, q, nboot, ci, paired, show_messages,
+    effective_length, pseudocount, norm, method, log_base, what,
+    min_valid_frac, resample_by, counts_matrix,
+    include_diagnostics, use_job, gene_name, verbose) {
     .bootstrap_validate_inputs(x, q, nboot, ci, paired, show_messages)
-
-    # PHASE 4B: Enhanced validation for data quality and edge cases
     .validate_bootstrap_data(x, effective_length = effective_length, pseudocount = pseudocount)
 
-    # PHASE 5: Handle multiple q values
     if (length(q) > 1) {
-        result <- .bootstrap_process_multiple_q(x, q, norm, nboot, ci, method, log_base,
+        return(._bootstrap_multi_q(x, q, norm, nboot, ci, method, log_base,
             pseudocount, what, gene_name, verbose, include_diagnostics, use_job,
-            paired, effective_length, min_valid_frac, resample_by = resample_by,
-            counts_matrix = counts_matrix)
-        if (verbose && !is.null(gene_name)) {
-            message("Bootstrap Confidence Intervals for ", gene_name, " (multiple q values)")
-            for (i in seq_along(result)) {
-                res <- result[[i]]
-                message("q=", q[i], ": [", sprintf("%.6f", res$lower_ci), ", ", sprintf("%.6f",
-                  res$upper_ci), "]")
-            }
-        }
-        return(invisible(result))
+            paired, effective_length, min_valid_frac, resample_by, counts_matrix))
     }
 
-    # PHASE 6: Compute single q bootstrap CI
     ci_data <- .bootstrap_compute_ci(x, q, norm, nboot, ci, method, log_base, pseudocount,
         what, paired, effective_length, min_valid_frac, resample_by = resample_by,
         counts_matrix = counts_matrix)
 
-    # PHASE 7: Compute diagnostics (if requested)
     diag_list <- .bootstrap_compute_diag(ci_data$point_est, ci_data$bootstrap_dist,
         use_job, paired, x, q, norm, nboot, ci, method, log_base, pseudocount, what,
         ci_data$accel_factor)
 
-    # PHASE 8: Assemble and return result
-    result <- .bootstrap_assemble_result(ci_data$point_est, ci_data$ci_result, ci_data$bootstrap_dist,
-        ci, method, nboot, diag_list, include_diagnostics, use_job)
+    result <- .bootstrap_assemble_result(ci_data$point_est, ci_data$ci_result,
+        ci_data$bootstrap_dist, ci, method, nboot, diag_list, include_diagnostics, use_job)
 
     .bootstrap_print_results(result, gene_name, ci, verbose)
+    invisible(result)
+}
+
+#' Multi-q bootstrap pipeline
+#' @noRd
+._bootstrap_multi_q <- function(x, q, norm, nboot, ci, method, log_base,
+    pseudocount, what, gene_name, verbose, include_diagnostics, use_job,
+    paired, effective_length, min_valid_frac, resample_by, counts_matrix) {
+    result <- .bootstrap_process_multiple_q(x, q, norm, nboot, ci, method, log_base,
+        pseudocount, what, gene_name, verbose, include_diagnostics, use_job,
+        paired, effective_length, min_valid_frac, resample_by = resample_by,
+        counts_matrix = counts_matrix)
+    if (verbose && !is.null(gene_name)) {
+        message("Bootstrap Confidence Intervals for ", gene_name, " (multiple q values)")
+        for (i in seq_along(result)) {
+            res <- result[[i]]
+            message("q=", q[i], ": [", sprintf("%.6f", res$lower_ci), ", ",
+                sprintf("%.6f", res$upper_ci), "]")
+        }
+    }
     invisible(result)
 }
 
