@@ -400,7 +400,7 @@
         ncol = n_cols, align = "hv", axis = "lr")
 
     # Add main title and subtitle above the grid
-    title_plot <- .create_title_grob("SAIT Interaction Profiles: Top Genes with q×Condition Effects",
+    title_plot <- .create_title_grob("SAIT Interaction Profiles: Top Genes with q\u00d7Condition Effects",
         subtitle = "Diverging curves indicate isoform complexity changes driven by specific q-ranges",
         title_size = 24, subtitle_size = 18)
 
