@@ -252,10 +252,10 @@ test_that("map_metadata warns when only one condition is present", {
         assays = list(diversity = mat)
     )
     
-    # Should warn about only one condition
-    expect_warning(
+    # Should notify about only one condition
+    expect_message(
         TSENAT:::.map_metadata_se(se, coldata, sample_col = "Sample", condition_col = "Condition"),
-        "Only one condition detected"
+        "Single condition detected"
     )
 })
 
@@ -285,7 +285,7 @@ test_that("map_tx_to_readcounts assigns rownames when sizes match", {
 test_that("map_tx_to_readcounts errors when sizes mismatch and no matching ids", {
     rc <- matrix(1:6, nrow = 3)
     txmap <- data.frame(Transcript = c("a", "b"), Gene = c("g1", "g2"), stringsAsFactors = FALSE)
-    expect_error(TSENAT:::.map_tx_to_readcounts(rc, txmap), "does not match readcounts rows")
+    expect_error(TSENAT:::.map_tx_to_readcounts(rc, txmap), "Transcript count mismatch")
 })
 
 test_that("map_tx_to_readcounts matches existing rownames", {
@@ -423,7 +423,7 @@ test_that("map_tx_to_readcounts accepts file path input", {
     txmap <- data.frame(Transcript = paste0("tx", 1:4), Gene = c("g1", "g1", "g2", "g2"), stringsAsFactors = FALSE)
     tf <- tempfile(fileext = ".tsv")
     write.table(txmap, tf, sep = "\t", row.names = FALSE, quote = FALSE)
-    expect_error(TSENAT:::.map_tx_to_readcounts(rc, tf), "does not match readcounts rows")
+    expect_error(TSENAT:::.map_tx_to_readcounts(rc, tf), "Transcript count mismatch")
     unlink(tf)
 })
 
