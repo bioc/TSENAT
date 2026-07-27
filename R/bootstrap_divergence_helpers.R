@@ -29,9 +29,8 @@
             return(NA_real_)
         divergence <- sum(p[idx] * log(p[idx]/r[idx], base = log_base))
     } else if (q > 0) {
-        # General Tsallis divergence (Furuichi formula) D_q(p||r) = (1/(q-1)) *
-        # (1 - sum(p^q * r^(1-q))) Paper I004 reference: Furuichi formula for
-        # normalized Tsallis divergence
+        # General Tsallis divergence (Furuichi 2006, I002)
+        # D_q(p||r) = (1/(q-1)) * (1 - sum(p^q * r^(1-q)))
 
         p_power <- p^q
         r_power <- r^(1 - q)
