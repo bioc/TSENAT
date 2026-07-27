@@ -200,24 +200,6 @@
 }
 
 # ============================================================================
-# HELPER: Validate filter parameters for type and range Raises errors for
-# invalid inputs @noRd
-.validate_filter_params <- function(min_isoform_abundance, tpm_assay_name) {
-    if (!is.null(min_isoform_abundance)) {
-        if (!is.numeric(min_isoform_abundance) || length(min_isoform_abundance) !=
-            1) {
-            stop(".filter_se: 'min_isoform_abundance' must be numeric in [0, 1], or NULL to disable",
-                call. = FALSE)
-        }
-        if (min_isoform_abundance < 0 || min_isoform_abundance > 1) {
-            stop(".filter_se: 'min_isoform_abundance' must be numeric in [0, 1], or NULL to disable",
-                call. = FALSE)
-        }
-    }
-    invisible(TRUE)
-}
-
-# ============================================================================
 # HELPER: Auto-estimate min_tpm from data distribution using quantiles
 # Implements Law et al. limma-voom methodology @noRd
 .estimate_min_tpm <- function(assay_mat, stringency, verbose = FALSE) {
@@ -563,8 +545,10 @@
         # Auto-detect or validate pair column
         if (is.null(pair_col)) {
             col_data <- SummarizedExperiment::colData(se)
+            # Use shared detection helper for consistent column detection
             pair_candidates <- c("pair", "pair_id", "paired_samples", "subject",
-                "subject_id", "individual")
+                "subject_id", "individual", "pair_num", "pair_number",
+                "replicate_id", "rep_id")
             pair_col <- pair_candidates[pair_candidates %in% colnames(col_data)][1]
 
             if (is.na(pair_col)) {
@@ -1024,7 +1008,11 @@
         sample_idx <- c()
         for (cond in conditions) {
             cond_idx <- which(coldata$condition == cond)
-            selected <- sample(cond_idx, min(samples_per_cond, length(cond_idx)))
+            if (length(cond_idx) == 1) {
+                selected <- cond_idx
+            } else {
+                selected <- sample(cond_idx, min(samples_per_cond, length(cond_idx)))
+            }
             sample_idx <- c(sample_idx, selected)
         }
         return(head(sample_idx, n_samples))
@@ -1037,7 +1025,11 @@
         sample_idx <- c()
         for (type in types) {
             type_idx <- which(coldata$sample_type == type)
-            selected <- sample(type_idx, min(samples_per_type, length(type_idx)))
+            if (length(type_idx) == 1) {
+                selected <- type_idx
+            } else {
+                selected <- sample(type_idx, min(samples_per_type, length(type_idx)))
+            }
             sample_idx <- c(sample_idx, selected)
         }
         return(head(sample_idx, n_samples))
