@@ -13,7 +13,7 @@ testthat::test_that("select_top_genes returns correct number of genes", {
   )
 
   # Select top 3
-  top_genes <- .select_top_genes(results, n_genes = 3)
+  top_genes <- .resolve_plot_genes(results, n_top = 3)
   testthat::expect_equal(length(top_genes), 3)
   testthat::expect_equal(top_genes, c("G001", "G002", "G003"))
 })
@@ -25,7 +25,7 @@ testthat::test_that("select_top_genes auto-detects gene column", {
     stringsAsFactors = FALSE
   )
 
-  top_genes <- .select_top_genes(results, p_col = "p_col", gene_col = "gene", n_genes = 2)
+  top_genes <- .resolve_plot_genes(results, rank_by = "p_col", gene_col = "gene", n_top = 2)
   testthat::expect_equal(length(top_genes), 2)
   testthat::expect_equal(top_genes, c("A", "B"))
 })
@@ -38,7 +38,7 @@ testthat::test_that("select_top_genes handles empty results", {
   )
 
   testthat::expect_error(
-    .select_top_genes(results),
+    .resolve_plot_genes(results),
     "must be a non-empty data frame"
   )
 })
@@ -50,7 +50,7 @@ testthat::test_that("select_top_genes requests more genes than available", {
     stringsAsFactors = FALSE
   )
 
-  top_genes <- .select_top_genes(results, n_genes = 5)
+  top_genes <- .resolve_plot_genes(results, n_top = 5)
   testthat::expect_equal(length(top_genes), 2)
 })
 
@@ -65,7 +65,7 @@ testthat::test_that("filter_genes_by_pvalue returns significant genes", {
     stringsAsFactors = FALSE
   )
 
-  sig_genes <- .filter_genes_by_pvalue(results, p_threshold = 0.05)
+  sig_genes <- .resolve_plot_genes(results, sig_alpha = 0.05)
   testthat::expect_equal(length(sig_genes), 2)
   testthat::expect_equal(sig_genes, c("G001", "G002"))
 })
@@ -77,7 +77,7 @@ testthat::test_that("filter_genes_by_pvalue returns empty when no significant ge
     stringsAsFactors = FALSE
   )
 
-  sig_genes <- .filter_genes_by_pvalue(results, p_threshold = 0.05)
+  sig_genes <- suppressWarnings(.resolve_plot_genes(results, sig_alpha = 0.05))
   testthat::expect_equal(length(sig_genes), 0)
 })
 
@@ -88,7 +88,7 @@ testthat::test_that("filter_genes_by_pvalue auto-detects columns", {
     stringsAsFactors = FALSE
   )
 
-  sig_genes <- .filter_genes_by_pvalue(results, p_threshold = 0.06)
+  sig_genes <- .resolve_plot_genes(results, sig_alpha = 0.06)
   testthat::expect_equal(length(sig_genes), 2)
 })
 
@@ -444,7 +444,7 @@ testthat::test_that("select_genes_from_results orders by p-value", {
     stringsAsFactors = FALSE
   )
 
-  top <- .select_genes_from_results(res, top_n = 2)
+  top <- .resolve_plot_genes(res, n_top = 2)
   testthat::expect_equal(top, c("G2", "G3"))
 })
 
@@ -455,21 +455,21 @@ testthat::test_that("select_genes_from_results removes duplicates", {
     stringsAsFactors = FALSE
   )
 
-  top <- .select_genes_from_results(res, top_n = 2)
+  top <- .resolve_plot_genes(res, n_top = 2)
   testthat::expect_equal(length(top), 2)
   testthat::expect_equal(top[1], "G1")
 })
 
 testthat::test_that("select_genes_from_results errors on missing genes column", {
   res <- data.frame(
-    gene_id = c("G1", "G2"),
-    padj = c(0.01, 0.05),
+    x = c("G1", "G2"),
+    y = c(0.01, 0.05),
     stringsAsFactors = FALSE
   )
 
   testthat::expect_error(
-    .select_genes_from_results(res, top_n = 1),
-    "must contain a 'genes' column"
+    .resolve_plot_genes(res, n_top = 1),
+    "No gene identifier column found"
   )
 })
 
@@ -807,7 +807,7 @@ testthat::test_that(".plot_gam_fit_group returns NULL for insufficient data", {
   testthat::expect_null(result)
 })
 
-testthat::test_that(".plot_select_genes returns user-specified genes", {
+testthat::test_that(".resolve_plot_genes returns user-specified genes", {
   sait_res <- data.frame(
     gene = c("gene1", "gene2", "gene3", "gene4"),
     adj_p_interaction = c(0.001, 0.01, 0.05, 0.1),
@@ -815,12 +815,12 @@ testthat::test_that(".plot_select_genes returns user-specified genes", {
   )
   
   genes_specified <- c("gene2", "gene4")
-  selected <- TSENAT:::.plot_select_genes(sait_res, genes = genes_specified, n_top = 2)
+  selected <- TSENAT:::.resolve_plot_genes(sait_res, genes = genes_specified, n_top = 2)
   
   testthat::expect_equal(selected, genes_specified)
 })
 
-testthat::test_that(".plot_select_genes filters by significance", {
+testthat::test_that(".resolve_plot_genes filters by significance", {
   sait_res <- data.frame(
     gene = c("gene1", "gene2", "gene3", "gene4"),
     adj_p_interaction = c(0.001, 0.01, 0.05, 0.1),
@@ -828,7 +828,7 @@ testthat::test_that(".plot_select_genes filters by significance", {
   )
   
   # Select top 2 with sig_alpha = 0.05 should get gene1, gene2, gene3
-  selected <- TSENAT:::.plot_select_genes(sait_res, genes = NULL, n_top = 2, sig_alpha = 0.05)
+  selected <- TSENAT:::.resolve_plot_genes(sait_res, genes = NULL, n_top = 2, sig_alpha = 0.05)
   
   # Should return exactly 2 genes (top 2 by p-value)
   testthat::expect_equal(length(selected), 2)
@@ -838,14 +838,14 @@ testthat::test_that(".plot_select_genes filters by significance", {
   testthat::expect_true("gene2" %in% selected)
 })
 
-testthat::test_that(".plot_select_genes returns NULL when no significant genes", {
+testthat::test_that(".resolve_plot_genes returns NULL when no significant genes", {
   sait_res <- data.frame(
     gene = c("gene1", "gene2", "gene3"),
     adj_p_interaction = c(0.1, 0.2, 0.3),
     stringsAsFactors = FALSE
   )
   
-  selected <- TSENAT:::.plot_select_genes(sait_res, genes = NULL, n_top = 2, sig_alpha = 0.05)
+  selected <- suppressWarnings(TSENAT:::.resolve_plot_genes(sait_res, genes = NULL, n_top = 2, sig_alpha = 0.05))
   
   testthat::expect_null(selected)
 })

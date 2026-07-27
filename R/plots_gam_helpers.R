@@ -131,50 +131,6 @@
 
     list(plot_data = plot_df, pred_data = pred_df, group_levels = group_levels)
 }
-
-#' Select genes to plot based on significance
-#'
-#' @param sait_res Data frame with gene and p-value columns
-#' @param genes Optional character vector of specific genes
-#' @param n_top Number of top genes to select
-#' @param sig_alpha Significance threshold
-#' @return Character vector of gene IDs to plot (or NULL if none selected)
-
-#' @noRd
-.plot_select_genes <- function(sait_res, genes = NULL, n_top = 6, sig_alpha = 0.05) {
-    if (!is.null(genes)) {
-        if (!is.character(genes)) {
-            stop("genes must be a character vector of gene names", call. = FALSE)
-        }
-        return(genes)
-    }
-
-    # Identify p-value column
-    if ("adj_p_interaction" %in% colnames(sait_res)) {
-        p_col <- "adj_p_interaction"
-    } else if ("p_interaction" %in% colnames(sait_res)) {
-        p_col <- "p_interaction"
-    } else {
-        stop("sait_res must contain 'adj_p_interaction' or 'p_interaction' column",
-            call. = FALSE)
-    }
-
-    # Filter to significant genes (p-value < sig_alpha)
-    sig_genes <- sait_res[sait_res[[p_col]] < sig_alpha, , drop = FALSE]
-
-    # If no significant genes, return NULL
-    if (nrow(sig_genes) == 0) {
-        return(NULL)
-    }
-
-    # Sort by p-value and select top n_top genes
-    top_idx <- order(sig_genes[[p_col]])[seq_len(min(n_top, nrow(sig_genes)))]
-    top_genes <- sig_genes[top_idx, , drop = FALSE]
-
-    # Return gene names sorted by p-value
-    top_genes$gene
-}
-
 #' Prepare gene CI data for plotting
 #'
 #' Converts CI matrices into long-format data for gene-specific bootstrap CI
@@ -444,11 +400,12 @@
 
     # Add main title and subtitle above the grid
     title_plot <- .create_title_grob("q-curve: Top genes with group interaction",
-        subtitle = "Fitted smooth curves by group", title_size = 20, subtitle_size = 16)
+        subtitle = "Fitted smooth curves by group",
+        title_size = 20, subtitle_size = 13)
 
     # Combine title, plots, and single legend at bottom
     final_plot <- cowplot::plot_grid(title_plot, combined_plot, legend, nrow = 3,
-        rel_heights = c(0.12, 1, 0.08))
+        rel_heights = c(0.10, 1, 0.08))
 
     final_plot
 }

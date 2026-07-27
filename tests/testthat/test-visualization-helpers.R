@@ -16,9 +16,11 @@ library(TSENAT)
 
 testthat::test_that("apply_tsenat_theme can be applied to plots", {
 
-  # Just verify the function can be called
+  # Just verify the function can be called with a dummy plot
+  p_dummy <- ggplot2::ggplot(data.frame(x = 1, y = 1), ggplot2::aes(x, y)) +
+    ggplot2::geom_point()
   testthat::expect_error(
-    theme_obj <- .apply_tsenat_theme(base_size = 11),
+    theme_obj <- .apply_publication_theme(p_dummy, base_size = 11),
     NA  # Expect no error
   )
   
@@ -27,7 +29,7 @@ testthat::test_that("apply_tsenat_theme can be applied to plots", {
     ggplot2::geom_point()
   
   testthat::expect_error(
-    p_themed <- p + .apply_tsenat_theme(),
+    p_themed <- .apply_publication_theme(p, base_size = 11),
     NA  # Expect no error
   )
   testthat::expect_is(p_themed, "ggplot")
@@ -38,7 +40,7 @@ testthat::test_that("set_plot_title modifies title correctly", {
   p <- ggplot2::ggplot(data.frame(x = 1, y = 1), ggplot2::aes(x, y)) +
     ggplot2::geom_point()
 
-  p_titled <- .set_plot_title(p, title = "Test Title", subtitle = "Test Subtitle")
+  p_titled <- .apply_publication_theme(p, title = "Test Title", subtitle = "Test Subtitle")
 
   # Extract title from plot
   testthat::expect_is(p_titled, "ggplot")
@@ -51,7 +53,7 @@ testthat::test_that("set_plot_title applies font sizes", {
   p <- ggplot2::ggplot(data.frame(x = 1, y = 1), ggplot2::aes(x, y)) +
     ggplot2::geom_point()
 
-  p_styled <- .set_plot_title(p, title = "Title", title_size = 16, subtitle_size = 12)
+  p_styled <- .apply_publication_theme(p, title = "Title", title_size = 16, subtitle_size = 12)
 
   testthat::expect_is(p_styled, "ggplot")
 })
@@ -61,7 +63,7 @@ testthat::test_that("set_plot_title handles NULL title/subtitle", {
   p <- ggplot2::ggplot(data.frame(x = 1, y = 1), ggplot2::aes(x, y)) +
     ggplot2::geom_point()
 
-  p_unchanged <- .set_plot_title(p, title = NULL, subtitle = NULL)
+  p_unchanged <- .apply_publication_theme(p, title = NULL, subtitle = NULL)
 
   testthat::expect_is(p_unchanged, "ggplot")
 })
@@ -306,7 +308,7 @@ testthat::test_that("set_plot_title preserves existing plot aesthetics", {
     ggplot2::geom_point(color = "red", size = 3) +
     ggplot2::labs(x = "X Axis", y = "Y Axis")
 
-  p_modified <- .set_plot_title(p, title = "New Title")
+  p_modified <- .apply_publication_theme(p, title = "New Title")
 
   # Check title was added
   testthat::expect_equal(p_modified$labels$title, "New Title")
@@ -367,12 +369,13 @@ testthat::test_that("theme + composition workflow produces valid plot", {
   )
 
   # Create plot with custom theme
-  p <- ggplot2::ggplot(df, ggplot2::aes(x, y, color = group)) +
-    ggplot2::geom_point() +
-    .apply_tsenat_theme()
+  p <- .apply_publication_theme(
+    ggplot2::ggplot(df, ggplot2::aes(x, y, color = group)) +
+    ggplot2::geom_point()
+  )
 
   # Apply title
-  p_titled <- .set_plot_title(p, title = "Test Plot", subtitle = "Integration Test")
+  p_titled <- .apply_publication_theme(p, title = "Test Plot", subtitle = "Integration Test")
 
   # Combine with another plot
   plots <- list(p_titled, p_titled)
@@ -2096,7 +2099,7 @@ test_that(".apply_publication_aesthetics applies theme with various base_size va
 # TEST: make_plot_for_genecombine_cowplot (100% uncovered - lines 4198-4218)
 # ============================================================================
 
-test_that(".make_plot_for_genecombine_cowplot returns plot without output file", {
+test_that(".combine_plots_cowplot returns plot without output file", {
   p1 <- ggplot2::ggplot(data.frame(x = 1:5, y = 1:5), ggplot2::aes(x, y)) +
     ggplot2::geom_point() +
     ggplot2::ggtitle("Gene 1")
@@ -2106,7 +2109,7 @@ test_that(".make_plot_for_genecombine_cowplot returns plot without output file",
     ggplot2::ggtitle("Gene 2")
   
   result <- tryCatch({
-    p_result <- TSENAT:::.make_plot_for_genecombine_cowplot(
+    p_result <- TSENAT:::.combine_plots_cowplot(
       list(p1, p2),
       output_file = NULL,
       agg_label_unique = "median"
@@ -2118,7 +2121,7 @@ test_that(".make_plot_for_genecombine_cowplot returns plot without output file",
   expect_true(!is.null(result))
 })
 
-test_that(".make_plot_for_genecombine_cowplot saves to file with output_file parameter", {
+test_that(".combine_plots_cowplot saves to file with output_file parameter", {
   p1 <- ggplot2::ggplot(data.frame(x = 1:5, y = 1:5), ggplot2::aes(x, y)) +
     ggplot2::geom_point() +
     ggplot2::ggtitle("Gene 1")
@@ -2131,7 +2134,7 @@ test_that(".make_plot_for_genecombine_cowplot saves to file with output_file par
   
   # Function should not error when saving to file
   expect_error({
-    TSENAT:::.make_plot_for_genecombine_cowplot(
+    TSENAT:::.combine_plots_cowplot(
       list(p1, p2),
       output_file = output_file,
       agg_label_unique = "mean"
@@ -2145,14 +2148,14 @@ test_that(".make_plot_for_genecombine_cowplot saves to file with output_file par
   }
 })
 
-test_that(".make_plot_for_genecombine_cowplot handles different aggregation labels", {
+test_that(".combine_plots_cowplot handles different aggregation labels", {
   p1 <- ggplot2::ggplot(data.frame(x = 1:5, y = 1:5), ggplot2::aes(x, y)) +
     ggplot2::geom_point() +
     ggplot2::ggtitle("Gene A")
   
   for (label in c("median", "mean", "variance", "custom_metric")) {
     result <- tryCatch({
-      p_result <- TSENAT:::.make_plot_for_genecombine_cowplot(
+      p_result <- TSENAT:::.combine_plots_cowplot(
         list(p1),
         output_file = NULL,
         agg_label_unique = label
@@ -2164,7 +2167,7 @@ test_that(".make_plot_for_genecombine_cowplot handles different aggregation labe
   }
 })
 
-test_that(".make_plot_for_genecombine_cowplot handles multiple plots (grid layout)", {
+test_that(".combine_plots_cowplot handles multiple plots (grid layout)", {
   plots <- lapply(1:4, function(i) {
     ggplot2::ggplot(data.frame(x = 1:5, y = 1:5), ggplot2::aes(x, y)) +
       ggplot2::geom_point() +
@@ -2172,7 +2175,7 @@ test_that(".make_plot_for_genecombine_cowplot handles multiple plots (grid layou
   })
   
   result <- tryCatch({
-    p_result <- TSENAT:::.make_plot_for_genecombine_cowplot(
+    p_result <- TSENAT:::.combine_plots_cowplot(
       plots,
       output_file = NULL,
       agg_label_unique = "median"
@@ -2228,7 +2231,7 @@ test_that(".compute_diversity_spectrum handles different metric types", {
 # TEST: select_top_genes - uncovered lines (712, 713, 724, 725)
 # ============================================================================
 
-test_that(".select_top_genes handles NULL p_col parameter", {
+test_that(".resolve_plot_genes handles NULL p_col parameter", {
   results <- data.frame(
     gene = c("Gene1", "Gene2", "Gene3"),
     p_value = c(0.001, 0.05, 0.1),
@@ -2236,7 +2239,7 @@ test_that(".select_top_genes handles NULL p_col parameter", {
   )
   
   result <- tryCatch({
-    genes <- TSENAT:::.select_top_genes(
+    genes <- TSENAT:::.resolve_plot_genes(
       results,
       p_col = NULL,
       gene_col = "gene",
@@ -2248,7 +2251,7 @@ test_that(".select_top_genes handles NULL p_col parameter", {
   expect_true(is.null(result) || is.character(result))
 })
 
-test_that(".select_top_genes handles NULL gene_col parameter", {
+test_that(".resolve_plot_genes handles NULL gene_col parameter", {
   results <- data.frame(
     gene_id = c("G1", "G2", "G3"),
     pval = c(0.001, 0.05, 0.1),
@@ -2256,7 +2259,7 @@ test_that(".select_top_genes handles NULL gene_col parameter", {
   )
   
   result <- tryCatch({
-    genes <- TSENAT:::.select_top_genes(
+    genes <- TSENAT:::.resolve_plot_genes(
       results,
       p_col = "pval",
       gene_col = NULL,
@@ -2272,7 +2275,7 @@ test_that(".select_top_genes handles NULL gene_col parameter", {
 # TEST: filter_genes_by_pvalue - uncovered lines (756, 766, 776)
 # ============================================================================
 
-test_that(".filter_genes_by_pvalue handles NULL p_col", {
+test_that(".resolve_plot_genes handles NULL p_col", {
   results <- data.frame(
     gene = c("Gene1", "Gene2", "Gene3"),
     p_value = c(0.001, 0.05, 0.1),
@@ -2280,7 +2283,7 @@ test_that(".filter_genes_by_pvalue handles NULL p_col", {
   )
   
   result <- tryCatch({
-    filtered <- TSENAT:::.filter_genes_by_pvalue(
+    filtered <- TSENAT:::.resolve_plot_genes(
       results,
       p_threshold = 0.05,
       p_col = NULL,
@@ -2292,7 +2295,7 @@ test_that(".filter_genes_by_pvalue handles NULL p_col", {
   expect_true(is.null(result) || is.data.frame(result))
 })
 
-test_that(".filter_genes_by_pvalue handles NULL gene_col", {
+test_that(".resolve_plot_genes handles NULL gene_col", {
   results <- data.frame(
     gene_id = c("G1", "G2", "G3"),
     pval = c(0.001, 0.05, 0.1),
@@ -2300,10 +2303,10 @@ test_that(".filter_genes_by_pvalue handles NULL gene_col", {
   )
   
   # With gene_id column present, it auto-detects when gene_col = NULL
-  filtered <- TSENAT:::.filter_genes_by_pvalue(
+  filtered <- TSENAT:::.resolve_plot_genes(
     results,
-    p_threshold = 0.05,
-    p_col = "pval",
+    sig_alpha = 0.05,
+    rank_by = "pval",
     gene_col = NULL
   )
   
@@ -2312,16 +2315,16 @@ test_that(".filter_genes_by_pvalue handles NULL gene_col", {
   expect_true(length(filtered) >= 1)  # At least G1
 })
 
-test_that(".filter_genes_by_pvalue with high threshold returns all genes", {
+test_that(".resolve_plot_genes with high threshold returns all genes", {
   results <- data.frame(
     gene = c("Gene1", "Gene2", "Gene3"),
     adj_p = c(0.001, 0.05, 0.1)
   )
   
-  filtered <- TSENAT:::.filter_genes_by_pvalue(
+  filtered <- TSENAT:::.resolve_plot_genes(
     results,
-    p_threshold = 0.99,
-    p_col = "adj_p",
+    sig_alpha = 0.99,
+    rank_by = "adj_p",
     gene_col = "gene"
   )
   
@@ -2523,14 +2526,14 @@ test_that(".infer_samples_from_coldata with mismatched samples", {
 # TEST: select_genes_from_results - uncovered lines (1261, 1274)
 # ============================================================================
 
-test_that(".select_genes_from_results handles missing required columns", {
+test_that(".resolve_plot_genes handles missing required columns", {
   res <- data.frame(
     gene_name = c("Gene1", "Gene2", "Gene3"),
     value = c(1, 2, 3)
   )
   
   result <- tryCatch({
-    genes <- TSENAT:::.select_genes_from_results(res, top_n = 2)
+    genes <- TSENAT:::.resolve_plot_genes(res, n_top = 2)
     genes
   }, error = function(e) NULL)
   
@@ -2669,7 +2672,7 @@ test_that(".plot_gam_fit_group handles invalid plot_df structure", {
 # TEST: plot_select_genes - uncovered lines (1815, 1823-1824, 1826-1827)
 # ============================================================================
 
-test_that(".plot_select_genes handles NULL genes parameter", {
+test_that(".resolve_plot_genes handles NULL genes parameter", {
   sait_res <- list(
     results = data.frame(
       gene = c("Gene1", "Gene2", "Gene3"),
@@ -2679,7 +2682,7 @@ test_that(".plot_select_genes handles NULL genes parameter", {
   )
   
   result <- tryCatch({
-    plots <- TSENAT:::.plot_select_genes(
+    plots <- TSENAT:::.resolve_plot_genes(
       sait_res,
       genes = NULL,
       n_top = 3
@@ -3027,12 +3030,12 @@ test_that(".plot_transcript_grid_draw handles empty grobs list", {
 # TEST: make_plot_for_gene functions - various integration points
 # ============================================================================
 
-test_that(".make_plot_for_genecombine_plots with list of plots", {
+test_that(".combine_gene_plots with list of plots", {
   p1 <- ggplot2::ggplot(data.frame(x = 1:5, y = 1:5), ggplot2::aes(x, y)) +
     ggplot2::geom_point()
   
   result <- tryCatch({
-    combined <- TSENAT:::.make_plot_for_genecombine_plots(
+    combined <- TSENAT:::.combine_gene_plots(
       list(p1),
       output_file = NULL,
       agg_label_unique = "mean"
@@ -3043,12 +3046,12 @@ test_that(".make_plot_for_genecombine_plots with list of plots", {
   expect_true(is.null(result) || is(result, "ggplot") || is(result, "gtable"))
 })
 
-test_that(".make_plot_for_genecombine_grid with grid layout", {
+test_that(".combine_plots_grid with grid layout", {
   p1 <- ggplot2::ggplot(data.frame(x = 1:5, y = 1:5), ggplot2::aes(x, y)) +
     ggplot2::geom_point()
   
   result <- tryCatch({
-    grid <- TSENAT:::.make_plot_for_genecombine_grid(
+    grid <- TSENAT:::.combine_plots_grid(
       list(p1),
       output_file = NULL,
       agg_label_unique = "median"
@@ -3294,7 +3297,7 @@ testthat::test_that(".compute_diversity_spectrum with condition_col parameter (l
 })
 
 # Line 652: filter_genes_by_pvalue when gene column not found
-testthat::test_that(".filter_genes_by_pvalue fails when gene_col not found (line 652)", {
+testthat::test_that(".resolve_plot_genes fails when gene_col not found (line 652)", {
   results <- data.frame(
     gene_name = c("Gene1", "Gene2", "Gene3"),
     p_value = c(0.001, 0.05, 0.1),
@@ -3303,13 +3306,13 @@ testthat::test_that(".filter_genes_by_pvalue fails when gene_col not found (line
   
   # Try to filter with wrong gene_col that doesn't exist
   testthat::expect_error(
-    TSENAT:::.filter_genes_by_pvalue(
+    TSENAT:::.resolve_plot_genes(
       results,
-      p_threshold = 0.05,
-      p_col = "p_value",
+      sig_alpha = 0.05,
+      rank_by = "p_value",
       gene_col = "nonexistent_gene_column"  # This doesn't exist
     ),
-    "nonexistent_gene_column"  # dplyr error mentioning the column name
+    "No gene identifier column found"
   )
 })
 

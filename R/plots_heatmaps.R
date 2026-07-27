@@ -389,13 +389,6 @@
     # Resolve gene identifiers: convert gene names/transcript IDs to gene IDs
     gene <- .resolve_gene_identifiers(gene, tx2gene, rd, gene_col)
 
-    if (FALSE) {
-        # Debug mode - set to TRUE if needed
-        message("[DEBUG] After resolution, genes: ", paste(gene, collapse = ", "))
-        message("[DEBUG] tx2gene$Gen unique values (first 10): ", paste(head(unique(tx2gene$Gen),
-            10), collapse = ", "))
-    }
-
     # Phase 3: Plan layout
     gene_info_list <- lapply(seq_along(gene), function(i) {
         tx_idx <- which(tx2gene$Gen == gene[i])

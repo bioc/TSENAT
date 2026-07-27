@@ -431,19 +431,6 @@ TSENAT <- function(analysis, output_dir = "tsenat_outputs", save_output = TRUE, 
 # ============================================================================
 # UTILITY FUNCTION
 # ============================================================================
-
-#' `%||%` operator for default values
-#'
-#' Returns left operand if not NULL, otherwise right operand.
-#'
-
-#' @noRd
-`%||%` <- function(x, y) {
-    if (is.null(x) || (length(x) == 1 && is.na(x)))
-        y else x
-}
-
-# ============================================================================
 # HELPER FUNCTIONS FOR REPORTING
 # ============================================================================
 
@@ -912,7 +899,7 @@ TSENAT_config <- function(q = 1, condition_col = "condition", subject_col = NULL
     tryCatch({
         output_file <- if (!is.null(output_dir))
             file.path(output_dir, "sait_interaction_gam_plot.png") else NULL
-        p_sait <- plot_sait(analysis, output_file = output_file)
+        p_sait <- plot_sait(analysis, n_top = 4, output_file = output_file)
         if (!is.null(p_sait)) {
             analysis <- addPlot(analysis, type = "sait_interaction", plot = p_sait, replace = TRUE)
             if (verbose)
@@ -1108,7 +1095,7 @@ TSENAT_config <- function(q = 1, condition_col = "condition", subject_col = NULL
 #' @noRd
 .execute_concordance_analysis <- function(analysis, verbose, output_dir, output_format) {
 
-    output_file <- .build_output_file("concordance_results", output_dir, output_format)
+    output_file <- .build_output_file("concordance_results", output_dir, "txt")
 
     # Note: concordance requires both analysis_sait and analysis_rank parameters
     # For a two-analysis pipeline, use: analysis <-

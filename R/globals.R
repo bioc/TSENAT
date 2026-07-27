@@ -202,6 +202,21 @@ METHOD_ORDER <- c("diversity", "jackknife", "sait_interaction", "divergence", "r
     c(`non-significant` = "#CCCCCC", significant = "#D73027")
 }
 
+# ============================================================================
+# NULL-COALESCING OPERATOR
+# ============================================================================
+
+#' `%||%` operator for default values
+#'
+#' Returns left operand if not NULL, otherwise right operand.
+#'
+
+#' @noRd
+`%||%` <- function(x, y) {
+    if (is.null(x) || (length(x) == 1 && is.na(x)))
+        y else x
+}
+
 #' TSENAT Base Plot Theme
 #'
 #' Returns a publication-ready ggplot2 theme with standardized visual
@@ -209,8 +224,10 @@ METHOD_ORDER <- c("diversity", "jackknife", "sait_interaction", "divergence", "r
 #' Applies consistent font sizes, gridlines, borders, and color scales
 #' across all plots.
 #'
-#' @param base_size Numeric; base font size in points (default: 11).
-#'   All other sizes scale proportionally from this.
+#' @param base_size Numeric; base font size in points (default: 12).
+#' @param type Character; theme variant: 'standard' or 'spectrum'.
+#'   'spectrum' adds right-aligned legend, horizontal gridlines, and wider margins.
+#'   All other sizes scale proportionally from base_size.
 #'
 #' @return List of ggplot2 theme elements that can be added to plots with `+`.
 #'
@@ -237,13 +254,20 @@ METHOD_ORDER <- c("diversity", "jackknife", "sait_interaction", "divergence", "r
 #'
 
 #' @noRd
-.theme_base <- function(base_size = 12) {
-    ggplot2::theme_minimal(base_size = base_size) + ggplot2::theme(plot.title = ggplot2::element_text(hjust = 0.5,
+.theme_base <- function(base_size = 12, type = c("standard", "spectrum")) {
+    type <- match.arg(type)
+    t <- ggplot2::theme_minimal(base_size = base_size) + ggplot2::theme(plot.title = ggplot2::element_text(hjust = 0.5,
         face = "bold", size = base_size * 1.3, margin = ggplot2::margin(b = 8)),
         plot.subtitle = ggplot2::element_text(hjust = 0.5, face = "italic", size = base_size *
             0.95), axis.title = ggplot2::element_text(size = base_size * 1.1), axis.text = ggplot2::element_text(size = base_size *
             0.9), panel.grid.minor = ggplot2::element_blank(), panel.border = ggplot2::element_rect(color = "grey85",
             fill = NA, linewidth = 0.3))
+    if (type == "spectrum") {
+        t <- t + ggplot2::theme(legend.position = "right",
+            panel.grid.major.y = ggplot2::element_line(color = "gray90", linewidth = 0.25),
+            plot.margin = ggplot2::margin(t = 5, r = 8, b = 5, l = 5, unit = "mm"))
+    }
+    t
 }
 
 # ============================================================================
@@ -283,8 +307,8 @@ METHOD_ORDER <- c("diversity", "jackknife", "sait_interaction", "divergence", "r
 #'
 
 #' @noRd
-.font_sizes <- list(title = 21, subtitle = 17, axis_title = 17, axis_text = 14, legend_title = 14,
-    legend_text = 13, heatmap_main = 14, heatmap_labels = 12)
+.font_sizes <- list(title = 18, subtitle = 14, axis_title = 14, axis_text = 12, legend_title = 13,
+    legend_text = 11, heatmap_main = 14, heatmap_labels = 11)
 
 # ============================================================================
 # THEME VARIANTS - Specialized themes for different plot types
@@ -312,9 +336,7 @@ METHOD_ORDER <- c("diversity", "jackknife", "sait_interaction", "divergence", "r
 
 #' @noRd
 .theme_spectrum <- function(base_size = 12) {
-    .theme_base(base_size = base_size) + ggplot2::theme(legend.position = "right",
-        panel.grid.major.y = ggplot2::element_line(color = "gray90", linewidth = 0.25),
-        plot.margin = ggplot2::margin(t = 5, r = 8, b = 5, l = 5, unit = "mm"))
+    .theme_base(base_size = base_size, type = "spectrum")
 }
 
 

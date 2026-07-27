@@ -107,9 +107,6 @@
     # Validate data compatibility
     .validate_plot_data(se = se, sait_results = sait_res, stop_on_error = FALSE, verbose = FALSE)
 
-    # Extract and validate q-values
-    q_values <- .plot_gam_extract_q_values(model_data)
-
     # Match and filter genes
     gene_match <- .plot_gam_match_genes(se, sait_res)
     se <- gene_match$se
@@ -125,9 +122,10 @@
     # Build sample-to-group mapping
     sample_to_group <- .prepare_sample_group_mapping(cdata, condition_col)
 
-    # Select genes to plot
-    top_genes <- .plot_select_genes(sait_res, genes = genes, n_top = n_top, sig_alpha = sig_alpha)
-    if (is.null(top_genes)) {
+    # Select genes to plot (unified gene selection)
+    top_genes <- .resolve_plot_genes(results = sait_res, genes = genes,
+        n_top = n_top, sig_alpha = sig_alpha)
+    if (length(top_genes) == 0) {
         warning("No genes found in sait_res to plot", call. = FALSE)
         return(NULL)
     }

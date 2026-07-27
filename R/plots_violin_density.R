@@ -49,36 +49,13 @@ plot_diversity_violin_density <- function(se, assay_name = "diversity", title = 
     # Load visualization dependencies (ggplot2, cowplot, etc.)
     .load_visualization_deps()
 
-    # Handle TSENATAnalysis objects - extract first diversity result
-    if (methods::is(se, "TSENATAnalysis")) {
-        if (length(se@diversity_results) == 0) {
-            stop("No diversity results found in TSENATAnalysis object. Run calculate_diversity() first.")
-        }
-        # Extract first diversity result
-        se <- se@diversity_results[[1]]
-    }
+    # Normalize input (handles TSENATAnalysis → SE, condition_col, assay validation)
+    normalized <- .normalize_plot_input(se, assay_name = assay_name, multi_q = FALSE)
+    se <- normalized$se
 
-    # Try to extract q from SE metadata first (best source for single-q SE)
-    q_val <- NA
-    if (!is.null(S4Vectors::metadata(se)$q) && length(S4Vectors::metadata(se)$q) >
-        0) {
-        q_vals <- unique(as.numeric(S4Vectors::metadata(se)$q))
-        if (length(q_vals) > 0 && !all(is.na(q_vals))) {
-            q_val <- q_vals[1]
-        }
-    }
-
-    # Fallback: use prepare_long_format for data transformation
-    long <- .prepare_long_format(se, assay_name = assay_name)
-
-    # If still no q, extract from data
-    if (is.na(q_val)) {
-        q_values <- unique(long$q)
-        q_values <- q_values[!is.na(q_values)]
-        if (length(q_values) > 0) {
-            q_val <- q_values[1]
-        }
-    }
+    # Extract q-value and long-format data
+    extracted <- .extract_q_value(se, assay_name = assay_name)
+    q_val <- extracted$q_val
 
     # Generate base title
     base_title <- title %||% sprintf("Tsallis entropy at q = %g", q_val)
@@ -86,7 +63,6 @@ plot_diversity_violin_density <- function(se, assay_name = "diversity", title = 
     # Create individual plots
     p_violin <- .plot_diversity_violin_singleq(se = se, assay_name = assay_name,
         title = "Violin")
-
     p_density <- .plot_diversity_density_singleq(se = se, assay_name = assay_name,
         title = "Density")
 
@@ -95,17 +71,12 @@ plot_diversity_violin_density <- function(se, assay_name = "diversity", title = 
         axis = "b")
 
     # Add overall title and subtitle above the grid
-    title_grob <- .create_title_grob("Tsallis Entropy Distribution by Group", subtitle = "Violin and density plots across samples",
-        title_size = 19, subtitle_size = 15)
+    title_grob <- .create_title_grob(base_title, subtitle = "Violin and density plots across samples")
     grid_with_title <- cowplot::plot_grid(title_grob, grid, nrow = 2, rel_heights = c(0.08,
         1))
 
-    # Save to file if output_file is provided
-    if (!is.null(output_file)) {
-        .save_plot_standard(grid_with_title, output_file, width_inches = 12, aspect_type = "standard",
-            dpi_output = 100)
-    }
-
+    # Unified save-or-return
+    .finalize_plot(grid_with_title, output_file)
     return(grid_with_title)
 }
 
@@ -118,7 +89,6 @@ plot_diversity_violin_density <- function(se, assay_name = "diversity", title = 
 #' @param se A `SummarizedExperiment` returned by `calculate_diversity`
 #' containing
 #'   entropy values at one or more q values.
-#' @param q_value The specific q value to plot (numeric, e.g., 1, 2, 0.5).
 #' @param assay_name Name of the assay to use (default: 'diversity').
 #' @param title Optional plot title. If NULL, auto-generated based on q value.
 #'
@@ -126,33 +96,11 @@ plot_diversity_violin_density <- function(se, assay_name = "diversity", title = 
 #'
 #' @noRd
 .plot_diversity_density_singleq <- function(se, assay_name = "diversity", title = NULL) {
-    suppressPackageStartupMessages({
-    })
 
-    # Try to extract q from SE metadata first (best source for single-q SE)
-    q_val <- NA
-    if (!is.null(S4Vectors::metadata(se)$q) && length(S4Vectors::metadata(se)$q) >
-        0) {
-        q_vals <- unique(as.numeric(S4Vectors::metadata(se)$q))
-        if (length(q_vals) > 0 && !all(is.na(q_vals))) {
-            q_val <- q_vals[1]
-        }
-    }
-
-    # Fallback: use prepare_tsallis_long for data transformation
-    long <- .prepare_tsallis_long(se, assay_name = assay_name)
-
-    if (nrow(long) == 0)
-        stop("No data found in the long format dataframe")
-
-    # If still no q, extract from data
-    if (is.na(q_val)) {
-        q_values <- unique(long$q)
-        q_values <- q_values[!is.na(q_values)]
-        if (length(q_values) > 0) {
-            q_val <- q_values[1]
-        }
-    }
+    # Extract q-value and long-format data
+    extracted <- .extract_q_value(se, assay_name = assay_name)
+    q_val <- extracted$q_val
+    long <- extracted$long
 
     # Set title
     title_use <- title %||% sprintf("Density plot: Tsallis entropy at q = %g", q_val)
@@ -178,7 +126,6 @@ plot_diversity_violin_density <- function(se, assay_name = "diversity", title = 
 #' @param se A `SummarizedExperiment` returned by `calculate_diversity`
 #' containing
 #'   entropy values at one or more q values.
-#' @param q_value The specific q value to plot (numeric, e.g., 1, 2, 0.5).
 #' @param assay_name Name of the assay to use (default: 'diversity').
 #' @param title Optional plot title. If NULL, auto-generated based on q value.
 #'
@@ -186,33 +133,11 @@ plot_diversity_violin_density <- function(se, assay_name = "diversity", title = 
 #'  
 #' @noRd
 .plot_diversity_violin_singleq <- function(se, assay_name = "diversity", title = NULL) {
-    suppressPackageStartupMessages({
-    })
 
-    # Try to extract q from SE metadata first (best source for single-q SE)
-    q_val <- NA
-    if (!is.null(S4Vectors::metadata(se)$q) && length(S4Vectors::metadata(se)$q) >
-        0) {
-        q_vals <- unique(as.numeric(S4Vectors::metadata(se)$q))
-        if (length(q_vals) > 0 && !all(is.na(q_vals))) {
-            q_val <- q_vals[1]
-        }
-    }
-
-    # Fallback: use prepare_tsallis_long for data transformation
-    long <- .prepare_tsallis_long(se, assay_name = assay_name)
-
-    if (nrow(long) == 0)
-        stop("No data found in the long format dataframe")
-
-    # If still no q, extract from data
-    if (is.na(q_val)) {
-        q_values <- unique(long$q)
-        q_values <- q_values[!is.na(q_values)]
-        if (length(q_values) > 0) {
-            q_val <- q_values[1]
-        }
-    }
+    # Extract q-value and long-format data
+    extracted <- .extract_q_value(se, assay_name = assay_name)
+    q_val <- extracted$q_val
+    long <- extracted$long
 
     # Set title
     title_use <- title %||% sprintf("Violin plot: Tsallis entropy at q = %g", q_val)

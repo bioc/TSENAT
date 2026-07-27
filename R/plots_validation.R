@@ -149,8 +149,3 @@
     }
     return(sprintf("%s = %.2f", prefix, as.numeric(q_val)))
 }
-
-#' Format Label for Display
-#'
-#' @noRd
-
