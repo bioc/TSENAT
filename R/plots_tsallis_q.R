@@ -346,8 +346,8 @@ plot_diversity_spectrum <- function(se, assay_name = "diversity", condition_col 
     p <- .apply_publication_theme(p, base_theme = "theme_spectrum", base_size = 11,
         title = "Tsallis Entropy q-Spectrum: Scale-Dependent Diversity Patterns",
         subtitle = "Lines trace median normalized entropy from rare (low q) to dominant (high q) isoforms")
-    p <- p + ggplot2::labs(x = "q value", y = expression("Tsallis entropy (" * S[q] *
-        ")"), color = "Group", fill = "Group")
+    p <- p + ggplot2::labs(x = "q value", y = "Tsallis entropy",
+        color = "Group", fill = "Group")
 
     if (length(groups) == 1) {
         p <- .configure_legend(p, position = "none")
@@ -529,8 +529,7 @@ plot_diversity_spectrum <- function(se, assay_name = "diversity", condition_col 
     p <- .apply_publication_theme(p, base_theme = "theme_spectrum", base_size = 11,
         title = "Tsallis Entropy q-Spectrum: Scale-Dependent Diversity Patterns",
         subtitle = "Lines trace median normalized entropy from rare (low q) to dominant (high q) isoforms")
-    p <- p + ggplot2::labs(x = "q value", y = expression("Tsallis entropy (" * S[q] *
-        ")"))
+    p <- p + ggplot2::labs(x = "q value", y = "Tsallis entropy")
 
     if (length(unique(long$group)) == 1) {
         p <- .configure_legend(p, position = "none")

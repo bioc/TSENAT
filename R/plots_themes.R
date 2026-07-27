@@ -145,12 +145,18 @@
     theme_fn <- get(theme_name)
     result <- plot + theme_fn(base_size = base_size)
 
-    # Apply title/subtitle/axis/legend styling from unified .font_sizes constants
+    # Scale font sizes relative to reference base_size (11)
+    font_scale <- base_size / 11
+
+    # Apply title/subtitle/axis/legend styling scaled to base_size
     result <- result + ggplot2::theme(plot.title = ggplot2::element_text(hjust = 0.5,
-        size = title_size, face = "bold"), plot.subtitle = ggplot2::element_text(hjust = 0.5,
-        size = subtitle_size, face = "italic"), axis.title = ggplot2::element_text(size = .font_sizes$axis_title),
-        axis.text = ggplot2::element_text(size = .font_sizes$axis_text), legend.title = ggplot2::element_text(size = .font_sizes$legend_title),
-        legend.text = ggplot2::element_text(size = .font_sizes$legend_text))
+        size = title_size * font_scale, face = "bold"),
+        plot.subtitle = ggplot2::element_text(hjust = 0.5,
+        size = subtitle_size * font_scale, face = "italic"),
+        axis.title = ggplot2::element_text(size = .font_sizes$axis_title * font_scale),
+        axis.text = ggplot2::element_text(size = .font_sizes$axis_text * font_scale),
+        legend.title = ggplot2::element_text(size = .font_sizes$legend_title * font_scale),
+        legend.text = ggplot2::element_text(size = .font_sizes$legend_text * font_scale))
 
     # Add title/subtitle labels if provided
     if (!is.null(title) && !is.null(subtitle)) {
@@ -718,23 +724,19 @@
 #' @noRd
 .create_title_grob <- function(title, subtitle = NULL, title_size = .font_sizes$title,
     subtitle_size = .font_sizes$subtitle, title_face = "bold", subtitle_face = "italic",
-    title_color = "black", subtitle_color = "gray40") {
+    title_color = "black", subtitle_color = "black") {
 
-    # Start with title grob
-    title_grob <- cowplot::ggdraw() + cowplot::draw_label(title, fontface = title_face,
-        size = title_size, x = 0.5, hjust = 0.5, color = title_color)
+    # Start with title
+    tg <- cowplot::ggdraw() + cowplot::draw_label(title, fontface = title_face,
+        size = title_size, x = 0.5, y = 0.65, hjust = 0.5, color = title_color)
 
-    # Add subtitle if provided
+    # Add subtitle if provided, positioned just below title
     if (!is.null(subtitle)) {
-        subtitle_grob <- cowplot::ggdraw() + cowplot::draw_label(subtitle, fontface = subtitle_face,
-            size = subtitle_size, x = 0.5, hjust = 0.5, color = subtitle_color)
-
-        # Combine title + subtitle
-        title_grob <- cowplot::plot_grid(title_grob, subtitle_grob, nrow = 2, rel_heights = c(1,
-            0.55))
+        tg <- tg + cowplot::draw_label(subtitle, fontface = subtitle_face,
+            size = subtitle_size, x = 0.5, y = 0.25, hjust = 0.5, color = subtitle_color)
     }
 
-    title_grob
+    tg
 }
 
 #' Apply Facet Styling with Panel Spacing and Strip Text

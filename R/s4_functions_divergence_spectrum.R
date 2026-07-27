@@ -157,7 +157,7 @@ plot_divergence_spectrum <- function(analysis, gene = NULL, n_genes = 4, ncol = 
     # Calculate height if not provided (based on grid layout)
     if (is.null(height)) {
         n_rows <- ceiling(n_genes/ncol)
-        height <- 3 + (3.5 * n_rows)  # 3' base + 3.5' per row
+        height <- 3 + (2.5 * n_rows)  # 3" base + 2.5" per row
     }
 
     # Create the plot using base function

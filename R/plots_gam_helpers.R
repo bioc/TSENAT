@@ -378,13 +378,14 @@
     n_cols <- 2
     n_rows <- ceiling(n_plots/n_cols)
 
-    # Add margins to plots for spacing, particularly between rows
+    # Add margins; strip y-axis labels from non-left-column and x-axis from non-bottom-row
     plots_with_margins <- lapply(seq_along(plots), function(i) {
-        p <- plots[[i]]
-        # Add larger bottom margin for plots in the first row to create space
-        # before second row
-        if (i <= n_cols) {
-            p <- p + ggplot2::theme(plot.margin = ggplot2::margin(b = 15, unit = "pt"))
+        p <- plots[[i]] + ggplot2::theme(plot.margin = ggplot2::margin(b = 15, l = 5, r = 5, t = 5, unit = "pt"))
+        if (i %% n_cols == 0 || i == n_plots) {  # right column: remove y label
+            p <- p + ggplot2::theme(axis.title.y = ggplot2::element_blank())
+        }
+        if (i <= n_cols) {  # top row: remove x label
+            p <- p + ggplot2::theme(axis.title.x = ggplot2::element_blank())
         }
         p
     })
@@ -401,11 +402,13 @@
     # Add main title and subtitle above the grid
     title_plot <- .create_title_grob("SAIT Interaction Profiles: Top Genes with q×Condition Effects",
         subtitle = "Diverging curves indicate isoform complexity changes driven by specific q-ranges",
-        title_size = 24, subtitle_size = 17)
+        title_size = 24, subtitle_size = 18)
 
     # Combine title, plots, and single legend at bottom
-    final_plot <- cowplot::plot_grid(title_plot, combined_plot, legend, nrow = 3,
-        rel_heights = c(0.10, 1, 0.08))
+    # Add spacer row between title and figures for breathing room
+    spacer <- cowplot::ggdraw()
+    final_plot <- cowplot::plot_grid(title_plot, spacer, combined_plot, legend, nrow = 4,
+        rel_heights = c(0.14, 0.03, 1, 0.08))
 
     final_plot
 }
@@ -523,8 +526,10 @@
         ggplot2::scale_color_manual(values = color_mapping, name = condition_col,
             breaks = group_levels) + ggplot2::scale_linetype_manual(values = c(`Model fit` = 1),
         name = "") + ggplot2::labs(x = "q parameter", y = "Tsallis entropy", title = ifelse(gene_display_name !=
-        gene, sprintf("%s (%s)", gene_display_name, gene), gene_display_name)) +
-        .theme_spectrum(base_size = 12)
+        gene, sprintf("%s (%s)", gene_display_name, gene), gene_display_name))
+
+    p <- .apply_publication_theme(p, base_theme = "theme_spectrum", base_size = 15,
+        title_size = 16)
 
     p <- .configure_legend(p, position = "none")
 

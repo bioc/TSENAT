@@ -1028,7 +1028,7 @@ NULL
 
     # Add threshold annotation
     p_effect <- p_effect + ggplot2::annotate("text", x = threshold, y = Inf, label = paste("Information\nthreshold\n(D=",
-        threshold, ")", sep = ""), vjust = 1.5, hjust = -0.1, color = "red", size = 3.5)
+        threshold, ")", sep = ""), vjust = 1.5, hjust = 0, color = "red", size = 3.5)
 
     return(p_effect)
 }
