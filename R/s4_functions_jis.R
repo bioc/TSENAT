@@ -72,6 +72,11 @@
 #'  uses adjusted p-values from sait_results 
 #'   (default: TRUE).
 #'
+#' @param nthreads \code{numeric} or  \code{NULL}.  Number of CPU threads for 
+#' parallel processing.
+#'   If NULL, reads from \code{@config$nthreads} (or defaults to 1).
+#'   If > 1 and multiple q-values provided, uses parallel PSOCK cluster.
+#'
 #' @param verbose \code{logical}. Print progress messages (default: FALSE).
 #' @param output_file \code{character} or  \code{NULL}.
 #'  Optional file path to save results.

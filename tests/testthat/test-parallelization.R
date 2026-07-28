@@ -102,6 +102,67 @@ test_that(".get_bpparam returns MulticoreParam for nthreads>1 on Unix", {
     expect_is(bpparam, "MulticoreParam")
 })
 
+test_that(".get_bpparam on Unix: MulticoreParam without RNGseed when seed=NULL", {
+    skip_if_not(.Platform$OS.type == "unix",
+                message = "Multicore parallelization requires Unix (uses mclapply)")
+    bpparam <- TSENAT:::.get_bpparam(nthreads = 2, seed = NULL)
+    expect_is(bpparam, "MulticoreParam")
+    # RNGseed slot should be NA when not provided
+    expect_true(is.na(bpparam$RNGseed) || is.null(bpparam$RNGseed))
+})
+
+test_that(".get_bpparam on Unix: MulticoreParam with RNGseed when seed provided", {
+    skip_if_not(.Platform$OS.type == "unix",
+                message = "Multicore parallelization requires Unix (uses mclapply)")
+    has_rngseed <- "RNGseed" %in% names(formals(BiocParallel::MulticoreParam))
+    skip_if_not(has_rngseed,
+                message = "BiocParallel version does not support RNGseed")
+    bpparam <- TSENAT:::.get_bpparam(nthreads = 2, seed = 42L)
+    expect_is(bpparam, "MulticoreParam")
+    expect_equal(bpparam$RNGseed, 42L)
+})
+
+test_that(".get_bpparam on Windows: SnowParam without RNGseed when seed=NULL", {
+    skip_if_not(.Platform$OS.type == "windows",
+                message = "SnowParam fallback test requires Windows")
+    bpparam <- TSENAT:::.get_bpparam(nthreads = 2, seed = NULL)
+    expect_is(bpparam, "SnowParam")
+    expect_true(is.na(bpparam$RNGseed) || is.null(bpparam$RNGseed))
+})
+
+test_that(".get_bpparam on Windows: SnowParam with RNGseed when seed provided", {
+    skip_if_not(.Platform$OS.type == "windows",
+                message = "SnowParam fallback test requires Windows")
+    has_rngseed <- "RNGseed" %in% names(formals(BiocParallel::SnowParam))
+    skip_if_not(has_rngseed,
+                message = "BiocParallel version does not support RNGseed in SnowParam")
+    bpparam <- TSENAT:::.get_bpparam(nthreads = 2, seed = 42L)
+    expect_is(bpparam, "SnowParam")
+    expect_equal(bpparam$RNGseed, 42L)
+})
+
+test_that(".get_bpparam: has_rngseed detection works for MulticoreParam", {
+    # Verify the capability detection logic returns the correct boolean
+    has_rngseed <- "RNGseed" %in% names(formals(BiocParallel::MulticoreParam))
+    expect_true(is.logical(has_rngseed))
+    expect_length(has_rngseed, 1)
+})
+
+test_that(".get_bpparam: has_rngseed detection works for SnowParam", {
+    # Verify the capability detection logic returns the correct boolean
+    has_rngseed <- "RNGseed" %in% names(formals(BiocParallel::SnowParam))
+    expect_true(is.logical(has_rngseed))
+    expect_length(has_rngseed, 1)
+})
+
+test_that(".get_bpparam returns correct worker count", {
+    bpparam <- TSENAT:::.get_bpparam(nthreads = 1)
+    expect_equal(BiocParallel::bpworkers(bpparam), 1)
+    
+    bpparam <- TSENAT:::.get_bpparam(nthreads = 4)
+    expect_equal(BiocParallel::bpworkers(bpparam), 4)
+})
+
 test_that(".bplapply serial execution returns list", {
     X <- 1:5
     FUN <- function(x) x * 2

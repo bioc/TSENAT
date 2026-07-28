@@ -729,13 +729,6 @@
         na.rm = TRUE), spread = !!spread_calc, .groups = "drop")
 }
 
-#' Aggregate bootstrap CI bounds by group and q-value
-#'
-#' @noRd
-# NOTE (March 2026): .bootstrap_aggregate_ci() moved to bootstrap.R for
-# consolidation
-
-
 #' Volcano plot for differential results
 #'
 #' Create a volcano plot showing fold-change (x-axis) versus adjusted

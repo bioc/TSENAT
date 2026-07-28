@@ -21,7 +21,7 @@
 #' common control/reference names: 'Normal', 'Control', 'WT' (wild-type),
 #' 'Reference', 'Baseline', 'Wild-type', 'wild_type', 'wt'.
 #' If no standard name matches, an error is raised because the control group
-#' is a scientific decision that cannot be reliably guessed — the user must
+#' is a scientific decision that cannot be reliably guessed --- the user must
 #' specify it explicitly via the \code{control_group} parameter.
 #'
 #' @param se SummarizedExperiment object with sample metadata in colData
@@ -90,7 +90,7 @@
 
     # If no standard control label is found, we cannot reliably guess the
     # reference group.  The control group is a scientific decision, not a
-    # computational convenience — choosing the smallest group, the first
+    # computational convenience --- choosing the smallest group, the first
     # alphabetically, or any other heuristic can silently produce incorrect
     # results.  Per Bioconductor reproducibility guidelines, we error out
     # with a clear message that lists the available groups so the user can
@@ -319,7 +319,7 @@
         # numeric vectors with names (required for matching)
         if (is.null(names(pair_ids))) {
             # pair_ids must have names to match with x and y samples
-            warning("pair_ids has no names — cannot perform paired resampling. Falling back to unpaired bootstrap.")
+            warning("pair_ids has no names --- cannot perform paired resampling. Falling back to unpaired bootstrap.")
             return(list(valid = FALSE))
         }
 
@@ -510,7 +510,7 @@
 
     # AUDIT FIX July 2026 (I6): Only apply min-probability clamping when
     # pseudocount is zero. When pseudocount > 0, it already handles zero
-    # probabilities — applying both is a double-correction that distorts
+    # probabilities --- applying both is a double-correction that distorts
     # divergence values. When pseudocount == 0, min_prob acts as a safety
     # net against log(0) and power-of-zero numerical issues.
     if (pseudocount < 1e-10) {
@@ -529,8 +529,8 @@
 
     if (abs(q_val) < 0.01) {
         # q=0: Support-difference divergence.
-        # D_0(p||r) = |supp(p) Δ supp(r)| / |supp(p) ∪ supp(r)|
-        # where supp(·) = {i : prob_i > 0} after pseudocount threshold.
+        # D_0(p||r) = |supp(p) \u0394 supp(r)| / |supp(p) \u222A supp(r)|
+        # where supp(\u00B7) = {i : prob_i > 0} after pseudocount threshold.
         # This measures what fraction of isoforms are present in one
         # distribution but not the other (Jaccard-style).
         min_pos <- 1e-10
@@ -572,14 +572,14 @@
     }
 
     # AUDIT FIX July 2026 (I10): log_base normalization only applies to the
-    # q→1 (KL divergence) limit. The Tsallis divergence for q≠1 is scale-invariant
+    # q\u21921 (KL divergence) limit. The Tsallis divergence for q\u22601 is scale-invariant
     # and does not involve a logarithm base. Previously applied to all q values,
-    # which distorted divergence values by a factor of 1/log(log_base) for q≠1.
+    # which distorted divergence values by a factor of 1/log(log_base) for q\u22601.
     if (abs(q_val - 1) < 0.01 && log_base != exp(1)) {
         div <- div/log(log_base)
     }
 
-    # abs() handles numerical underflow (sum_term ≈ 1) while preserving magnitude.
+    # abs() handles numerical underflow (sum_term \u2248 1) while preserving magnitude.
     # max(0, div) would zero out small negative values, losing information.
     return(abs(div))
 }
@@ -628,7 +628,7 @@
 
     # AUDIT FIX July 2026 (I6): Only apply min-probability clamping when
     # pseudocount is zero. When pseudocount > 0, it already handles zero
-    # probabilities — applying both is a double-correction that distorts
+    # probabilities --- applying both is a double-correction that distorts
     # divergence values.
     if (pseudocount < 1e-10) {
         min_prob <- 1e-10
@@ -688,8 +688,8 @@
     }
 
     # AUDIT FIX July 2026 (I10): log_base normalization only applies to the
-    # q→1 (KL divergence) limit. For q≠1, Tsallis divergence is scale-invariant.
-    # Only normalize the q≈1 entries in the result vector.
+    # q\u21921 (KL divergence) limit. For q\u22601, Tsallis divergence is scale-invariant.
+    # Only normalize the q\u22481 entries in the result vector.
     q1_mask <- abs(q_vals - 1) < 0.01
     if (log_base != exp(1) && any(q1_mask)) {
         result[q1_mask] <- result[q1_mask] / log(log_base)
