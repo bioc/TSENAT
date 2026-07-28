@@ -249,7 +249,7 @@ divergence_bootstrap_compute_cpp_wrapper <- function(x, y, q = 1, nboot = 1000L,
     if (!is.numeric(q) || q < 0) {
         stop("q must be a non-negative numeric value")
     }
-    if (!is.integer(nboot) || nboot < 1) {
+    if (!is.numeric(nboot) || nboot < 1 || nboot != as.integer(nboot)) {
         stop("nboot must be a positive integer")
     }
 

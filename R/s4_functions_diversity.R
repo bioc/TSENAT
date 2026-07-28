@@ -215,7 +215,7 @@ calculate_diversity <- function(analysis, q = NULL, norm = TRUE, norm_method = N
         verbose, what, nthreads, pseudocount, min_valid_frac, shrinkage, bootstrap,
         nboot, bootstrap_method, bootstrap_ci, bootstrap_include_diagnostics, show_messages,
         log_base = log_base)
-    .validate_norm_method(params$norm_method)
+    params$norm_method <- .validate_norm_method(params$norm_method)
 
     # Execute diversity calculation
     calc_args <- .build_calc_diversity_args(params, analysis, list(...))
@@ -257,6 +257,7 @@ calculate_diversity <- function(analysis, q = NULL, norm = TRUE, norm_method = N
         # Validate norm_method parameter per Bioconductor code syntax standards
         norm_method <- match.arg(norm_method, c("default", "zscore", "log_odds_ratio", "relative_reference"))
     }
+    return(norm_method)
 }
 
 # ============================================================================

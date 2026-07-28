@@ -1077,9 +1077,12 @@ TSENAT_config <- function(q = 1, condition_col = "condition", subject_col = NULL
 #' @noRd
 .execute_rank_transform_test <- function(analysis, verbose, output_dir, output_format) {
 
-    # Compute diversity for SRH analysis with bootstrap CIs
-    analysis <- calculate_diversity(analysis, norm = TRUE, pseudocount = "auto",
-        verbose = FALSE)
+    # Only compute diversity if not already present (avoids redundant re-computation
+    # when diversity was already computed in Stage 2 of the pipeline)
+    if (length(analysis@diversity_results) == 0) {
+        analysis <- calculate_diversity(analysis, norm = TRUE, pseudocount = "auto",
+            verbose = FALSE)
+    }
 
     # Run SRH test for q * condition interaction
     output_file <- .build_output_file("rank_transform_results", output_dir, output_format)

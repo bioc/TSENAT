@@ -246,9 +246,12 @@
     resampled_pairs <- sample(seq_len(num_pairs), size = num_pairs, replace = TRUE)
     resampled_pair_ids <- pairs_in_data[resampled_pairs]
 
-    # Collect samples for each resampled pair
-    resampled_control <- numeric(0)
-    resampled_treatment <- numeric(0)
+    # Collect samples for each resampled pair (pre-allocate for O(n) performance)
+    n_resampled <- length(resampled_pair_ids) * 2L  # upper bound: 2 samples per pair
+    resampled_control <- numeric(n_resampled)
+    resampled_treatment <- numeric(n_resampled)
+    c_idx <- 1L
+    t_idx <- 1L
 
     for (pair_id in resampled_pair_ids) {
         # Get both samples from this pair
@@ -256,12 +259,17 @@
 
         for (sample_name in pair_samples) {
             if (sample_name %in% names(control_samples)) {
-                resampled_control <- c(resampled_control, control_samples[sample_name])
+                resampled_control[c_idx] <- control_samples[sample_name]
+                c_idx <- c_idx + 1L
             } else if (sample_name %in% names(treatment_samples)) {
-                resampled_treatment <- c(resampled_treatment, treatment_samples[sample_name])
+                resampled_treatment[t_idx] <- treatment_samples[sample_name]
+                t_idx <- t_idx + 1L
             }
         }
     }
+    # Trim to actual used length
+    resampled_control <- resampled_control[seq_len(c_idx - 1L)]
+    resampled_treatment <- resampled_treatment[seq_len(t_idx - 1L)]
 
     # BUGFIX #3: Validate balanced groups after paired resampling Ensures
     # control and treatment have equal sizes (required for divergence
@@ -311,11 +319,12 @@
         # numeric vectors with names (required for matching)
         if (is.null(names(pair_ids))) {
             # pair_ids must have names to match with x and y samples
+            warning("pair_ids has no names — cannot perform paired resampling. Falling back to unpaired bootstrap.")
             return(list(valid = FALSE))
         }
 
         if (!(is.numeric(pair_ids) || is.integer(pair_ids) || is.character(pair_ids))) {
-            warning("pair_ids must be a named integer/numeric/character vector")
+            warning("pair_ids must be a named integer/numeric/character vector. Falling back to unpaired bootstrap.")
             return(list(valid = FALSE))
         }
 

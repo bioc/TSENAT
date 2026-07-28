@@ -430,8 +430,10 @@
             min_nperm, max_nperm)
         if (verbose)
             message(sprintf("Estimated %d permutations", wy_randomizations))
-    } else if (!is.numeric(wy_randomizations)) {
+    } else if (is.null(wy_randomizations)) {
         wy_randomizations <- 500
+    } else if (!is.numeric(wy_randomizations)) {
+        stop("wy_randomizations must be numeric, 'auto', or NULL")
     }
     wy_randomizations <- as.integer(wy_randomizations)
 
@@ -453,9 +455,7 @@
     if (any(grepl("westfall-young", multicorr, ignore.case = TRUE))) {
         # Pre-compute global ranks for all data (used in initial tests)
         if (!"ranks" %in% colnames(data)) {
-            if (any(grepl("westfall-young", multicorr, ignore.case = TRUE))) {
-                data$ranks <- rank(data$entropy, na.last = "keep")
-            }
+            data$ranks <- rank(data$entropy, na.last = "keep")
         }
         # Pre-compile formula to avoid repeated as.formula() calls (100K+
         # times)
@@ -686,7 +686,12 @@
     )
     if (!is.null(raw_model)) {
         raw_anova <- anova(raw_model)
-        interaction_row <- nrow(raw_anova) - 1
+        # Use name-based lookup for interaction row (robust to formula order changes)
+        interaction_row <- grep(":", rownames(raw_anova), fixed = TRUE)
+        if (length(interaction_row) != 1) {
+            # Fallback: assume interaction is the last row (standard R formula expansion)
+            interaction_row <- nrow(raw_anova) - 1
+        }
         ss_interaction_raw <- raw_anova$`Sum Sq`[interaction_row]
         ss_total_raw <- sum(raw_anova$`Sum Sq`)
         eta2_raw <- if (ss_total_raw > 0) ss_interaction_raw / ss_total_raw else 0

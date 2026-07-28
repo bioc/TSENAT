@@ -209,8 +209,9 @@ METHOD_ORDER <- c("diversity", "jackknife", "sait_interaction", "divergence", "r
 #' `%||%` operator for default values
 #'
 #' Returns left operand if not NULL, otherwise right operand.
+#' NOTE: Also treats a single NA as NULL (non-standard but intentional —
+#' NA is treated as "missing" for configuration parameter defaults).
 #'
-
 #' @noRd
 `%||%` <- function(x, y) {
     if (is.null(x) || (length(x) == 1 && is.na(x)))

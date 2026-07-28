@@ -209,7 +209,8 @@ calculate_sait <- function(analysis, fdr_threshold = NULL, formula = NULL, condi
         analysis@sait_results <- list(sait_interaction = data.frame())
         return(analysis)
     }
-    .store_sait_results_in_analysis(analysis, extracted$results, extracted$model_data)
+    analysis <- .store_sait_results_in_analysis(analysis, extracted$results, extracted$model_data)
+    return(analysis)
 }
 
 # Helper: Sync colData from diversity results to analysis@se @param analysis
