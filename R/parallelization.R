@@ -1,8 +1,22 @@
 # Helper functions for parallel processing using BiocParallel and parallel
 # package
 
+# Validate nthreads input — ensure numeric, finite, non-negative
+.validate_nthreads <- function(nthreads) {
+    if (is.null(nthreads)) return(invisible(NULL))
+    if (!is.numeric(nthreads) || length(nthreads) != 1) {
+        stop("nthreads must be a single numeric value", call. = FALSE)
+    }
+    if (!is.finite(nthreads) || nthreads < 0) {
+        stop("nthreads must be a finite, non-negative number", call. = FALSE)
+    }
+    invisible(NULL)
+}
+
 # Get effective number of threads, respecting environment constraints
 .get_effective_nthreads <- function(nthreads = 1) {
+    .validate_nthreads(nthreads)
+
     if (nthreads <= 1) {
         return(1)
     }
@@ -20,7 +34,13 @@
         }
     }
 
-    return(max(1, nthreads))
+    # Respect R's standard 'mc.cores' option (set by users or system admins)
+    mc_cores <- getOption("mc.cores")
+    if (is.numeric(mc_cores) && length(mc_cores) == 1 && is.finite(mc_cores) && mc_cores > 0) {
+        nthreads <- min(nthreads, as.integer(mc_cores))
+    }
+
+    return(max(1L, as.integer(nthreads)))
 }
 
 # ==============================================================================
@@ -28,6 +48,7 @@
 # ==============================================================================
 # PARAMETERS:
 #   nthreads: Number of threads to use (default: 1)
+#   seed:     Integer seed for reproducible parallel execution
 #
 # RETURNS:
 #   BiocParallel BPPARAM object
@@ -39,13 +60,27 @@
         return(BiocParallel::SerialParam())
     }
 
-    # AUDIT FIX #20: Pass RNGseed for reproducible parallel execution.
-    # Without RNGseed, different runs (even with set.seed) produce different results
-    # when using multiple threads.
+    # RNGseed for reproducible parallel execution.
+    # Note: set.seed() in the main R process does NOT propagate to forked
+    # workers on Unix (mclapply). The caller should derive a seed from the
+    # current RNG state (e.g., sample.int()) and pass it explicitly.
+    #
+    # BiocParallel >= 1.16.0 (MulticoreParam) / >= 1.14.0 (SnowParam) supports
+    # RNGseed. Fall back to no-seed for older versions.
+    has_rngseed <- "RNGseed" %in% names(formals(BiocParallel::MulticoreParam))
+
     if (.Platform$OS.type == "unix") {
-        return(BiocParallel::MulticoreParam(workers = nthreads, RNGseed = seed))
+        if (has_rngseed && !is.null(seed)) {
+            return(BiocParallel::MulticoreParam(workers = nthreads, RNGseed = seed))
+        } else {
+            return(BiocParallel::MulticoreParam(workers = nthreads))
+        }
     } else {
-        return(BiocParallel::SnowParam(workers = nthreads, RNGseed = seed))
+        if (has_rngseed && !is.null(seed)) {
+            return(BiocParallel::SnowParam(workers = nthreads, RNGseed = seed))
+        } else {
+            return(BiocParallel::SnowParam(workers = nthreads))
+        }
     }
 }
 
@@ -56,49 +91,23 @@
 #   X:         Vector or list to iterate over
 #   FUN:       Function to apply
 #   nthreads:  Number of threads (default: 1)
-#   SIMPLIFY:  Whether to simplify results (default: TRUE)
-#   FUN.VALUE: Template for vapply (optional)
-.bplapply <- function(X, FUN, nthreads = 1, SIMPLIFY = TRUE, FUN.VALUE = NULL) {
+#
+# NOTE: Always returns a list. Callers that need simplified output should
+#   use vapply() / unlist() on the result themselves.
+.bplapply <- function(X, FUN, nthreads = 1) {
+    .validate_nthreads(nthreads)
+
     if (nthreads <= 1) {
-        # Serial execution
-        if (is.null(FUN.VALUE)) {
-            return(lapply(X, FUN))
-        } else {
-            return(unname(vapply(X, FUN, FUN.VALUE = FUN.VALUE)))
-        }
+        return(lapply(X, FUN))
     }
 
     # Parallel execution
-    # Derive seed from current RNG state for reproducibility across parallel runs.
-    # Without this, set.seed() has no effect on parallel workers, making results
-    # non-deterministic even when the main R session's RNG is seeded.
+    # Derive seed from current RNG state so that outer set.seed() calls
+    # propagate deterministically to workers.
     seed <- sample.int(.Machine$integer.max, 1)
     bpparam <- .get_bpparam(nthreads, seed = seed)
 
-    if (is.null(FUN.VALUE)) {
-        return(BiocParallel::bplapply(X, FUN, BPPARAM = bpparam))
-    } else {
-        # Use bplapply and then simplify with vapply
-        result_list <- BiocParallel::bplapply(X, FUN, BPPARAM = bpparam)
-        return(vapply(result_list, identity, FUN.VALUE = FUN.VALUE))
-    }
-}
-
-# ==============================================================================
-# Apply Function Over Two Vectors in Parallel
-# ==============================================================================
-# PARAMETERS:
-#   X:        First vector or list
-#   Y:        Second vector or list
-#   FUN:      Function to apply (takes two arguments)
-#   nthreads: Number of threads (default: 1)
-.bpmapply <- function(X, Y, FUN, nthreads = 1) {
-    if (nthreads <= 1) {
-        return(unname(mapply(FUN, X, Y, SIMPLIFY = FALSE)))
-    }
-
-    bpparam <- .get_bpparam(nthreads)
-    return(unname(BiocParallel::bpmapply(FUN, X, Y, BPPARAM = bpparam, SIMPLIFY = FALSE)))
+    return(BiocParallel::bplapply(X, FUN, BPPARAM = bpparam))
 }
 
 # ==============================================================================
@@ -114,13 +123,20 @@
 # RETURNS:
 #   Validated number of threads respecting environment limits
 .get_nthreads_auto_detect <- function(nthreads = NULL) {
-    if (is.null(nthreads) || nthreads < 1) {
+    if (is.null(nthreads) || (is.numeric(nthreads) && nthreads < 1)) {
         # Auto-detect available cores, leaving one free for system
-        nthreads <- max(1, parallel::detectCores() - 1)
+        # detectCores() can return NA in container/restricted environments;
+        # fall back to 1 in that case (na.rm = TRUE handles NA gracefully)
+        detected <- parallel::detectCores()
+        if (is.na(detected) || !is.finite(detected) || detected < 1) {
+            nthreads <- 1L
+        } else {
+            nthreads <- max(1L, as.integer(detected - 1L))
+        }
     } else {
         nthreads <- as.integer(nthreads)
     }
 
-    # Apply environment variable constraints (R CMD check limits)
+    # Apply environment variable constraints (R CMD check limits, mc.cores)
     return(.get_effective_nthreads(nthreads))
 }

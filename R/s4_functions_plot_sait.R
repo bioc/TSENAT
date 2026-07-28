@@ -202,9 +202,9 @@ plot_sait <- function(analysis, n_top = 6, genes = NULL, condition_col = NULL, s
             }
             n_genes_plot <- min(sum(sig_genes), n_top)
         }
-        # Calculate height: 2 rows per 3-gene group, ~3.5 inches per row
+        # Calculate height: 2 rows per 3-gene group, ~4.35 inches per row
         n_rows <- ceiling(n_genes_plot/2)
-        height <- 2 + (3.5 * n_rows)
+        height <- 2 + (4.35 * n_rows)
     }
 
     # =========================================================================

@@ -5,63 +5,6 @@
 
 
 # ============================================================================
-# THEME UTILITIES
-# ============================================================================
-
-#' Apply TSENAT Base Theme
-#'
-#' Applies standard TSENAT styling: minimal theme with centered titles.
-#'
-#' @param base_size Integer: base font size (default: 11).
-#' @param color_palette Character: 'blue_red' (default) or other.
-#'
-#' @return ggplot2 theme object.
-#'
-
-#' @noRd
-
-.apply_tsenat_theme <- function(base_size = 11, color_palette = "blue_red") {
-
-    theme_result <- .theme_base(base_size = base_size) + ggplot2::theme(plot.title = ggplot2::element_text(hjust = 0.5,
-        size = .font_sizes$title, face = "bold"), plot.subtitle = ggplot2::element_text(hjust = 0.5,
-        size = .font_sizes$subtitle, face = "italic"))
-
-    return(theme_result)
-}
-
-#' Modify Plot Title and Subtitle
-#'
-#' Convenience function to update title/subtitle in existing plot.
-#'
-#' @param plot ggplot2 object.
-#' @param title Character: new title.
-#' @param subtitle Character: new subtitle.
-#' @param title_size Integer: title font size (default: from constants).
-#' @param subtitle_size Integer: subtitle font size (default: from constants).
-#'
-#' @return Modified ggplot2 object.
-#'
-
-#' @noRd
-
-.set_plot_title <- function(plot, title = NULL, subtitle = NULL, title_size = .font_sizes$title,
-    subtitle_size = .font_sizes$subtitle) {
-
-    if (!is.null(title)) {
-        plot <- plot + ggplot2::labs(title = title)
-    }
-
-    if (!is.null(subtitle)) {
-        plot <- plot + ggplot2::labs(subtitle = subtitle)
-    }
-
-    plot <- plot + ggplot2::theme(plot.title = ggplot2::element_text(hjust = 0.5,
-        size = title_size, face = "bold"), plot.subtitle = ggplot2::element_text(hjust = 0.5,
-        size = subtitle_size, face = "italic"))
-
-    return(plot)
-}
-
 # ============================================================================
 # HEATMAP STYLING
 # ============================================================================
@@ -202,11 +145,18 @@
     theme_fn <- get(theme_name)
     result <- plot + theme_fn(base_size = base_size)
 
-    # Apply title/subtitle styling (always centered, bold/italic as per TSENAT
-    # convention)
+    # Scale font sizes relative to reference base_size (11)
+    font_scale <- base_size / 11
+
+    # Apply title/subtitle/axis/legend styling scaled to base_size
     result <- result + ggplot2::theme(plot.title = ggplot2::element_text(hjust = 0.5,
-        size = title_size, face = "bold"), plot.subtitle = ggplot2::element_text(hjust = 0.5,
-        size = subtitle_size, face = "italic"))
+        size = title_size * font_scale, face = "bold"),
+        plot.subtitle = ggplot2::element_text(hjust = 0.5,
+        size = subtitle_size * font_scale, face = "italic"),
+        axis.title = ggplot2::element_text(size = .font_sizes$axis_title * font_scale),
+        axis.text = ggplot2::element_text(size = .font_sizes$axis_text * font_scale),
+        legend.title = ggplot2::element_text(size = .font_sizes$legend_title * font_scale),
+        legend.text = ggplot2::element_text(size = .font_sizes$legend_text * font_scale))
 
     # Add title/subtitle labels if provided
     if (!is.null(title) && !is.null(subtitle)) {
@@ -609,13 +559,6 @@
         has_grouping <- FALSE
     }
 
-    # Check if we have valid CI data to plot
-    has_valid_ci <- FALSE
-    if (ci_lower_col %in% colnames(data) && ci_upper_col %in% colnames(data)) {
-        has_valid_ci <- any(!is.na(data[[ci_lower_col]]) & !is.infinite(data[[ci_lower_col]]) &
-            !is.na(data[[ci_upper_col]]) & !is.infinite(data[[ci_upper_col]]))
-    }
-
     # Add ribbon layer (CI bounds) only if we have valid CI data
     if (has_valid_ci) {
         if (has_grouping) {
@@ -781,23 +724,19 @@
 #' @noRd
 .create_title_grob <- function(title, subtitle = NULL, title_size = .font_sizes$title,
     subtitle_size = .font_sizes$subtitle, title_face = "bold", subtitle_face = "italic",
-    title_color = "black", subtitle_color = "gray40") {
+    title_color = "black", subtitle_color = "black") {
 
-    # Start with title grob
-    title_grob <- cowplot::ggdraw() + cowplot::draw_label(title, fontface = title_face,
-        size = title_size, x = 0.5, hjust = 0.5, color = title_color)
+    # Start with title
+    tg <- cowplot::ggdraw() + cowplot::draw_label(title, fontface = title_face,
+        size = title_size, x = 0.5, y = 0.65, hjust = 0.5, color = title_color)
 
-    # Add subtitle if provided
+    # Add subtitle if provided, positioned just below title
     if (!is.null(subtitle)) {
-        subtitle_grob <- cowplot::ggdraw() + cowplot::draw_label(subtitle, fontface = subtitle_face,
-            size = subtitle_size, x = 0.5, hjust = 0.5, color = subtitle_color)
-
-        # Combine title + subtitle
-        title_grob <- cowplot::plot_grid(title_grob, subtitle_grob, nrow = 2, rel_heights = c(1,
-            0.6))
+        tg <- tg + cowplot::draw_label(subtitle, fontface = subtitle_face,
+            size = subtitle_size, x = 0.5, y = 0.25, hjust = 0.5, color = subtitle_color)
     }
 
-    title_grob
+    tg
 }
 
 #' Apply Facet Styling with Panel Spacing and Strip Text
@@ -823,7 +762,7 @@
     if (!is.null(facet_var)) {
         facet_formula <- stats::as.formula(paste0("~", facet_var))
         plot <- plot + ggplot2::facet_wrap(facet_formula, ncol = ncol, nrow = nrow,
-            scales = scales)
+            scales = scales, labeller = ggplot2::label_wrap_gen(22))
     }
 
     # Apply panel and strip styling
@@ -872,6 +811,194 @@
     }
 
     long
+}
+
+#' Extract Q-Value from SE Metadata with Fallback
+#'
+#' Consolidated helper that extracts the q-value from a SummarizedExperiment
+#' and prepares long-format data. Replaces 7 copy-pasted blocks across the
+#' codebase.
+#'
+#' @param se SummarizedExperiment with diversity/entropy data
+#' @param assay_name Character: assay name (default: 'diversity')
+#'
+#' @return List with elements:
+#'   - q_val: Numeric q-value (or NA if not found)
+#'   - long: Data frame in long format
+#'
+#' @noRd
+.extract_q_value <- function(se, assay_name = "diversity") {
+    q_val <- NA
+    if (!is.null(S4Vectors::metadata(se)$q) && length(S4Vectors::metadata(se)$q) > 0) {
+        q_vals <- unique(as.numeric(S4Vectors::metadata(se)$q))
+        if (length(q_vals) > 0 && !all(is.na(q_vals))) q_val <- q_vals[1]
+    }
+    long <- .prepare_tsallis_long(se, assay_name = assay_name)
+    if (nrow(long) == 0) stop("No data found in the long format dataframe")
+    if (is.na(q_val)) {
+        q_values <- unique(long$q)
+        q_values <- q_values[!is.na(q_values)]
+        if (length(q_values) > 0) q_val <- q_values[1]
+    }
+    list(q_val = q_val, long = long)
+}
+
+# ============================================================================
+# PHASE 7: UNIFIED PLOT PIPELINE HELPERS (July 2026 architecture consolidation)
+# ============================================================================
+
+#' Normalize Plot Input
+#'
+#' Single entry point for all plot functions. Handles TSENATAnalysis → SE
+#' conversion, condition_col resolution, and assay validation.
+#' Replaces duplicated 30+ line blocks in plot_diversity_spectrum() and
+#' plot_diversity_violin_density().
+#'
+#' @param se A SummarizedExperiment or TSENATAnalysis object.
+#' @param assay_name Character: name of assay to use (default: 'diversity').
+#' @param condition_col Character or NULL: condition column name.
+#' @param multi_q Logical: if TRUE, combine all q-value results into single SE
+#'   (for spectrum/q-curve plots). If FALSE, extract first result only
+#'   (for single-q plots like violin/density). Default: TRUE.
+#'
+#' @return List with elements:
+#'   - se: Normalized SummarizedExperiment
+#'   - condition_col: Resolved condition column name
+#'
+#' @noRd
+.normalize_plot_input <- function(se, assay_name = "diversity", condition_col = NULL,
+    multi_q = TRUE) {
+    # Handle TSENATAnalysis objects
+    if (methods::is(se, "TSENATAnalysis")) {
+        if (is.null(condition_col)) {
+            condition_col <- se@config$condition_col %||% "condition"
+        }
+        if (multi_q) {
+            se <- .prepare_combined_se(se)
+        } else if (length(se@diversity_results) > 0) {
+            se <- se@diversity_results[[1]]
+        } else {
+            stop("No diversity results found in TSENATAnalysis object. Run calculate_diversity() first.",
+                call. = FALSE)
+        }
+    }
+
+    # Validate we have a SummarizedExperiment
+    if (!methods::is(se, "SummarizedExperiment")) {
+        stop("Input must be a SummarizedExperiment or TSENATAnalysis object", call. = FALSE)
+    }
+
+    # Resolve condition_col for direct SE input
+    if (is.null(condition_col)) {
+        cd_cols <- colnames(SummarizedExperiment::colData(se))
+        if ("condition" %in% cd_cols) {
+            condition_col <- "condition"
+        } else if ("sample_type" %in% cd_cols) {
+            condition_col <- "sample_type"
+        }
+    }
+
+    # Validate assay exists
+    if (!assay_name %in% SummarizedExperiment::assayNames(se)) {
+        stop("Assay '", assay_name, "' not found in SummarizedExperiment", call. = FALSE)
+    }
+
+    list(se = se, condition_col = condition_col)
+}
+
+#' Resolve Genes for Plotting
+#'
+#' Unified gene selection for all plot types. Replaces 4 previously scattered
+#' functions with a single centralized dispatcher.
+#' The heatmap-specific selectors (.heatmap_select_genes_multiq,
+#' .heatmap_select_genes_results) remain for their specialized multi-q logic.
+#'
+#' @param results Data frame or NULL: results with gene and p-value columns.
+#' @param genes Character vector or NULL: specific gene names to plot.
+#' @param n_top Integer: number of top genes to select (default: 4).
+#' @param rank_by Character: column to rank by - auto-detected p-value column.
+#' @param sig_alpha Numeric or NULL: significance threshold filter.
+#' @param gene_col Character: manual gene column override (auto-detected if NULL).
+#'
+#' @return Character vector of gene identifiers, or NULL for aggregate mode
+#'   or when no significant genes pass threshold.
+#'
+#' @noRd
+.resolve_plot_genes <- function(results = NULL, genes = NULL, n_top = 4,
+    rank_by = NULL, sig_alpha = NULL, gene_col = NULL) {
+
+    # Case 1: User provided specific genes
+    if (!is.null(genes)) {
+        if (!is.character(genes)) stop("'genes' must be a character vector", call. = FALSE)
+        return(as.character(genes))
+    }
+
+    # Case 2: No results provided → aggregate mode (all genes)
+    if (is.null(results)) return(NULL)
+
+    # Case 3: Select from results by ranking
+    if (!is.data.frame(results) || nrow(results) == 0) {
+        stop("must be a non-empty data frame", call. = FALSE)
+    }
+
+    # Auto-detect gene column (unless explicitly provided)
+    if (is.null(gene_col)) {
+        gene_cols <- c("gene", "gene_name", "gene_id", "genes")
+        gene_col <- intersect(gene_cols, colnames(results))[1]
+    }
+    if (is.null(gene_col) || is.na(gene_col) || !gene_col %in% colnames(results)) {
+        stop("No gene identifier column found in results. Expected one of: ",
+            paste(c("gene", "gene_name", "gene_id", "genes"), collapse = ", "),
+            call. = FALSE)
+    }
+
+    # Auto-detect p-value column (unless explicitly provided)
+    if (is.null(rank_by)) {
+        p_cols <- c("adj_p_interaction", "p_interaction", "adj_p_value",
+            "p_value", "padj", "pvalue", "adjusted_p_values", "raw_p_values")
+        rank_by <- intersect(p_cols, colnames(results))[1]
+    }
+
+    # Filter by significance threshold if requested
+    if (!is.null(sig_alpha) && !is.null(rank_by) && !is.na(rank_by) &&
+        rank_by %in% colnames(results)) {
+        results <- results[results[[rank_by]] < sig_alpha, , drop = FALSE]
+        if (nrow(results) == 0) {
+            warning("No genes pass significance threshold ", sig_alpha,
+                call. = FALSE)
+            return(NULL)
+        }
+    }
+
+    # Sort and select top N
+    if (!is.null(rank_by) && !is.na(rank_by) && rank_by %in% colnames(results)) {
+        results <- results[order(results[[rank_by]], na.last = TRUE), , drop = FALSE]
+    }
+
+    genes_sel <- as.character(results[[gene_col]])
+    genes_sel <- unique(genes_sel)
+    head(genes_sel, min(n_top, length(genes_sel)))
+}
+
+#' Finalize Plot Output
+#'
+#' Unified save-or-return for all plot functions. Replaces duplicated
+#' ggsave + .save_plot_standard + manual save patterns.
+#'
+#' @param plot A ggplot2 or grob object to return or save.
+#' @param output_file Character or NULL: file path for saving.
+#' @param width Numeric: output width in inches (default: 12).
+#' @param aspect Character: aspect ratio type (default: 'standard').
+#'
+#' @return Invisibly returns the plot object.
+#'
+#' @noRd
+.finalize_plot <- function(plot, output_file = NULL, width = 12, aspect = "standard") {
+    if (!is.null(output_file)) {
+        .save_plot_standard(plot, output_file, width_inches = width,
+            aspect_type = aspect, dpi_output = 300)
+    }
+    invisible(plot)
 }
 
 #' Create Centered Theme Element Components

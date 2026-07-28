@@ -4075,6 +4075,33 @@ test_that(".assumptions_empty_data includes requested check placeholders", {
     expect_false("gam_metrics" %in% names(checks))
 })
 
+test_that(".assumptions_empty_data handles lmm_metrics check type", {
+    result <- TSENAT:::.assumptions_empty_data(c("exchangeability", "lmm_metrics"))
+    checks <- attr(result, "checks")
+    expect_true("lmm_metrics" %in% names(checks))
+    expect_equal(checks$lmm_metrics$variance_components$status, "? SKIP")
+    expect_equal(checks$lmm_metrics$normality$status, "? SKIP")
+    expect_equal(checks$lmm_metrics$homogeneity$status, "? SKIP")
+    expect_equal(checks$lmm_metrics$influence$status, "? SKIP")
+})
+
+test_that(".assumptions_empty_data handles fpca_metrics check type", {
+    result <- TSENAT:::.assumptions_empty_data(c("exchangeability", "fpca_metrics"))
+    checks <- attr(result, "checks")
+    expect_true("fpca_metrics" %in% names(checks))
+    expect_equal(checks$fpca_metrics$variance_adequacy$status, "? SKIP")
+    expect_equal(checks$fpca_metrics$bootstrap_stability$status, "? SKIP")
+})
+
+test_that(".assumptions_empty_data handles all check types simultaneously", {
+    result <- TSENAT:::.assumptions_empty_data(
+        c("exchangeability", "gam_metrics", "gee_metrics", "lmm_metrics", "fpca_metrics")
+    )
+    checks <- attr(result, "checks")
+    expect_true(all(c("gam_metrics", "gee_metrics", "lmm_metrics", "fpca_metrics") %in% names(checks)))
+    expect_s3_class(result, "rank_assumptions")
+})
+
 test_that(".check_exchangeability skips with insufficient samples", {
     data <- matrix(1:6, nrow = 3, ncol = 2)
     result <- TSENAT:::.check_exchangeability(data)

@@ -97,37 +97,6 @@ test_that(".get_gene_ids uses gene_name as fallback", {
 })
 
 # ===========================================================================
-# Tests for .extract_attribute_fast()
-# ===========================================================================
-
-test_that(".extract_attribute_fast extracts attribute values correctly", {
-    attr_str <- "ID=ENST00000001;Parent=ENSG00000001;gene_name=BRCA1"
-
-    id_val <- TSENAT:::.extract_attribute_fast(attr_str, "ID=")
-    expect_equal(id_val, "ENST00000001")
-
-    parent_val <- TSENAT:::.extract_attribute_fast(attr_str, "Parent=")
-    expect_equal(parent_val, "ENSG00000001")
-
-    gene_name <- TSENAT:::.extract_attribute_fast(attr_str, "gene_name=")
-    expect_equal(gene_name, "BRCA1")
-})
-
-test_that(".extract_attribute_fast handles missing attributes", {
-    attr_str <- "ID=ENST00000001;Parent=ENSG00000001"
-
-    missing <- TSENAT:::.extract_attribute_fast(attr_str, "gene_name=")
-    expect_true(is.na(missing))
-})
-
-test_that(".extract_attribute_fast handles end-of-string attributes", {
-    attr_str <- "ID=ENST00000001;gene_name=BRCA1"
-
-    gene_name <- TSENAT:::.extract_attribute_fast(attr_str, "gene_name=")
-    expect_equal(gene_name, "BRCA1")
-})
-
-# ===========================================================================
 # Tests for .validate_readcounts()
 # ===========================================================================
 

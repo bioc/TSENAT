@@ -1530,3 +1530,127 @@ test_that("calc_div_for_gene_q: many genes, many q-values", {
   expect_equal(nrow(se), n_genes)
   expect_equal(ncol(se), n_samples * n_q)
 })
+
+# ============================================================================
+# COVERAGE IMPROVEMENT: .validate_and_auto_detect_groups (57.7%)
+# ============================================================================
+
+test_that(".validate_and_auto_detect_groups resolves group_col from control_group", {
+    se <- SummarizedExperiment::SummarizedExperiment(
+        assays = list(counts = matrix(1:12, nrow = 3)),
+        colData = data.frame(
+            sample_type = c("normal", "tumor", "normal", "tumor"),
+            row.names = paste0("S", 1:4)
+        )
+    )
+    
+    result <- TSENAT:::.validate_and_auto_detect_groups(
+        se, group_col = NULL, control_group = "normal", progress = FALSE
+    )
+    
+    expect_equal(result$group_col, "sample_type")
+    expect_equal(result$control_group, "normal")
+})
+
+test_that(".validate_and_auto_detect_groups errors when control_group not in candidates", {
+    se <- SummarizedExperiment::SummarizedExperiment(
+        assays = list(counts = matrix(1:12, nrow = 3)),
+        colData = data.frame(
+            custom_col = c("A", "B", "A", "B"),
+            row.names = paste0("S", 1:4)
+        )
+    )
+    
+    expect_error(
+        TSENAT:::.validate_and_auto_detect_groups(
+            se, group_col = NULL, control_group = "A", progress = FALSE
+        ),
+        "control_group.*not found"
+    )
+})
+
+test_that(".validate_and_auto_detect_groups auto-detects both group_col and control_group", {
+    se <- SummarizedExperiment::SummarizedExperiment(
+        assays = list(counts = matrix(1:12, nrow = 3)),
+        colData = data.frame(
+            sample_type = c("Control", "Treatment", "Control", "Treatment"),
+            row.names = paste0("S", 1:4)
+        )
+    )
+    
+    result <- TSENAT:::.validate_and_auto_detect_groups(
+        se, group_col = NULL, control_group = NULL, progress = FALSE
+    )
+    
+    expect_equal(result$group_col, "sample_type")
+    expect_equal(result$control_group, "Control")
+})
+
+test_that(".validate_and_auto_detect_groups uses provided group_col, auto-detects control_group", {
+    se <- SummarizedExperiment::SummarizedExperiment(
+        assays = list(counts = matrix(1:12, nrow = 3)),
+        colData = data.frame(
+            condition = c("WT", "Mutant", "WT", "Mutant"),
+            row.names = paste0("S", 1:4)
+        )
+    )
+    
+    result <- TSENAT:::.validate_and_auto_detect_groups(
+        se, group_col = "condition", control_group = NULL, progress = FALSE
+    )
+    
+    expect_equal(result$group_col, "condition")
+    expect_equal(result$control_group, "WT")
+})
+
+test_that(".validate_and_auto_detect_groups errors when no group column found", {
+    se <- SummarizedExperiment::SummarizedExperiment(
+        assays = list(counts = matrix(1:12, nrow = 3)),
+        colData = data.frame(
+            foo = c("X", "Y", "X", "Y"),
+            bar = c(1, 2, 3, 4),
+            row.names = paste0("S", 1:4)
+        )
+    )
+    
+    expect_error(
+        TSENAT:::.validate_and_auto_detect_groups(
+            se, group_col = NULL, control_group = NULL, progress = FALSE
+        ),
+        "auto-detect"
+    )
+})
+
+test_that(".validate_and_auto_detect_groups errors when control_group not auto-detectable", {
+    se <- SummarizedExperiment::SummarizedExperiment(
+        assays = list(counts = matrix(1:12, nrow = 3)),
+        colData = data.frame(
+            group = c("X", "Y", "X", "Y"),
+            row.names = paste0("S", 1:4)
+        )
+    )
+    
+    expect_error(
+        TSENAT:::.validate_and_auto_detect_groups(
+            se, group_col = NULL, control_group = NULL, progress = FALSE
+        ),
+        "auto-detect control"
+    )
+})
+
+test_that(".validate_and_auto_detect_groups both provided explicitly (passthrough)", {
+    se <- SummarizedExperiment::SummarizedExperiment(
+        assays = list(counts = matrix(1:12, nrow = 3)),
+        colData = data.frame(
+            group = c("A", "B", "A", "B"),
+            row.names = paste0("S", 1:4)
+        )
+    )
+    
+    result <- TSENAT:::.validate_and_auto_detect_groups(
+        se, group_col = "group", control_group = "A", progress = FALSE
+    )
+    
+    expect_equal(result$group_col, "group")
+    expect_equal(result$control_group, "A")
+})

@@ -131,50 +131,6 @@
 
     list(plot_data = plot_df, pred_data = pred_df, group_levels = group_levels)
 }
-
-#' Select genes to plot based on significance
-#'
-#' @param sait_res Data frame with gene and p-value columns
-#' @param genes Optional character vector of specific genes
-#' @param n_top Number of top genes to select
-#' @param sig_alpha Significance threshold
-#' @return Character vector of gene IDs to plot (or NULL if none selected)
-
-#' @noRd
-.plot_select_genes <- function(sait_res, genes = NULL, n_top = 6, sig_alpha = 0.05) {
-    if (!is.null(genes)) {
-        if (!is.character(genes)) {
-            stop("genes must be a character vector of gene names", call. = FALSE)
-        }
-        return(genes)
-    }
-
-    # Identify p-value column
-    if ("adj_p_interaction" %in% colnames(sait_res)) {
-        p_col <- "adj_p_interaction"
-    } else if ("p_interaction" %in% colnames(sait_res)) {
-        p_col <- "p_interaction"
-    } else {
-        stop("sait_res must contain 'adj_p_interaction' or 'p_interaction' column",
-            call. = FALSE)
-    }
-
-    # Filter to significant genes (p-value < sig_alpha)
-    sig_genes <- sait_res[sait_res[[p_col]] < sig_alpha, , drop = FALSE]
-
-    # If no significant genes, return NULL
-    if (nrow(sig_genes) == 0) {
-        return(NULL)
-    }
-
-    # Sort by p-value and select top n_top genes
-    top_idx <- order(sig_genes[[p_col]])[seq_len(min(n_top, nrow(sig_genes)))]
-    top_genes <- sig_genes[top_idx, , drop = FALSE]
-
-    # Return gene names sorted by p-value
-    top_genes$gene
-}
-
 #' Prepare gene CI data for plotting
 #'
 #' Converts CI matrices into long-format data for gene-specific bootstrap CI
@@ -422,13 +378,14 @@
     n_cols <- 2
     n_rows <- ceiling(n_plots/n_cols)
 
-    # Add margins to plots for spacing, particularly between rows
+    # Add margins; strip y-axis labels from non-left-column and x-axis from non-bottom-row
     plots_with_margins <- lapply(seq_along(plots), function(i) {
-        p <- plots[[i]]
-        # Add larger bottom margin for plots in the first row to create space
-        # before second row
-        if (i <= n_cols) {
-            p <- p + ggplot2::theme(plot.margin = ggplot2::margin(b = 15, unit = "pt"))
+        p <- plots[[i]] + ggplot2::theme(plot.margin = ggplot2::margin(b = 15, l = 5, r = 5, t = 5, unit = "pt"))
+        if (i %% n_cols == 0 || i == n_plots) {  # right column: remove y label
+            p <- p + ggplot2::theme(axis.title.y = ggplot2::element_blank())
+        }
+        if (i <= n_cols) {  # top row: remove x label
+            p <- p + ggplot2::theme(axis.title.x = ggplot2::element_blank())
         }
         p
     })
@@ -443,12 +400,15 @@
         ncol = n_cols, align = "hv", axis = "lr")
 
     # Add main title and subtitle above the grid
-    title_plot <- .create_title_grob("q-curve: Top genes with group interaction",
-        subtitle = "Fitted smooth curves by group", title_size = 20, subtitle_size = 16)
+    title_plot <- .create_title_grob("SAIT Interaction Profiles: Top Genes with q\u00d7Condition Effects",
+        subtitle = "Diverging curves indicate isoform complexity changes driven by specific q-ranges",
+        title_size = 24, subtitle_size = 18)
 
     # Combine title, plots, and single legend at bottom
-    final_plot <- cowplot::plot_grid(title_plot, combined_plot, legend, nrow = 3,
-        rel_heights = c(0.12, 1, 0.08))
+    # Add spacer row between title and figures for breathing room
+    spacer <- cowplot::ggdraw()
+    final_plot <- cowplot::plot_grid(title_plot, spacer, combined_plot, legend, nrow = 4,
+        rel_heights = c(0.14, 0.03, 1, 0.08))
 
     final_plot
 }
@@ -566,8 +526,10 @@
         ggplot2::scale_color_manual(values = color_mapping, name = condition_col,
             breaks = group_levels) + ggplot2::scale_linetype_manual(values = c(`Model fit` = 1),
         name = "") + ggplot2::labs(x = "q parameter", y = "Tsallis entropy", title = ifelse(gene_display_name !=
-        gene, sprintf("%s (%s)", gene_display_name, gene), gene_display_name)) +
-        .theme_spectrum(base_size = 12)
+        gene, sprintf("%s (%s)", gene_display_name, gene), gene_display_name))
+
+    p <- .apply_publication_theme(p, base_theme = "theme_spectrum", base_size = 15,
+        title_size = 16)
 
     p <- .configure_legend(p, position = "none")
 

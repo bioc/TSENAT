@@ -77,7 +77,7 @@ test_that("make_plot_for_geneprepare_inputs errors when tx2gene missing", {
     counts <- matrix(1:6, nrow = 3)
     rownames(counts) <- paste0("tx", seq_len(nrow(counts)))
     colnames(counts) <- c("S1", "S2")
-    expect_error(TSENAT:::.make_plot_for_geneprepare_inputs(counts = counts, readcounts = NULL, samples = c("S1", "S2"), coldata = NULL, condition_col = "sample_type", tx2gene = NULL, res = NULL, top_n = 2, pseudocount = 1e-6, output_file = NULL), "tx2gene")
+    expect_error(TSENAT:::.prepare_transcript_inputs(counts = counts, readcounts = NULL, samples = c("S1", "S2"), coldata = NULL, condition_col = "sample_type", tx2gene = NULL, res = NULL, top_n = 2, pseudocount = 1e-6, output_file = NULL), "tx2gene")
 })
 
 test_that("make_plot_for_geneprepare_inputs returns list with mapping when provided", {
@@ -87,7 +87,7 @@ test_that("make_plot_for_geneprepare_inputs returns list with mapping when provi
     rownames(counts) <- paste0("tx", 1:3)
     colnames(counts) <- c("S1", "S2")
     tx2 <- data.frame(Transcript = rownames(counts), Gen = c("G1", "G1", "G2"), stringsAsFactors = FALSE)
-    prep <- TSENAT:::.make_plot_for_geneprepare_inputs(counts = counts, readcounts = NULL, samples = c("S1", "S2"), coldata = NULL, condition_col = "sample_type", tx2gene = tx2, res = NULL, top_n = 2, pseudocount = 1e-6, output_file = NULL)
+    prep <- TSENAT:::.prepare_transcript_inputs(counts = counts, readcounts = NULL, samples = c("S1", "S2"), coldata = NULL, condition_col = "sample_type", tx2gene = tx2, res = NULL, top_n = 2, pseudocount = 1e-6, output_file = NULL)
     expect_type(prep, "list")
     expect_true(all(c("counts", "samples", "mapping", "agg_fun") %in% names(prep)))
 })
@@ -100,7 +100,7 @@ test_that("make_plot_for_genemake_plot_for_gene returns ggplot object", {
     colnames(counts) <- c("S1", "S2")
     mapping <- data.frame(Transcript = rownames(counts), Gen = c("G1", "G1", "G2"), stringsAsFactors = FALSE)
     agg_fun <- function(x) median(x, na.rm = TRUE)
-    p <- TSENAT:::.make_plot_for_genemake_plot_for_gene("G1", mapping = mapping, counts = counts, samples = c("Normal", "Tumor"), top_n = 2, agg_fun = agg_fun, pseudocount = 1e-6, agg_label_unique = "label")
+    p <- TSENAT:::.make_single_gene_plot("G1", mapping = mapping, counts = counts, samples = c("Normal", "Tumor"), top_n = 2, agg_fun = agg_fun, pseudocount = 1e-6, agg_label_unique = "label")
     expect_s3_class(p, "ggplot")
 })
 
@@ -111,7 +111,7 @@ test_that("make_plot_for_genecombine_plots returns a plot-like object", {
         ggplot2::geom_point(mapping = ggplot2::aes(x = 1:3, y = 3:1))
     p2 <- ggplot2::ggplot() +
         ggplot2::geom_point(mapping = ggplot2::aes(x = 1:3, y = c(1, 2, 3)))
-    out <- TSENAT:::.make_plot_for_genecombine_plots(list(p1, p2), output_file = NULL, agg_label_unique = "agg")
+    out <- TSENAT:::.combine_gene_plots(list(p1, p2), output_file = NULL, agg_label_unique = "agg")
     expect_true(!is.null(out))
 })
 
@@ -154,20 +154,19 @@ context("Visualization: Top Transcripts Helper Functions")
 # make_plot_for_geneselect_genes_from_res
 test_that("make_plot_for_geneselect_genes_from_res errors on NULL or missing genes", {
     skip_on_bioc()
-    expect_error(.make_plot_for_geneselect_genes_from_res(NULL, 3), "Either 'gene' or 'res' must be provided")
-    expect_error(.make_plot_for_geneselect_genes_from_res(data.frame(a = 1:3), 2), "must contain a 'genes' column")
+    expect_error(.resolve_plot_genes(data.frame(a = 1:3)), "No gene identifier column found")
 })
 
 test_that("make_plot_for_geneselect_genes_from_res sorts by adjusted or raw p-values and returns unique genes", {
     skip_on_bioc()
     res <- data.frame(genes = c("g1", "g2", "g1", "g3"), adjusted_p_values = c(0.2, 0.01, 0.05, NA))
-    sel <- .make_plot_for_geneselect_genes_from_res(res, top_n = 3)
+    sel <- .resolve_plot_genes(res, n_top = 3)
     expect_true(all(c("g2", "g1") %in% sel))
     expect_length(unique(sel), length(sel))
 
     # raw p-values fallback
     res2 <- data.frame(genes = c("a", "b", "c"), raw_p_values = c(0.5, 0.1, 0.3))
-    sel2 <- .make_plot_for_geneselect_genes_from_res(res2, top_n = 2)
+    sel2 <- .resolve_plot_genes(res2, n_top = 2)
     expect_equal(sel2, c("b", "c"))
 })
 
@@ -179,44 +178,44 @@ test_that("make_plot_for_geneinfer_samples_from_coldata handles row-named coldat
 
     cdf <- data.frame(sample_type = c("A", "B", "A"), stringsAsFactors = FALSE)
     rownames(cdf) <- c("S1", "S2", "S3")
-    out <- .make_plot_for_geneinfer_samples_from_coldata(cdf, counts, "sample_type")
+    out <- .infer_samples_from_coldata(cdf, counts, "sample_type")
     expect_equal(out, c("A", "B", "A")[1:ncol(counts)])
 
     # mismatched sample ids should error
     cdf_bad <- data.frame(Sample = c("X", "Y", "Z"), sample_type = c("A", "B", "A"), stringsAsFactors = FALSE)
-    expect_error(.make_plot_for_geneinfer_samples_from_coldata(cdf_bad, counts, "sample_type"), "coldata sample id column does not match")
-    expect_error(.make_plot_for_geneinfer_samples_from_coldata(123, counts, "sample_type"), "must be a data.frame or path")
+    expect_error(.infer_samples_from_coldata(cdf_bad, counts, "sample_type"), "coldata sample ID column")
+    expect_error(.infer_samples_from_coldata("not_a_df_or_path", counts, "sample_type"))
 })
 
 # make_plot_for_generead_tx2gene
 test_that("make_plot_for_generead_tx2gene validates inputs and reads mapping", {
     skip_on_bioc()
-    expect_error(.make_plot_for_generead_tx2gene(NULL), "`tx2gene` must be provided")
+    expect_error(.read_tx2gene(NULL), "`tx2gene` must be provided")
 
     bad <- data.frame(X = 1:2)
-    expect_error(.make_plot_for_generead_tx2gene(bad), "tx2gene must have columns 'Transcript' and 'Gen'")
+    expect_error(.read_tx2gene(bad), "tx2gene must have columns 'Transcript' and 'Gen'")
 
     good <- data.frame(Transcript = c("t1", "t2"), Gen = c("g1", "g1"), stringsAsFactors = FALSE)
-    out <- .make_plot_for_generead_tx2gene(good)
+    out <- .read_tx2gene(good)
     expect_equal(out, good)
 
     tf <- tempfile(fileext = ".tsv")
     write.table(good, file = tf, sep = "\t", row.names = FALSE, quote = FALSE)
-    outf <- .make_plot_for_generead_tx2gene(tf)
+    outf <- .read_tx2gene(tf)
     expect_true(is.data.frame(outf))
     unlink(tf)
-    expect_error(.make_plot_for_generead_tx2gene("no_such_file.tsv"), "tx2gene file not found")
+    expect_error(.read_tx2gene("no_such_file.tsv"), "tx2gene file not found")
 })
 
 # make_plot_for_genemake_agg
 test_that("make_plot_for_genemake_agg returns an aggregation function and label", {
     skip_on_bioc()
-    maj <- .make_plot_for_genemake_agg("median")
+    maj <- .create_aggregation_function("median")
     expect_equal(maj$metric_choice, "median")
     expect_true(is.function(maj$agg_fun))
     expect_true(grepl("median", maj$agg_label_unique, ignore.case = TRUE))
 
-    m2 <- .make_plot_for_genemake_agg("iqr")
+    m2 <- .create_aggregation_function("iqr")
     expect_equal(m2$metric_choice, "iqr")
     expect_true(grepl("IQR", m2$agg_label_unique))
 })
@@ -246,13 +245,15 @@ context("Visualization: Unit Tests for Plotting Helpers")
 test_that("make_plot_for_geneselect_genes_from_res selects by adjusted_p_values and raw_p_values", {
     skip_on_bioc()
     res1 <- data.frame(genes = c("A", "B", "C"), adjusted_p_values = c(0.05, 0.01, 0.2), stringsAsFactors = FALSE)
-    expect_equal(TSENAT:::.make_plot_for_geneselect_genes_from_res(res1, top_n = 2), c("B", "A"))
+    expect_equal(TSENAT:::.resolve_plot_genes(res1, n_top = 2), c("B", "A"))
 
     res2 <- data.frame(genes = c("X", "Y", "Z"), raw_p_values = c(0.2, 0.01, 0.05), stringsAsFactors = FALSE)
-    expect_equal(TSENAT:::.make_plot_for_geneselect_genes_from_res(res2, top_n = 2), c("Y", "Z"))
+    expect_equal(TSENAT:::.resolve_plot_genes(res2, n_top = 2), c("Y", "Z"))
 
-    expect_error(TSENAT:::.make_plot_for_geneselect_genes_from_res(NULL, top_n = 2))
-    expect_error(TSENAT:::.make_plot_for_geneselect_genes_from_res(data.frame(a = 1), top_n = 2))
+    # NULL results returns NULL (aggregate mode)
+    expect_null(TSENAT:::.resolve_plot_genes(NULL))
+    # Missing gene column errors
+    expect_error(TSENAT:::.resolve_plot_genes(data.frame(a = 1)), "No gene identifier column found")
 })
 
 # make_plot_for_geneinfer_samples_from_coldata
@@ -265,7 +266,7 @@ test_that("make_plot_for_geneinfer_samples_from_coldata infers samples from data
     cdf <- data.frame(sample_type = c("N", "T", "N", "T"), stringsAsFactors = FALSE)
     rownames(cdf) <- colnames(counts)
 
-    samp <- TSENAT:::.make_plot_for_geneinfer_samples_from_coldata(cdf, counts, condition_col = "sample_type")
+    samp <- TSENAT:::.infer_samples_from_coldata(cdf, counts, condition_col = "sample_type")
     expect_equal(as.character(samp), as.character(cdf[colnames(counts), "sample_type"]))
 
     # write as file with sample id column
@@ -273,12 +274,12 @@ test_that("make_plot_for_geneinfer_samples_from_coldata infers samples from data
     dff <- data.frame(sample = colnames(counts), sample_type = c("N", "T", "N", "T"), stringsAsFactors = FALSE)
     utils::write.table(dff, file = tf, sep = "\t", quote = FALSE, row.names = FALSE)
 
-    samp2 <- TSENAT:::.make_plot_for_geneinfer_samples_from_coldata(tf, counts, condition_col = "sample_type")
+    samp2 <- TSENAT:::.infer_samples_from_coldata(tf, counts, condition_col = "sample_type")
     expect_equal(as.character(samp2), as.character(dff$sample_type))
 
     # mismatch
     badcdf <- data.frame(other = c("a", "b"))
-    expect_error(TSENAT:::.make_plot_for_geneinfer_samples_from_coldata(badcdf, counts, condition_col = "sample_type"))
+    expect_error(TSENAT:::.infer_samples_from_coldata(badcdf, counts, condition_col = "sample_type"))
 })
 
 # make_plot_for_generead_tx2gene
@@ -286,38 +287,39 @@ test_that("make_plot_for_geneinfer_samples_from_coldata infers samples from data
 test_that("make_plot_for_generead_tx2gene reads mapping from data.frame and file and errors on missing columns", {
     skip_on_bioc()
     mapping <- data.frame(Transcript = c("t1", "t2"), Gen = c("G1", "G1"), stringsAsFactors = FALSE)
-    out <- TSENAT:::.make_plot_for_generead_tx2gene(mapping)
+    out <- TSENAT:::.read_tx2gene(mapping)
     expect_equal(out, mapping)
 
     tf <- tempfile(fileext = ".tsv")
     utils::write.table(mapping, file = tf, sep = "\t", quote = FALSE, row.names = FALSE)
-    out2 <- TSENAT:::.make_plot_for_generead_tx2gene(tf)
+    out2 <- TSENAT:::.read_tx2gene(tf)
     expect_equal(out2$Transcript, mapping$Transcript)
 
-    expect_error(TSENAT:::.make_plot_for_generead_tx2gene(data.frame(a = 1)))
+    expect_error(TSENAT:::.read_tx2gene(data.frame(a = 1)))
 })
 
 # make_plot_for_genemake_agg
 
 test_that("make_plot_for_genemake_agg returns correct aggregator and label", {
     skip_on_bioc()
-    med <- TSENAT:::.make_plot_for_genemake_agg("median")
+    med <- TSENAT:::.create_aggregation_function("median")
     expect_equal(med$metric_choice, "median")
     expect_equal(med$agg_fun(c(1, 2, NA)), stats::median(c(1, 2, NA), na.rm = TRUE))
 
-    mn <- TSENAT:::.make_plot_for_genemake_agg("mean")
+    mn <- TSENAT:::.create_aggregation_function("mean")
     expect_equal(mn$agg_fun(c(1, 2, NA)), mean(c(1, 2, NA), na.rm = TRUE))
 
-    varr <- TSENAT:::.make_plot_for_genemake_agg("variance")
+    varr <- TSENAT:::.create_aggregation_function("variance")
     expect_equal(varr$agg_fun(c(1, 2, 3, NA)), stats::var(c(1, 2, 3, NA), na.rm = TRUE))
 
-    iq <- TSENAT:::.make_plot_for_genemake_agg("iqr")
+    iq <- TSENAT:::.create_aggregation_function("iqr")
     expect_equal(iq$agg_fun(c(1, 2, 3, 4, NA)), stats::IQR(c(1, 2, 3, 4, NA), na.rm = TRUE))
 
-    # check counter side-effect increments
+    # check metric_choice is correct
     opt_before <- as.integer(getOption("TSENAT.plot_top_counter", 0))
-    TSENAT:::.make_plot_for_genemake_agg("median")
-    expect_true(as.integer(getOption("TSENAT.plot_top_counter", 0)) >= opt_before + 1)
+    res <- TSENAT:::.create_aggregation_function("median")
+    expect_equal(res$metric_choice, "median")
+    expect_true(is.function(res$agg_fun))
 })
 
 # make_plot_for_genebuild_tx_long & make_plot_for_geneaggregate_df_long & make_plot_for_genebuild_plot_from_summary
@@ -330,18 +332,18 @@ test_that("tx long building, aggregation and plot building behave correctly", {
     mapping <- data.frame(Transcript = rownames(counts), Gen = rep("G1", 6), stringsAsFactors = FALSE)
     samples <- c("N", "T")
 
-    built <- TSENAT:::.make_plot_for_genebuild_tx_long("G1", mapping, counts, samples, top_n = 3)
+    built <- TSENAT:::.build_transcript_long("G1", mapping, counts, samples, top_n = 3)
     expect_true(is.list(built))
     expect_true(all(c("df_long", "txs") %in% names(built)))
     expect_true(length(built$txs) <= 3)
     expect_true(all(c("tx", "sample", "expr", "group") %in% colnames(built$df_long)))
 
-    df_summary <- TSENAT:::.make_plot_for_geneaggregate_df_long(built$df_long, agg_fun = function(x) mean(x, na.rm = TRUE), pseudocount = 1e-6)
+    df_summary <- TSENAT:::.aggregate_transcript_data(built$df_long, agg_fun = function(x) mean(x, na.rm = TRUE), pseudocount = 1e-6)
     expect_true(all(c("tx", "group", "expr", "log2expr") %in% colnames(df_summary)))
     expect_true(is.factor(df_summary$tx))
 
     skip_if_not_installed("ggplot2")
-    p <- TSENAT:::.make_plot_for_genebuild_plot_from_summary(df_summary, agg_label_unique = "label")
+    p <- TSENAT:::.build_tile_plot_from_summary(df_summary, agg_label_unique = "label")
     expect_s3_class(p, "gg")
 })
 
@@ -359,7 +361,7 @@ test_that("make_plot_for_genecombine_grid writes a PNG file when output_file is 
 
     tf <- tempfile(fileext = ".png")
     # call grid combiner directly
-    TSENAT:::.make_plot_for_genecombine_grid(list(p1, p2), output_file = tf, agg_label_unique = "agg")
+    TSENAT:::.combine_plots_grid(list(p1, p2), output_file = tf, agg_label_unique = "agg")
     expect_true(file.exists(tf))
     expect_true(file.info(tf)$size > 0)
 })
@@ -470,7 +472,7 @@ test_that("plot_diversity_spectrum handles single group and empty long df", {
     expect_error(plot_diversity_spectrum(se_empty), "No tsallis values found in SummarizedExperiment")
 
     # not a summarized experiment
-    expect_error(plot_diversity_spectrum(123), "unable to find an inherited method")
+    expect_error(plot_diversity_spectrum(123), "Input must be a SummarizedExperiment")
 })
 
 
@@ -511,7 +513,7 @@ test_that("make_plot_for_genecombine_plots fallbacks work", {
     p1 <- ggplot2::ggplot()
     # Ensure the function runs and falls back to any available backend;
     # don't rely on mocking namespace checks here.
-    expect_silent(.make_plot_for_genecombine_plots(list(p1), "label"))
+    expect_silent(.combine_gene_plots(list(p1), "label"))
 })
 
 test_that("make_plot_for_genecombine_plots treats single string second arg as label", {
@@ -520,8 +522,8 @@ test_that("make_plot_for_genecombine_plots treats single string second arg as la
     # explicit label
     out1 <- NULL
     out2 <- NULL
-    expect_error(out1 <- .make_plot_for_genecombine_plots(list(p1), output_file = NULL, agg_label_unique = "mylabel"), NA)
-    expect_error(out2 <- .make_plot_for_genecombine_plots(list(p1), "mylabel"), NA)
+    expect_error(out1 <- .combine_gene_plots(list(p1), output_file = NULL, agg_label_unique = "mylabel"), NA)
+    expect_error(out2 <- .combine_gene_plots(list(p1), "mylabel"), NA)
     expect_equal(class(out1), class(out2))
 })
 
@@ -540,42 +542,42 @@ test_that("make_plot_for_geneprepare_inputs handles file paths and various error
     t2g_file <- tempfile()
     write.table(data.frame(Transcript = c("tx1", "tx2"), Gen = c("g1", "g1")), t2g_file, sep = "\t", row.names = F)
 
-    prep <- .make_plot_for_geneprepare_inputs(counts, samples = NULL, coldata = cd_file, condition_col = "sample_type", tx2gene = t2g_file, res = NULL, top_n = 1, pseudocount = 1)
+    prep <- .prepare_transcript_inputs(counts, samples = NULL, coldata = cd_file, condition_col = "sample_type", tx2gene = t2g_file, res = NULL, top_n = 1, pseudocount = 1)
     expect_equal(prep$samples, c("a", "b"))
 
     # bad coldata (no sample_id-like columns)
     bad_cd_file <- tempfile()
     write.table(data.frame(x = 1), bad_cd_file)
-    expect_error(.make_plot_for_geneprepare_inputs(counts, samples = NULL, coldata = bad_cd_file, tx2gene = t2g_file), "Could not match `coldata` rows to `counts` columns")
+    expect_error(.prepare_transcript_inputs(counts, samples = NULL, coldata = bad_cd_file, tx2gene = t2g_file), "Could not match")
 
     # coldata sample_id column does not match counts column names
     cd_file_mismatch <- tempfile()
     write.table(data.frame(sample_id = c("s3", "s4"), sample_type = c("a", "b")), cd_file_mismatch, sep = "\t", row.names = FALSE)
-    expect_error(.make_plot_for_geneprepare_inputs(counts, samples = NULL, coldata = cd_file_mismatch, tx2gene = t2g_file), "coldata sample id column does not match column names of counts")
+    expect_error(.prepare_transcript_inputs(counts, samples = NULL, coldata = cd_file_mismatch, tx2gene = t2g_file), "coldata sample")
 
     # coldata file path not found
-    expect_error(.make_plot_for_geneprepare_inputs(counts, samples = NULL, coldata = "no_such_file.tsv", tx2gene = t2g_file), "coldata file not found")
+    expect_error(.prepare_transcript_inputs(counts, samples = NULL, coldata = "no_such_file.tsv", tx2gene = t2g_file), "coldata file not found")
 
     # tx2gene must be provided
-    expect_error(.make_plot_for_geneprepare_inputs(counts, samples = samples, tx2gene = NULL), "`tx2gene` must be provided")
+    expect_error(.prepare_transcript_inputs(counts, samples = samples, tx2gene = NULL), "`tx2gene` must be provided")
 
     # tx2gene file not found
-    expect_error(.make_plot_for_geneprepare_inputs(counts, samples = samples, tx2gene = "no_such_tx2gene.tsv"), "tx2gene file not found")
+    expect_error(.prepare_transcript_inputs(counts, samples = samples, tx2gene = "no_such_tx2gene.tsv"), "tx2gene file not found")
 
     # tx2gene missing required columns
     bad_t2g <- tempfile()
     write.table(data.frame(A = 1, B = 2), bad_t2g, sep = "\t", row.names = FALSE)
-    expect_error(.make_plot_for_geneprepare_inputs(counts, samples = samples, tx2gene = bad_t2g), "tx2gene must have columns 'Transcript' and 'Gen'")
+    expect_error(.prepare_transcript_inputs(counts, samples = samples, tx2gene = bad_t2g), "tx2gene must have columns 'Transcript' and 'Gen'")
 
     # counts must have rownames
     counts_no_rownames <- matrix(1:4, 2)
-    expect_error(.make_plot_for_geneprepare_inputs(counts_no_rownames, samples = samples, tx2gene = t2g_file), "`counts` must have rownames corresponding to transcript identifiers")
+    expect_error(.prepare_transcript_inputs(counts_no_rownames, samples = samples, tx2gene = t2g_file), "must have rownames")
 
     # counts must be matrix/data.frame
-    expect_error(.make_plot_for_geneprepare_inputs(123, samples = samples, tx2gene = t2g_file), "`counts` must be a matrix or data.frame")
+    expect_error(.prepare_transcript_inputs(123, samples = samples, tx2gene = t2g_file), "`counts` must be a matrix")
 
     # samples length must match number of columns
-    expect_error(.make_plot_for_geneprepare_inputs(counts, samples = c("a"), tx2gene = t2g_file), "Length of `samples` must equal number of columns in `counts`")
+    expect_error(.prepare_transcript_inputs(counts, samples = c("a"), tx2gene = t2g_file), "Length of `samples` must equal")
 
     # SummarizedExperiment input with tx2gene in metadata
   expect_error(
@@ -585,7 +587,7 @@ test_that("make_plot_for_geneprepare_inputs handles file paths and various error
 })
 
 # ════════════════════════════════════════════════════════════════════════════════
-# TESTS: .make_plot_for_geneprepare_inputs — SummarizedExperiment input path
+# TESTS: .prepare_transcript_inputs — SummarizedExperiment input path
 # Tests the SE-handling block: inherits(counts, "SummarizedExperiment") branch
 # ════════════════════════════════════════════════════════════════════════════════
 
@@ -614,7 +616,7 @@ test_that("make_plot_for_geneprepare_inputs: SE auto-detects readcounts, samples
     )
 
     # tx2gene=NULL triggers auto-detection from rowData$genes
-    prep <- .make_plot_for_geneprepare_inputs(
+    prep <- .prepare_transcript_inputs(
         counts = se,
         samples = NULL,
         coldata = NULL,
@@ -656,7 +658,7 @@ test_that("make_plot_for_geneprepare_inputs: SE with metadata$tx2gene preferred 
     )
     S4Vectors::metadata(se) <- list(tx2gene = tx2gene_meta)
 
-    prep <- .make_plot_for_geneprepare_inputs(
+    prep <- .prepare_transcript_inputs(
         counts = se,
         samples = NULL,
         coldata = NULL,
@@ -687,7 +689,7 @@ test_that("make_plot_for_geneprepare_inputs: SE with metadata$readcounts takes p
     )
     S4Vectors::metadata(se) <- list(readcounts = meta_counts)
 
-    prep <- .make_plot_for_geneprepare_inputs(
+    prep <- .prepare_transcript_inputs(
         counts = se,
         samples = NULL,
         coldata = NULL,
@@ -720,7 +722,7 @@ test_that("make_plot_for_geneprepare_inputs: SE with explicit tx2gene overrides 
     )
 
     # Provide explicit tx2gene — should override auto-detection from rowData
-    prep <- .make_plot_for_geneprepare_inputs(
+    prep <- .prepare_transcript_inputs(
         counts = se,
         samples = NULL,
         coldata = NULL,
@@ -748,7 +750,7 @@ test_that("make_plot_for_geneprepare_inputs: SE with explicit samples overrides 
 
     explicit_samples <- c("MyCtrl", "MyTreat")
 
-    prep <- .make_plot_for_geneprepare_inputs(
+    prep <- .prepare_transcript_inputs(
         counts = se,
         samples = explicit_samples,
         coldata = NULL,
@@ -774,7 +776,7 @@ test_that("make_plot_for_geneprepare_inputs: SE with preferred 'readcounts' assa
         colData = DataFrame(condition = c("N", "T"))
     )
 
-    prep <- .make_plot_for_geneprepare_inputs(
+    prep <- .prepare_transcript_inputs(
         counts = se,
         samples = NULL,
         condition_col = "condition",
@@ -800,7 +802,7 @@ test_that("make_plot_for_geneprepare_inputs: SE tx2gene fallback to rownames whe
     )
     # No rowData, no metadata$tx2gene → fallback to rownames
 
-    prep <- .make_plot_for_geneprepare_inputs(
+    prep <- .prepare_transcript_inputs(
         counts = se,
         samples = NULL,
         condition_col = "group",
@@ -829,7 +831,7 @@ test_that("make_plot_for_geneprepare_inputs: SE with colData fallback picks bina
         )
     )
 
-    prep <- .make_plot_for_geneprepare_inputs(
+    prep <- .prepare_transcript_inputs(
         counts = se,
         samples = NULL,
         condition_col = "nonexistent_col",

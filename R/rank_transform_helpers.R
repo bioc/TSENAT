@@ -393,7 +393,7 @@
     # =========================================================================
     if (method == "art") {
         return(.test_q_condition_interaction_art(
-            data, value_col, q_col, condition_col, paired, subject_col))
+            data, value_col, q_col, condition_col, paired, subject_col, pre_factored))
     }
 
     # =========================================================================
@@ -467,18 +467,26 @@
 #'
 #' @noRd
 .test_q_condition_interaction_art <- function(data, value_col, q_col, condition_col,
-                                               paired, subject_col) {
+                                               paired, subject_col, pre_factored = FALSE) {
     tryCatch({
-        # Ensure factors for ART
-        data[[q_col]] <- factor(data[[q_col]])
-        data[[condition_col]] <- factor(data[[condition_col]])
+        # Ensure factors (skip only if already factor, never skip for character)
+        if (!pre_factored || !is.factor(data[[q_col]])) {
+            data[[q_col]] <- factor(data[[q_col]])
+        }
+        if (!pre_factored || !is.factor(data[[condition_col]])) {
+            data[[condition_col]] <- factor(data[[condition_col]])
+        }
+        if (paired && !is.null(subject_col)) {
+            if (!pre_factored || !is.factor(data[[subject_col]])) {
+                data[[subject_col]] <- factor(data[[subject_col]])
+            }
+        }
 
         # Build ART formula: entropy ~ q * condition [+ Error(subject/q)]
         # NOTE: When Error(subject/q) is used, ARTool returns row names as
         # numbers ("1","2","3") instead of term names. We detect the
         # interaction row by matching the Term column.
         if (paired && !is.null(subject_col)) {
-            data[[subject_col]] <- factor(data[[subject_col]])
             art_formula <- as.formula(paste0(
                 value_col, " ~ ", q_col, " * ", condition_col,
                 " + Error(", subject_col, "/", q_col, ")"))

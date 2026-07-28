@@ -2170,21 +2170,8 @@ test_that(".get_gene_ids handles tx2gene mapping in metadata", {
   }
 })
 
-# =============================================================================
-# Tests for .validate_filter_params()
-# =============================================================================
-
-test_that(".validate_filter_params validates isoform abundance", {
-  # Invalid: > 1
-  expect_error(TSENAT:::.validate_filter_params(1.5, NULL))
-  # Invalid: < 0
-  expect_error(TSENAT:::.validate_filter_params(-0.1, NULL))
-  # Invalid: vector
-  expect_error(TSENAT:::.validate_filter_params(c(0.05, 0.1), NULL))
-})
-
-# =============================================================================
-# Tests for .estimate_min_tpm()
+# ============================================================================
+# TESTS FOR .estimate_min_tpm()
 # =============================================================================
 
 test_that(".estimate_min_tpm returns list with min_tpm and quant_label", {
@@ -3201,39 +3188,6 @@ test_that(".apply_tpm_filter with verbose message", {
     result <- TSENAT:::.apply_tpm_filter(assay_mat, min_tpm = 150, min_samples = 1, verbose = TRUE),
     "TPM-based filtering"
   )
-})
-
-# ============================================================================
-# TESTS FOR .validate_filter_params() Error paths
-# ============================================================================
-
-test_that(".validate_filter_params rejects min_isoform_abundance > 1", {
-  expect_error(
-    TSENAT:::.validate_filter_params(min_isoform_abundance = 1.5, tpm_assay_name = NULL),
-    "must be numeric in"
-  )
-})
-
-test_that(".validate_filter_params rejects negative min_isoform_abundance", {
-  expect_error(
-    TSENAT:::.validate_filter_params(min_isoform_abundance = -0.1, tpm_assay_name = NULL),
-    "must be numeric in"
-  )
-})
-
-test_that(".validate_filter_params rejects non-numeric min_isoform_abundance", {
-  expect_error(
-    TSENAT:::.validate_filter_params(min_isoform_abundance = "0.5", tpm_assay_name = NULL),
-    "must be numeric"
-  )
-})
-
-test_that(".validate_filter_params accepts NULL and valid values", {
-  result <- TSENAT:::.validate_filter_params(min_isoform_abundance = NULL, tpm_assay_name = NULL)
-  expect_true(result)
-  
-  result <- TSENAT:::.validate_filter_params(min_isoform_abundance = 0.05, tpm_assay_name = NULL)
-  expect_true(result)
 })
 
 # ============================================================================

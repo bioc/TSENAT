@@ -512,6 +512,9 @@
 #' @noRd
 .validate_and_sort_q_values <- function(q) {
     q <- sort(as.numeric(q))
+    if (length(q) == 0) {
+        stop("q parameter must be a non-empty numeric vector of Tsallis q-values (e.g., q = c(0, 0.5, 1, 2))")
+    }
     if (any(q < 0)) {
         stop("q parameter must be >= 0. ", "Note: q should be in range [0, 3] for typical use. ",
             "q=0 represents uniform divergence. ", "Got: ", paste(q, collapse = ", "))

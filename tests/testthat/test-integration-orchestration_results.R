@@ -3883,3 +3883,101 @@ test_that(".extract_analysis_statistics counts divergence results", {
     expect_equal(stats$n_divergence, 8)
 })
 
+# ============================================================================
+# TESTS FOR REFACTORED HELPERS: ._results_extract_plot, ._results_dispatch
+# ============================================================================
+
+test_that("._results_extract_plot returns plot from analysis@plots by mapped type", {
+    skip_on_bioc()
+    data_list <- setup_orchestration_test_data()
+    analysis <- data_list$analysis
+    
+    # Store a fake plot in the analysis
+    fake_plot <- "fake_ggplot_object"
+    analysis@plots$sait_interaction <- fake_plot
+    
+    result <- TSENAT:::._results_extract_plot(analysis, "sait")
+    expect_equal(result, fake_plot)
+})
+
+test_that("._results_extract_plot returns plot by direct type name", {
+    skip_on_bioc()
+    data_list <- setup_orchestration_test_data()
+    analysis <- data_list$analysis
+    
+    fake_plot <- "fake_ggplot_object"
+    analysis@plots$diversity <- fake_plot
+    
+    result <- TSENAT:::._results_extract_plot(analysis, "diversity")
+    expect_equal(result, fake_plot)
+})
+
+test_that("._results_extract_plot returns NULL with warning for unknown type", {
+    skip_on_bioc()
+    data_list <- setup_orchestration_test_data()
+    analysis <- data_list$analysis
+    
+    expect_warning(
+        result <- TSENAT:::._results_extract_plot(analysis, "unknown_type"),
+        "not found"
+    )
+    expect_null(result)
+})
+
+test_that("._results_dispatch routes diversity type correctly", {
+    skip_on_bioc()
+    data_list <- setup_orchestration_test_data()
+    analysis <- data_list$analysis
+    
+    # Create SE with proper diversity assay and matching colData
+    n_genes <- 5
+    n_samples <- 4
+    assay_mat <- matrix(rnorm(n_genes * n_samples), nrow = n_genes)
+    rownames(assay_mat) <- paste0("Gene", 1:n_genes)
+    colnames(assay_mat) <- paste0("S", 1:n_samples)
+    result_se <- SummarizedExperiment::SummarizedExperiment(
+        assays = list(diversity = assay_mat),
+        colData = data.frame(sample_type = rep(c("A", "B"), each = 2),
+                             row.names = paste0("S", 1:n_samples))
+    )
+    analysis@diversity_results <- list(q_1.00 = result_se)
+    
+    result <- TSENAT:::._results_dispatch(
+        analysis, "diversity", result_se, q = NULL, rankBy = "none", n = NA,
+        filterFDR = NULL, format = "text", n_genes = 3,
+        q_values_table = c(1), top_n = NULL, sort_by = "adj_p_interaction",
+        sample = NULL
+    )
+    expect_true(!is.null(result))
+})
+
+test_that("._results_dispatch routes metadata type directly", {
+    skip_on_bioc()
+    data_list <- setup_orchestration_test_data()
+    analysis <- data_list$analysis
+    
+    fake_metadata <- list(key = "value")
+    result <- TSENAT:::._results_dispatch(
+        analysis, "metadata", fake_metadata, q = NULL, rankBy = "none", n = NA,
+        filterFDR = NULL, format = "text", n_genes = 4,
+        q_values_table = c(1), top_n = NULL, sort_by = "adj_p_interaction",
+        sample = NULL
+    )
+    expect_equal(result, fake_metadata)
+})
+
+test_that("._results_dispatch falls through to result for unknown type", {
+    skip_on_bioc()
+    data_list <- setup_orchestration_test_data()
+    analysis <- data_list$analysis
+    
+    fake_result <- "some_value"
+    result <- TSENAT:::._results_dispatch(
+        analysis, "unknown_fallback", fake_result, q = NULL, rankBy = "none",
+        n = NA, filterFDR = NULL, format = "text", n_genes = 4,
+        q_values_table = c(1), top_n = NULL, sort_by = "adj_p_interaction",
+        sample = NULL
+    )
+    expect_equal(result, fake_result)
+})
+

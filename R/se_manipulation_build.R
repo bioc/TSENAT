@@ -407,40 +407,6 @@
 
     return(list(tx2gene = tx2gene_df, gene_names = gene_names_df))
 }
-
-#' Helper: Fast attribute extraction from GFF3 attributes string
-#'
-#' @param attributes Character string of GFF3 attributes (e.g.,
-#' 'ID=ENST000001;Parent=ENSG000001')
-#' @param field_pattern Character pattern to search for (e.g., 'ID=', 'Parent=')
-#'
-#' @return Character value of extracted attribute or NA
-#'
-#' @noRd
-.extract_attribute_fast <- function(attributes, field_pattern) {
-    # Find the start position of the field
-    start_pos <- gregexpr(field_pattern, attributes, fixed = TRUE)[[1]][1]
-
-    if (start_pos < 0)
-        return(NA_character_)
-
-    # Skip past the pattern itself
-    start_pos <- start_pos + nchar(field_pattern)
-
-    # Find the end (semicolon or end of string)
-    end_pos <- gregexpr(";", substr(attributes, start_pos, nchar(attributes)), fixed = TRUE)[[1]][1]
-
-    if (end_pos < 0) {
-        # No semicolon found, take rest of string
-        value <- substr(attributes, start_pos, nchar(attributes))
-    } else {
-        # Semicolon found
-        value <- substr(attributes, start_pos, start_pos + end_pos - 2)
-    }
-
-    return(if (value == "") NA_character_ else value)
-}
-
 ## Helper: build SummarizedExperiment from readcounts + tx2gene
 
 
@@ -510,7 +476,13 @@
                 call. = FALSE)
         } else {
             if (length(unmapped_idx) >= length(tx_ids) * 0.9) {
-                message("Note: >90% of transcripts unmapped. Using transcript IDs as gene identifiers.")
+                warning(">90% of transcripts (", length(unmapped_idx), "/", length(tx_ids),
+                    ") could not be mapped to genes. ",
+                    "Using transcript IDs as gene identifiers. ",
+                    "Gene-level analyses (diversity, divergence) will treat each transcript as a single-transcript gene, ",
+                    "producing potentially meaningless results. ",
+                    "Verify your tx2gene mapping matches the transcript IDs in your readcounts.",
+                    call. = FALSE)
                 genes <- tx_ids
             } else {
                 message("Removing unmapped transcripts from analysis (skip=TRUE).")

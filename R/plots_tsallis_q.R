@@ -149,45 +149,11 @@ plot_diversity_spectrum <- function(se, assay_name = "diversity", condition_col 
     # Load visualization dependencies (ggplot2, dplyr, tidyr, cowplot, etc.)
     .load_visualization_deps()
 
-    # Convert TSENATAnalysis to combined SE if needed
-    if (methods::is(se, "TSENATAnalysis")) {
-        if (assay_name != "diversity") {
-            stop("Assay '", assay_name, "' not found in SummarizedExperiment")
-        }
-
-        # Extract condition_col from config if not provided
-        if (is.null(condition_col)) {
-            if ("condition_col" %in% names(se@config)) {
-                condition_col <- se@config$condition_col
-            } else {
-                condition_col <- "condition"  # Default to 'condition' for new code
-            }
-        }
-
-        se <- .prepare_combined_se(se)
-        assay_name <- "diversity"
-    }
-
-    # Default condition_col if still NULL (for direct SE input) Try 'condition'
-    # first (standard), then 'sample_type' (legacy)
-    if (is.null(condition_col)) {
-        if ("condition" %in% colnames(SummarizedExperiment::colData(se))) {
-            condition_col <- "condition"
-        } else if ("sample_type" %in% colnames(SummarizedExperiment::colData(se))) {
-            condition_col <- "sample_type"  # Fallback for backwards compatibility
-        } else {
-            stop("No condition column found. Expected 'condition' or 'sample_type' in colData.")
-        }
-    }
-
-    # Validate input
-    if (!methods::is(se, "SummarizedExperiment")) {
-        stop("plot_tsallis_q_curve requires a SummarizedExperiment or TSENATAnalysis object")
-    }
-
-    if (!(assay_name %in% SummarizedExperiment::assayNames(se))) {
-        stop("Assay '", assay_name, "' not found in SummarizedExperiment")
-    }
+    # Normalize input (handles TSENATAnalysis → SE, condition_col, assay validation)
+    normalized <- .normalize_plot_input(se, assay_name = assay_name,
+        condition_col = condition_col)
+    se <- normalized$se
+    condition_col <- normalized$condition_col
 
     # Gene-specific mode
     if (!is.null(gene) || !is.null(sait_res)) {
@@ -226,8 +192,6 @@ plot_diversity_spectrum <- function(se, assay_name = "diversity", condition_col 
 
 .plot_tsallis_gene_specific <- function(se, assay_name, condition_col, gene, sait_res,
     n_top, metric, output_file) {
-    suppressPackageStartupMessages({
-    })
 
     long <- .prepare_long_format(se, assay_name = assay_name, condition_col = condition_col)
 
@@ -315,7 +279,7 @@ plot_diversity_spectrum <- function(se, assay_name = "diversity", condition_col 
                 color = group), linewidth = 1.3)
         p <- .apply_group_aesthetics(p, palette = "palette_blue_red", legend_name = "Group")
         p <- .apply_publication_theme(p, base_theme = "theme_spectrum", base_size = 11,
-            title = sel, title_size = 16)
+            title = sel)
         p <- p + ggplot2::labs(x = "q value", y = "Tsallis entropy")
         p
     }
@@ -347,8 +311,6 @@ plot_diversity_spectrum <- function(se, assay_name = "diversity", condition_col 
 # ============================================================================
 
 .plot_tsallis_bootstrap_ci <- function(se, long, output_file) {
-    suppressPackageStartupMessages({
-    })
 
     # Bootstrap CI Visualization Methodology (From Literature: S115, S018)
     # =================================================================== Point
@@ -382,9 +344,10 @@ plot_diversity_spectrum <- function(se, assay_name = "diversity", condition_col 
         line_width = 1.2, show_points = FALSE)
     p <- .apply_group_aesthetics(p, palette = "palette_blue_red", legend_name = "Group")
     p <- .apply_publication_theme(p, base_theme = "theme_spectrum", base_size = 11,
-        title = "Tsallis Entropy Across Diversity Scales (q-spectrum)", subtitle = "Observed median (line) with bootstrap 95% percentile CI (shaded band)")
-    p <- p + ggplot2::labs(x = "q value", y = expression("Tsallis entropy (" * S[q] *
-        ")"), color = "Group", fill = "Group")
+        title = "Tsallis Entropy q-Spectrum: Scale-Dependent Diversity Patterns",
+        subtitle = "Lines trace median normalized entropy from rare (low q) to dominant (high q) isoforms")
+    p <- p + ggplot2::labs(x = "q value", y = "Tsallis entropy",
+        color = "Group", fill = "Group")
 
     if (length(groups) == 1) {
         p <- .configure_legend(p, position = "none")
@@ -448,7 +411,7 @@ plot_diversity_spectrum <- function(se, assay_name = "diversity", condition_col 
             line_width = 1.2, show_points = FALSE)
         p <- .apply_group_aesthetics(p, palette = "palette_blue_red", legend_name = "Group")
         p <- .apply_publication_theme(p, base_theme = "theme_spectrum", base_size = 11,
-            title = g, title_size = 14)
+            title = g)
         p <- p + ggplot2::labs(x = "q value", y = "Tsallis entropy")
         p
     }
@@ -515,7 +478,7 @@ plot_diversity_spectrum <- function(se, assay_name = "diversity", condition_col 
             spread, ymax = median + spread), alpha = 0.2, color = NA)
         p <- .apply_group_aesthetics(p, palette = "palette_blue_red", legend_name = "Group")
         p <- .apply_publication_theme(p, base_theme = "theme_spectrum", base_size = 11,
-            title = g, title_size = 14)
+            title = g)
         p <- p + ggplot2::labs(x = "q value", y = "Tsallis entropy")
         p
     }
@@ -564,9 +527,9 @@ plot_diversity_spectrum <- function(se, assay_name = "diversity", condition_col 
         spread, ymax = median + spread), alpha = 0.2, color = NA)
     p <- .apply_group_aesthetics(p, palette = "palette_blue_red", legend_name = "Group")
     p <- .apply_publication_theme(p, base_theme = "theme_spectrum", base_size = 11,
-        title = "Tsallis Entropy Across Diversity Scales (q-spectrum)", subtitle = subtitle)
-    p <- p + ggplot2::labs(x = "q value", y = expression("Tsallis entropy (" * S[q] *
-        ")"))
+        title = "Tsallis Entropy q-Spectrum: Scale-Dependent Diversity Patterns",
+        subtitle = "Lines trace median normalized entropy from rare (low q) to dominant (high q) isoforms")
+    p <- p + ggplot2::labs(x = "q value", y = "Tsallis entropy")
 
     if (length(unique(long$group)) == 1) {
         p <- .configure_legend(p, position = "none")

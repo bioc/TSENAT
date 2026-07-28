@@ -19,6 +19,7 @@ calculate_jis(
   sait_results = NULL,
   sait_p_threshold = 0.05,
   use_sait_fdr = TRUE,
+  nthreads = NULL,
   output_file = NULL,
   verbose = FALSE,
   ...
@@ -82,6 +83,11 @@ filtering genes from
 \item{use_sait_fdr}{\code{logical}.  If TRUE,
 uses adjusted p-values from sait_results 
  (default: TRUE).}
+
+\item{nthreads}{\code{numeric} or  \code{NULL}.  Number of CPU threads for 
+parallel processing.
+  If NULL, reads from \code{@config$nthreads} (or defaults to 1).
+  If > 1 and multiple q-values provided, uses parallel PSOCK cluster.}
 
 \item{output_file}{\code{character} or  \code{NULL}.
  Optional file path to save results.

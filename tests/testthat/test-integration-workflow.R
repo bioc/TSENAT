@@ -614,7 +614,10 @@ test_that("[BUG #9] Empty SE after filtering produces informative error", {
     # Create TSENATAnalysis from counts matrix
     # Note: build_analysis() expects readcounts (matrix), not SE
     # skip=TRUE to handle gene names that don't match the GFF3 annotation
-    analysis <- build_analysis(readcounts = counts, tx2gene = gff3_file, skip = TRUE)
+    # suppressWarnings: expected when >90% of transcripts cannot map to GFF3
+    analysis <- suppressWarnings(
+        build_analysis(readcounts = counts, tx2gene = gff3_file, skip = TRUE)
+    )
     
     # TSENAT will raise error with clear message (Bug #9 validation)
     # when pipeline runs on empty counts

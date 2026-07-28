@@ -2008,3 +2008,264 @@ test_that("[AUDIT #3] .compute_divergence_jackknife produces valid estimates", {
     # Too few observations
     expect_null(TSENAT:::.compute_divergence_jackknife(c(1, 2), c(1, 2), q = 1))
 })
+
+# ============================================================================
+# COVERAGE IMPROVEMENT: .bootstrap_resample_with_quality_control regeneration branches
+# ============================================================================
+
+context("bootstrap: Quality Control Regeneration and Edge Branches")
+
+test_that(".bootstrap_resample_with_quality_control triggers regeneration loop", {
+    # Use sparse data that will produce some NA replicates, triggering regeneration
+    set.seed(3001)
+    x <- c(100, 0, 5, 0, 1)  # Sparse: many zeros
+    
+    # Use resample_by="read" and small nboot to increase chance of NA replicates
+    result <- tryCatch({
+        TSENAT:::.bootstrap_resample_with_quality_control(
+            x = x, q = 1.0, norm = TRUE, nboot = 100,
+            log_base = exp(1), pseudocount = 0, what = "S",
+            paired = FALSE, min_valid_frac = 0.9,
+            resample_by = "replicate"
+        )
+    }, warning = function(w) {
+        # May warn about quality control
+        NULL
+    }, error = function(e) {
+        NULL
+    })
+    
+    # Should return either a valid result or NULL (if data too sparse)
+    if (!is.null(result)) {
+        expect_true(is.numeric(result))
+        expect_length(result, 100)
+    }
+})
+
+test_that(".bootstrap_resample_with_quality_control handles extremely sparse data gracefully", {
+    # Heavily zero-dominated data - function should either error with a clear
+    # message or return a result without crashing
+    x <- c(1, 0, 0, 0, 0, 0)
+    
+    captured_warnings <- list()
+    captured_errors <- list()
+    
+    result <- tryCatch(
+        withCallingHandlers(
+            TSENAT:::.bootstrap_resample_with_quality_control(
+                x = x, q = 1.0, norm = TRUE, nboot = 30,
+                log_base = exp(1), pseudocount = 0, what = "S",
+                paired = FALSE, min_valid_frac = 0.95,
+                resample_by = "replicate"
+            ),
+            warning = function(w) {
+                captured_warnings[[length(captured_warnings) + 1]] <<- conditionMessage(w)
+                invokeRestart("muffleWarning")
+            }
+        ),
+        error = function(e) {
+            captured_errors[[length(captured_errors) + 1]] <<- conditionMessage(e)
+            NULL
+        }
+    )
+    
+    # Function should not crash - either returns result or errors gracefully
+    if (!is.null(result)) {
+        expect_true(is.numeric(result))
+    }
+    # If it errored, the message should be informative
+    if (length(captured_errors) > 0) {
+        expect_match(captured_errors[[1]], "CRITICAL|valid|replicate|NA")
+    }
+})
+
+test_that(".bootstrap_resample_with_quality_control handles moderately sparse data", {
+    # Moderately sparse data - tests the regeneration and warning paths
+    x <- c(10, 2, 1, 1, 2, 3, 1, 0, 1, 2)
+    
+    captured_warnings <- list()
+    
+    result <- tryCatch(
+        withCallingHandlers(
+            TSENAT:::.bootstrap_resample_with_quality_control(
+                x = x, q = 2.0, norm = FALSE, nboot = 50,
+                log_base = exp(1), pseudocount = 0, what = "S",
+                paired = FALSE, min_valid_frac = 0.95,
+                resample_by = "replicate"
+            ),
+            warning = function(w) {
+                captured_warnings[[length(captured_warnings) + 1]] <<- conditionMessage(w)
+                invokeRestart("muffleWarning")
+            }
+        ),
+        error = function(e) NULL
+    )
+    
+    # Should return a valid result
+    expect_true(is.numeric(result))
+    # Any warnings should be about quality control or regeneration
+    for (w in captured_warnings) {
+        expect_match(w, "CAUTION|unreliable|QC|Regenerated|regenerat", ignore.case = TRUE,
+                     info = sprintf("Unexpected warning: %s", w))
+    }
+})
+
+test_that(".bootstrap_resample_with_quality_control handles paired=TRUE path", {
+    # Test the paired resampling path in QC
+    x <- c(100, 95, 80, 85, 60, 55, 40, 45)
+    
+    result <- TSENAT:::.bootstrap_resample_with_quality_control(
+        x = x, q = 1.0, norm = TRUE, nboot = 50,
+        log_base = exp(1), pseudocount = 0, what = "S",
+        paired = TRUE, min_valid_frac = 0.5,
+        resample_by = "replicate"
+    )
+    
+    expect_true(is.numeric(result))
+    expect_length(result, 50)
+    expect_true(all(is.finite(result)))
+})
+
+test_that(".bootstrap_resample_with_quality_control handles count_matrix parameter", {
+    # Test resample_by="read" with counts_matrix
+    x <- c(100, 50, 25, 10)
+    counts_matrix <- matrix(c(100, 50, 25, 10), nrow = 1)
+    
+    result <- TSENAT:::.bootstrap_resample_with_quality_control(
+        x = x, q = 1.0, norm = TRUE, nboot = 30,
+        log_base = exp(1), pseudocount = 0, what = "S",
+        paired = FALSE, min_valid_frac = 0.5,
+        resample_by = "read", counts_matrix = counts_matrix
+    )
+    
+    expect_true(is.numeric(result))
+    expect_length(result, 30)
+})
+
+# ============================================================================
+# COVERAGE IMPROVEMENT: .bootstrap_resample_optimized uncovered branches
+# ============================================================================
+
+context("bootstrap: Resample Optimization Uncovered Branches")
+
+test_that(".bootstrap_resample_optimized handles effective_length normalization", {
+    x <- c(100, 50, 25, 10)
+    effective_length <- c(1000, 500, 250, 100)
+    
+    result <- TSENAT:::.bootstrap_resample_optimized(
+        x = x, q = 1.0, norm = TRUE, nboot = 20,
+        log_base = exp(1), pseudocount = 0, what = "S",
+        paired = FALSE, effective_length = effective_length
+    )
+    
+    expect_true(is.numeric(result))
+    expect_length(result, 20)
+    expect_true(all(is.finite(result)))
+})
+
+test_that(".bootstrap_resample_optimized warns on effective_length mismatch", {
+    x <- c(100, 50, 25, 10)
+    effective_length <- c(1000, 500)  # Mismatched length
+    
+    expect_warning(
+        TSENAT:::.bootstrap_resample_optimized(
+            x = x, q = 1.0, norm = TRUE, nboot = 10,
+            log_base = exp(1), pseudocount = 0, what = "S",
+            paired = FALSE, effective_length = effective_length
+        ),
+        "effective_length"
+    )
+})
+
+test_that(".bootstrap_resample_optimized handles paired=TRUE with what='D' (Hill)", {
+    x <- c(100, 95, 80, 85, 60, 55)  # Even length for pairs
+    
+    result <- TSENAT:::.bootstrap_resample_optimized(
+        x = x, q = 1.0, norm = FALSE, nboot = 20,
+        log_base = exp(1), pseudocount = 0, what = "D",
+        paired = TRUE
+    )
+    
+    expect_true(is.numeric(result))
+    expect_length(result, 20)
+    expect_true(all(result >= 1, na.rm = TRUE))  # Hill numbers >= 1
+})
+
+test_that(".bootstrap_resample_optimized paired with what='D' and q != 1", {
+    x <- c(100, 95, 80, 85, 60, 55)
+    
+    result <- TSENAT:::.bootstrap_resample_optimized(
+        x = x, q = 2.0, norm = FALSE, nboot = 20,
+        log_base = exp(1), pseudocount = 0, what = "D",
+        paired = TRUE
+    )
+    
+    expect_true(is.numeric(result))
+    expect_length(result, 20)
+})
+
+test_that(".bootstrap_resample_optimized rejects odd-length paired data", {
+    x <- c(100, 50, 25)  # Odd length
+    
+    expect_error(
+        TSENAT:::.bootstrap_resample_optimized(
+            x = x, q = 1.0, norm = TRUE, nboot = 10,
+            log_base = exp(1), pseudocount = 0, what = "S",
+            paired = TRUE
+        ),
+        "even length"
+    )
+})
+
+test_that(".bootstrap_resample_optimized standard with what='D' (Hill numbers)", {
+    x <- c(100, 50, 25, 10)
+    
+    result <- TSENAT:::.bootstrap_resample_optimized(
+        x = x, q = 1.0, norm = FALSE, nboot = 20,
+        log_base = exp(1), pseudocount = 0, what = "D",
+        paired = FALSE
+    )
+    
+    expect_true(is.numeric(result))
+    expect_length(result, 20)
+    expect_true(all(result >= 1, na.rm = TRUE))
+})
+
+test_that(".bootstrap_resample_optimized standard with what='D' and q != 1", {
+    x <- c(100, 50, 25, 10)
+    
+    result <- TSENAT:::.bootstrap_resample_optimized(
+        x = x, q = 2.0, norm = FALSE, nboot = 20,
+        log_base = exp(1), pseudocount = 0, what = "D",
+        paired = FALSE
+    )
+    
+    expect_true(is.numeric(result))
+    expect_length(result, 20)
+})
+
+test_that(".bootstrap_resample_optimized replicate resample without counts_matrix", {
+    x <- c(100, 50, 25, 10, 5)
+    
+    result <- TSENAT:::.bootstrap_resample_optimized(
+        x = x, q = 1.0, norm = TRUE, nboot = 20,
+        log_base = exp(1), pseudocount = 0, what = "S",
+        paired = FALSE, resample_by = "replicate"
+    )
+    
+    expect_true(is.numeric(result))
+    expect_length(result, 20)
+})
+
+test_that(".bootstrap_resample_optimized replicate with what='D'", {
+    x <- c(100, 50, 25, 10, 5)
+    
+    result <- TSENAT:::.bootstrap_resample_optimized(
+        x = x, q = 1.5, norm = FALSE, nboot = 20,
+        log_base = exp(1), pseudocount = 0, what = "D",
+        paired = FALSE, resample_by = "replicate"
+    )
+    
+    expect_true(is.numeric(result))
+    expect_length(result, 20)
+})

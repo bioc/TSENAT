@@ -160,6 +160,14 @@
     if (!is.null(se) && !is.null(condition_col) && (condition_col %in% colnames(SummarizedExperiment::colData(se)))) {
         st_vec <- as.character(SummarizedExperiment::colData(se)[, condition_col])
         names(st_vec) <- base_names
+        # Check for duplicate sample names with different conditions
+        dup_names <- duplicated(names(st_vec))
+        if (any(dup_names)) {
+            dup_samples <- unique(names(st_vec)[dup_names])
+            warning("[.map_samples_to_group] Duplicate sample names with potentially ",
+                "different conditions: ", paste(head(dup_samples, 5), collapse = ", "),
+                ". Using first occurrence.", call. = FALSE)
+        }
         st_map <- st_vec[!duplicated(names(st_vec))]
     } else {
         # No explicit mapping: assume single-group dataset
@@ -274,7 +282,7 @@
     long$sample[no_q_match] <- long$sample_q[no_q_match]
 
     # Remove entries with non-numeric q values that matched the pattern
-    has_q_pattern <- grepl("_q[0-9.]", sample_q_col)
+    has_q_pattern <- grepl("_q[0-9]+(\\.[0-9]+)?", sample_q_col)
     invalid_q <- has_q_pattern & is.na(long$q)
     if (any(invalid_q)) {
         long <- long[!invalid_q, ]
@@ -411,8 +419,11 @@
         return(readcounts)
     }
 
-    stop(sprintf("Number of transcripts in tx2gene (%d) does not match readcounts rows (%d), and automatic matching failed.",
-        n_tx, n_rc), call. = FALSE)
+    stop(sprintf("Transcript count mismatch: tx2gene has %d entries but readcounts has %d rows. ",
+        n_tx, n_rc),
+        "Automatic matching by rownames also failed. ",
+        "Ensure tx2gene and readcounts reference the same transcript IDs.",
+        call. = FALSE)
 }
 
 # ============================================================================
@@ -476,11 +487,10 @@
     # Sorted conditions for deterministic ordering
     conds <- sort(unique(coldata_condition_col_values))
 
-    # Warn if only one condition is present
+    # Notify if only one condition is present (common in single-group studies)
     if (length(conds) == 1) {
-        warning("[.map_metadata_detect_conditions] Only one condition detected: '",
-            conds, "'\n", "  Consider using multiple conditions for meaningful statistical analysis.",
-            call. = FALSE)
+        message("[.map_metadata_detect_conditions] Single condition detected: '",
+            conds, "'")
     }
 
     # Pairing structure: explicit subject_col required for paired analysis
@@ -580,7 +590,17 @@
 
         # Match against original coldata sample names
         expanded_rows <- match(sample_names_full, coldata_sample_col_values)
-        expanded_rows[is.na(expanded_rows)] <- 1
+        na_matches <- is.na(expanded_rows)
+        if (any(na_matches)) {
+            unmatched <- unique(sample_names_full[na_matches])
+            warning("[.map_metadata_expand_coldata] ", length(unmatched),
+                " sample(s) not found in coldata: ",
+                paste(head(unmatched, 5), collapse = ", "),
+                if (length(unmatched) > 5) " ..." else "",
+                ". Falling back to first metadata row for these samples.",
+                call. = FALSE)
+            expanded_rows[na_matches] <- 1L
+        }
 
         # Expand colData using the mapped indices
         new_col_data <- col_data[expanded_rows, ]

@@ -58,7 +58,8 @@ Multiple comparison correction method.
 
 \item{corstr}{\code{character} or  \code{NULL}.  Correlation structure for 
 GEE models.
-  Options: 'ar1', 'exchangeable', 'independence'.
+  Options: 'ar1', 'exchangeable', 'independence', 'auto'.
+  'auto' selects the best structure via QIC.
   If NULL, uses method from @config or base function defaults.}
 
 \item{pcorr}{\code{character} or \code{NULL}. P-value correction method.

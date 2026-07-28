@@ -3017,3 +3017,107 @@ test_that("block_bootstrap_compute_cpp_wrapper handles NA values in input (line 
   expect_true(!is.null(result) || is.numeric(result))
 })
 
+# ============================================================================
+# RIGID COMPONENT: bootstrap_replicate_cpp (July 2026: metrics.json risk=95.5)
+# ============================================================================
+
+context("Rigid: bootstrap_replicate_cpp")
+
+test_that("bootstrap_replicate_cpp returns correct dimensions", {
+  skip_if_not_installed("Rcpp")
+  counts <- matrix(c(10, 5, 3, 2, 8, 6, 4, 1, 15, 12, 9, 7), nrow = 4, ncol = 3)
+  nboot <- 100L
+  result <- bootstrap_replicate_cpp(counts, nboot = nboot, q = 1.0)
+  expect_type(result, "double")
+  expect_length(result, nboot)
+  expect_true(all(is.finite(result)))
+})
+
+test_that("bootstrap_replicate_cpp handles minimal input (2 samples)", {
+  skip_if_not_installed("Rcpp")
+  counts <- matrix(c(10, 5, 3, 2, 8, 6), nrow = 3, ncol = 2)
+  nboot <- 50L
+  result <- bootstrap_replicate_cpp(counts, nboot = nboot, q = 1.0)
+  expect_length(result, nboot)
+  expect_true(all(is.finite(result)))
+})
+
+test_that("bootstrap_replicate_cpp respects q parameter", {
+  skip_if_not_installed("Rcpp")
+  counts <- matrix(c(10, 5, 3, 2, 8, 6, 4, 1, 15, 12, 9, 7), nrow = 4, ncol = 3)
+  result_q05 <- bootstrap_replicate_cpp(counts, nboot = 100L, q = 0.5)
+  result_q20 <- bootstrap_replicate_cpp(counts, nboot = 100L, q = 2.0)
+  expect_true(all(is.finite(result_q05)))
+  expect_true(all(is.finite(result_q20)))
+  expect_true(median(result_q20, na.rm = TRUE) <= median(result_q05, na.rm = TRUE))
+})
+
+test_that("bootstrap_replicate_cpp normalize parameter works", {
+  skip_if_not_installed("Rcpp")
+  counts <- matrix(c(10, 5, 3, 2, 8, 6, 4, 1, 15, 12, 9, 7), nrow = 4, ncol = 3)
+  result_norm <- bootstrap_replicate_cpp(counts, nboot = 100L, q = 1.0, normalize = TRUE)
+  result_raw  <- bootstrap_replicate_cpp(counts, nboot = 100L, q = 1.0, normalize = FALSE)
+  expect_true(all(is.finite(result_norm)))
+  expect_true(all(is.finite(result_raw)))
+  expect_true(all(result_norm >= 0 & result_norm <= 1))
+  expect_true(all(result_raw >= 0))
+})
+
+test_that("bootstrap_replicate_cpp handles pseudocount", {
+  skip_if_not_installed("Rcpp")
+  counts <- matrix(c(10, 0, 3, 2, 8, 0, 4, 1, 15, 0, 9, 7), nrow = 4, ncol = 3)
+  result_no_pc <- bootstrap_replicate_cpp(counts, nboot = 100L, q = 1.0, pseudocount = 0)
+  result_pc <- bootstrap_replicate_cpp(counts, nboot = 100L, q = 1.0, pseudocount = 1.0)
+  expect_true(all(is.finite(result_no_pc)))
+  expect_true(all(is.finite(result_pc)))
+  expect_true(median(result_pc, na.rm = TRUE) > median(result_no_pc, na.rm = TRUE))
+})
+
+test_that("bootstrap_replicate_cpp with block_ids preserves pairing structure", {
+  skip_if_not_installed("Rcpp")
+  counts <- matrix(c(10, 5, 3, 2, 8, 6, 4, 1, 15, 12, 9, 7, 20, 18, 11, 5),
+                   nrow = 4, ncol = 4)
+  block_ids <- c(1L, 1L, 2L, 2L)
+  nboot <- 100L
+  result <- bootstrap_replicate_cpp(counts, nboot = nboot, q = 1.0,
+                                     block_ids = block_ids)
+  expect_length(result, nboot)
+  expect_true(all(is.finite(result)))
+})
+
+test_that("bootstrap_replicate_cpp produces reproducible output with seed", {
+  skip_if_not_installed("Rcpp")
+  counts <- matrix(c(10, 5, 3, 2, 8, 6, 4, 1, 15, 12, 9, 7), nrow = 4, ncol = 3)
+  set.seed(42)
+  result1 <- bootstrap_replicate_cpp(counts, nboot = 100L, q = 1.0)
+  set.seed(42)
+  result2 <- bootstrap_replicate_cpp(counts, nboot = 100L, q = 1.0)
+  expect_equal(result1, result2)
+})
+
+test_that("bootstrap_replicate_cpp nboot parameter works", {
+  skip_if_not_installed("Rcpp")
+  counts <- matrix(c(10, 5, 3, 2, 15, 12, 9, 7), nrow = 4, ncol = 2)
+  result_10  <- bootstrap_replicate_cpp(counts, nboot = 10L, q = 1.0)
+  result_100 <- bootstrap_replicate_cpp(counts, nboot = 100L, q = 1.0)
+  expect_length(result_10, 10L)
+  expect_length(result_100, 100L)
+})
+
+test_that("bootstrap_replicate_cpp handles large count values", {
+  skip_if_not_installed("Rcpp")
+  counts <- matrix(c(1000, 500, 200, 100, 800, 600, 300, 50, 1500, 1200, 900, 700),
+                   nrow = 4, ncol = 3)
+  result <- bootstrap_replicate_cpp(counts, nboot = 100L, q = 2.0)
+  expect_true(all(is.finite(result)))
+  expect_true(all(result >= 0))
+})
+
+test_that("bootstrap_replicate_cpp handles single-row input", {
+  skip_if_not_installed("Rcpp")
+  counts <- matrix(c(100, 200, 150), nrow = 1, ncol = 3)
+  result <- bootstrap_replicate_cpp(counts, nboot = 100L, q = 1.0, normalize = TRUE)
+  expect_length(result, 100L)
+  expect_true(all(result >= 0 & result <= 1))
+})
+

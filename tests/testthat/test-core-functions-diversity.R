@@ -3127,3 +3127,81 @@ test_that("L4: Log-odds normalization floors non-positive entropy values", {
     )
     expect_true(is.finite(result) && result >= 0)
 })
+
+# ============================================================================
+# COVERAGE IMPROVEMENT: .extract_gene_names (68.4%)
+# ============================================================================
+
+test_that(".extract_gene_names returns NULL for non-SE input", {
+    result <- TSENAT:::.extract_gene_names(
+        original_x = matrix(1:6, nrow = 2),
+        genes = c("g1", "g2"),
+        result = data.frame(gene = c("g1", "g2"))
+    )
+    expect_null(result)
+})
+
+test_that(".extract_gene_names returns NULL when no gene name column", {
+    se <- SummarizedExperiment::SummarizedExperiment(
+        assays = list(counts = matrix(1:12, nrow = 3)),
+        rowData = data.frame(foo = c("a", "b", "c"))
+    )
+    
+    result <- TSENAT:::.extract_gene_names(
+        original_x = se,
+        genes = c("a", "b", "c"),
+        result = data.frame(gene = c("a", "b", "c"), stringsAsFactors = FALSE)
+    )
+    expect_null(result)
+})
+
+test_that(".extract_gene_names extracts names from gene_name column", {
+    se <- SummarizedExperiment::SummarizedExperiment(
+        assays = list(counts = matrix(1:12, nrow = 3)),
+        rowData = data.frame(
+            gene_name = c("BRCA1", "TP53", "EGFR"),
+            row.names = c("tx1", "tx2", "tx3")
+        )
+    )
+    
+    result <- TSENAT:::.extract_gene_names(
+        original_x = se,
+        genes = c("tx1", "tx2", "tx3"),
+        result = data.frame(gene = c("tx1", "tx2", "tx3"), stringsAsFactors = FALSE)
+    )
+    expect_equal(as.character(result), c("BRCA1", "TP53", "EGFR"))
+})
+
+test_that(".extract_gene_names extracts names from gene_names column", {
+    se <- SummarizedExperiment::SummarizedExperiment(
+        assays = list(counts = matrix(1:12, nrow = 3)),
+        rowData = data.frame(
+            gene_names = c("GENE_A", "GENE_B", "GENE_C"),
+            row.names = c("t1", "t2", "t3")
+        )
+    )
+    
+    result <- TSENAT:::.extract_gene_names(
+        original_x = se,
+        genes = c("t1", "t2", "t3"),
+        result = data.frame(gene = c("t1", "t2", "t3"), stringsAsFactors = FALSE)
+    )
+    expect_equal(as.character(result), c("GENE_A", "GENE_B", "GENE_C"))
+})
+
+test_that(".extract_gene_names returns NULL for duplicate names", {
+    se <- SummarizedExperiment::SummarizedExperiment(
+        assays = list(counts = matrix(1:12, nrow = 3)),
+        rowData = data.frame(
+            gene_name = c("DUP", "DUP", "UNIQ"),
+            row.names = c("tx1", "tx2", "tx3")
+        )
+    )
+    
+    result <- TSENAT:::.extract_gene_names(
+        original_x = se,
+        genes = c("tx1", "tx2", "tx3"),
+        result = data.frame(gene = c("tx1", "tx2", "tx3"), stringsAsFactors = FALSE)
+    )
+    expect_null(result)
+})

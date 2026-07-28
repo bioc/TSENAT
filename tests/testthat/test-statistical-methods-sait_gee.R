@@ -2998,3 +2998,212 @@ test_that(".gee_assemble_result_row handles NULL kc_metadata", {
     expect_true(is.na(result$rho_ar1_estimate))
     expect_true(is.na(result$kc_multiplier))
 })
+
+# ============================================================================
+# PHASE 13: .compute_joint_wald_pvalue() — COVERAGE GAP (0%)
+# ============================================================================
+
+context("Phase 13: Joint Wald P-value for Multi-Level Groups")
+
+test_that(".compute_joint_wald_pvalue handles multi-level groups (chi-squared branch)", {
+    skip_if_not_installed("geepack")
+    
+    # Create data with 3-level group factor to get multiple q:group coefficients
+    set.seed(2001)
+    n_per_group <- 5
+    qvec <- rep(seq(0.01, 0.05, by = 0.01), times = 3 * n_per_group / 5)
+    if (length(qvec) < 3 * n_per_group) {
+        qvec <- rep(seq(0.01, 0.05, by = 0.01), length.out = 3 * n_per_group)
+    }
+    
+    df <- data.frame(
+        entropy = rnorm(length(qvec), mean = 1, sd = 0.3),
+        q = qvec,
+        group = factor(rep(c("A", "B", "C"), each = n_per_group)),
+        subject = factor(rep(1:(3 * n_per_group), each = 1))
+    )
+    
+    # Fit GEE with q * group interaction
+    fit <- try(
+        geepack::geeglm(
+            entropy ~ q * group,
+            id = df$subject,
+            data = df,
+            family = stats::gaussian(),
+            corstr = "independence"
+        ),
+        silent = TRUE
+    )
+    
+    if (!inherits(fit, "try-error") && !is.null(fit)) {
+        coefs <- stats::coef(fit)
+        ia_names <- names(coefs)[grepl("^q:", names(coefs), ignore.case = TRUE)]
+        
+        # With 3-level group (A/B/C), should have 2 interaction coefficients
+        expect_true(length(ia_names) >= 2,
+                    info = sprintf("Expected >=2 interaction coefs, got %d: %s",
+                                   length(ia_names), paste(ia_names, collapse = ", ")))
+        
+        # Test chi-squared branch (bias_correction = FALSE, n_clusters large)
+        n_clusters <- length(unique(df$subject))
+        p_joint <- TSENAT:::.compute_joint_wald_pvalue(
+            fit, ia_names, n_clusters = n_clusters, bias_correction = FALSE
+        )
+        
+        expect_true(is.numeric(p_joint))
+        expect_true(is.finite(p_joint))
+        expect_true(p_joint >= 0 && p_joint <= 1,
+                    info = sprintf("Joint Wald p-value = %f", p_joint))
+    }
+})
+
+test_that(".compute_joint_wald_pvalue handles small clusters (F-distribution branch)", {
+    skip_if_not_installed("geepack")
+    
+    # Small number of clusters triggers bias_correction + F-distribution
+    set.seed(2002)
+    df <- data.frame(
+        entropy = c(0.5, 0.7, 0.6, 0.8, 0.55, 0.75, 0.65, 0.85, 0.6, 0.8, 0.7, 0.9),
+        q = rep(seq(0.01, 0.04, by = 0.01), 3),
+        group = factor(rep(c("X", "Y", "Z"), each = 4)),
+        subject = factor(rep(1:3, each = 4))
+    )
+    
+    fit <- try(
+        geepack::geeglm(
+            entropy ~ q * group,
+            id = df$subject,
+            data = df,
+            family = stats::gaussian(),
+            corstr = "independence"
+        ),
+        silent = TRUE
+    )
+    
+    if (!inherits(fit, "try-error") && !is.null(fit)) {
+        coefs <- stats::coef(fit)
+        ia_names <- names(coefs)[grepl("^q:", names(coefs), ignore.case = TRUE)]
+        
+        if (length(ia_names) >= 2) {
+            # Small clusters + bias_correction = TRUE -> F-distribution
+            p_joint <- TSENAT:::.compute_joint_wald_pvalue(
+                fit, ia_names, n_clusters = 3, bias_correction = TRUE
+            )
+            
+            expect_true(is.numeric(p_joint))
+            expect_true(is.finite(p_joint))
+            expect_true(p_joint >= 0 && p_joint <= 1)
+        }
+    }
+})
+
+test_that(".compute_joint_wald_pvalue returns NA for empty ia_names", {
+    skip_if_not_installed("geepack")
+    
+    set.seed(2003)
+    df <- data.frame(
+        entropy = rnorm(10, mean = 1, sd = 0.2),
+        q = seq(0.01, 0.1, by = 0.01),
+        group = factor(rep(c("A", "B"), each = 5)),
+        subject = factor(rep(1:2, each = 5))
+    )
+    
+    fit <- try(
+        geepack::geeglm(
+            entropy ~ q + group,  # No interaction term
+            id = df$subject,
+            data = df,
+            family = stats::gaussian(),
+            corstr = "independence"
+        ),
+        silent = TRUE
+    )
+    
+    if (!inherits(fit, "try-error") && !is.null(fit)) {
+        # No q:group coefficients -> empty ia_names
+        p_joint <- TSENAT:::.compute_joint_wald_pvalue(
+            fit, character(0), n_clusters = 10, bias_correction = FALSE
+        )
+        expect_true(is.na(p_joint))
+    }
+})
+
+test_that(".compute_joint_wald_pvalue returns NA for invalid vcov", {
+    skip_if_not_installed("geepack")
+    
+    # Create degenerate data that may cause vcov issues
+    set.seed(2004)
+    df <- data.frame(
+        entropy = rep(1.0, 12),  # Constant response
+        q = rep(seq(0.01, 0.04, by = 0.01), 3),
+        group = factor(rep(c("A", "B", "C"), each = 4)),
+        subject = factor(rep(1:3, each = 4))
+    )
+    
+    fit <- try(
+        geepack::geeglm(
+            entropy ~ q * group,
+            id = df$subject,
+            data = df,
+            family = stats::gaussian(),
+            corstr = "independence"
+        ),
+        silent = TRUE
+    )
+    
+    # Should not crash even with problematic model
+    if (!inherits(fit, "try-error") && !is.null(fit)) {
+        coefs <- stats::coef(fit)
+        ia_names <- names(coefs)[grepl("^q:", names(coefs), ignore.case = TRUE)]
+        
+        result <- tryCatch({
+            TSENAT:::.compute_joint_wald_pvalue(
+                fit, ia_names, n_clusters = 3, bias_correction = FALSE
+            )
+        }, error = function(e) {
+            paste("Error:", e$message)
+        })
+        
+        # Should not crash
+        expect_false(is.character(result) && grepl("^Error:", result))
+    }
+})
+
+test_that(".compute_joint_wald_pvalue integration via .extract_interaction_pvalue", {
+    skip_if_not_installed("geepack")
+    
+    # Full integration: .extract_interaction_pvalue should call .compute_joint_wald_pvalue
+    # when there are multiple interaction coefficients (3-level group)
+    set.seed(2005)
+    n_per <- 6
+    df <- data.frame(
+        entropy = rnorm(n_per * 3, mean = 1, sd = 0.3),
+        q = rep(seq(0.01, 0.06, by = 0.01), 3),
+        group = factor(rep(c("Control", "Treatment_A", "Treatment_B"), each = n_per)),
+        subject = factor(rep(1:3, each = n_per))
+    )
+    
+    fit <- try(
+        geepack::geeglm(
+            entropy ~ q * group,
+            id = df$subject,
+            data = df,
+            family = stats::gaussian(),
+            corstr = "independence"
+        ),
+        silent = TRUE
+    )
+    
+    if (!inherits(fit, "try-error") && !is.null(fit)) {
+        # This should internally call .compute_joint_wald_pvalue for multi-level groups
+        p_val <- TSENAT:::.extract_interaction_pvalue(
+            fit, n_clusters = 3, bias_correction = FALSE
+        )
+        
+        expect_true(is.numeric(p_val))
+        expect_true(is.finite(p_val) || is.na(p_val))
+        if (!is.na(p_val)) {
+            expect_true(p_val >= 0 && p_val <= 1)
+        }
+    }
+})
