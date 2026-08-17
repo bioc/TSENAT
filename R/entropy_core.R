@@ -1,3 +1,4 @@
+
 ################################################################################
 #' Internal: Core Tsallis entropy calculation (consolidated)
 #' 
@@ -9,13 +10,13 @@
 #' @param q Numeric. Generalization parameter. Default: 1.0 (Shannon entropy)
 #' @param norm Logical. Normalize by maximum entropy. Default: FALSE
 #' @param log_base Numeric. Logarithm base. Default: exp(1) (natural log)
-#' @param q_tol Numeric. Tolerance for detecting q=1 case. Default: 1e-6
+#' @param q_tol Numeric. Tolerance for detecting q=1 case. Default: TSENAT_Q_TOL (1e-6)
 #'
 #' @return Numeric. Entropy value
 #'
 
 #' @noRd
-.entropy_core <- function(proportions, q = 1, norm = FALSE, log_base = exp(1), q_tol = 1e-06) {
+.entropy_core <- function(proportions, q = 1, norm = FALSE, log_base = exp(1), q_tol = TSENAT_Q_TOL) {
     # Input validation
     if (!is.numeric(proportions) || length(proportions) == 0) {
         return(NA_real_)
@@ -107,6 +108,24 @@
     return(H)
 }
 
+################################################################################
+# SINGLE SOURCE OF TRUTH: q-tolerance for the entropy layer
+#
+# Previously .entropy_core() used q_tol = 1e-6 while .calc_S()/
+# .calc_D() used sqrt(.Machine$double.eps) (~1.5e-8), so the same conceptual
+# quantity could be evaluated differently depending on the internal route
+# (e.g. .entropy_core(x, q = 1e-7) returned S_0 but
+# .calculate_tsallis_entropy(x, q = 1e-7) returned S(1e-7)).
+#
+# TSENAT_Q_TOL is the ONE tolerance used by the entropy layer to decide
+#   q ~ 0  -> Tsallis S_0 = n_present - 1  (support convention)
+#   q ~ 1  -> Shannon limit
+# The divergence layer keeps its own documented DIVERGENCE_Q_TOL = 1e-10
+# (validated against the C++ kernels in test-divergence-kernel-validation.R).
+################################################################################
+TSENAT_Q_TOL <- 1e-06
+
+
 #' Internal: Vectorized Tsallis entropy calculation
 #'
 #' Compute entropy for multiple observations (rows = observations, cols =
@@ -151,13 +170,13 @@
 #' @param n_species Integer. Number of species
 #' @param q Numeric. Generalization parameter. Default: 1.0
 #' @param log_base Numeric. Logarithm base. Default: exp(1)
-#' @param q_tol Numeric. Tolerance for q=1 detection. Default: 1e-6
+#' @param q_tol Numeric. Tolerance for q=1 detection. Default: TSENAT_Q_TOL (1e-6)
 #'
 #' @return Numeric. Maximum entropy value
 #'
 
 #' @noRd
-.entropy_max <- function(n_species, q = 1, log_base = exp(1), q_tol = 1e-06) {
+.entropy_max <- function(n_species, q = 1, log_base = exp(1), q_tol = TSENAT_Q_TOL) {
     if (n_species < 1)
         return(NA_real_)
 
@@ -193,7 +212,7 @@
 #' @param log_base Numeric. Logarithm base. Default: exp(1) (natural log)
 #' @param pseudocount Numeric. Add to each count before normalization.
 #' Default: 0
-#' @param q_tol Numeric. Tolerance for detecting q=1 case. Default: 1e-6
+#' @param q_tol Numeric. Tolerance for detecting q=1 case. Default: TSENAT_Q_TOL (1e-6)
 #'
 #' @return Numeric scalar: entropy value
 #'
@@ -203,7 +222,7 @@
 #'
 #' @noRd
 .entropy_single <- function(counts, q = 1, norm = TRUE, log_base = exp(1), pseudocount = 0,
-    q_tol = 1e-06) {
+    q_tol = TSENAT_Q_TOL) {
     # Pseudocount contract: .entropy_single adds pseudocount and normalizes to
     # proportions before calling .entropy_core. .entropy_core expects already-
     # proportioned input with no pseudocount handling. .entropy_vectorized also

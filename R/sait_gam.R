@@ -372,13 +372,21 @@ if (!exists(".KNOTS_MEMO_CACHE", mode = "environment")) {
     # PHASE 1 WEIGHTING (March 2026): Use bootstrap CI weights if provided
     # These take precedence over heteroscedasticity-estimated weights
     gam_weights_original <- NULL
+    weights_source <- "none"
 
     if (!is.null(weights_input) && length(weights_input) == nrow(df)) {
-        gam_weights_original <- weights_input  # Bootstrap CI weights for Phase 1
+        # User-provided weights are returned UNCHANGED (no attributes):
+        # callers and tests expect exact identity with the input.
+        return(weights_input)
     } else if (!is.na(hetero_result$is_heteroscedastic) && hetero_result$is_heteroscedastic) {
         weights_result <- .estimate_variance_weights(df, q_vals, method = "power")
         if (!is.null(weights_result)) {
             gam_weights_original <- weights_result$weights  # Store original weights
+            # AUDIT R3: weights derived from a Breusch-Pagan detection on a
+            # misspecified linear mean model + inverse squared-residual fit
+            # are DATA-ADAPTIVE. They must never silently shape the primary
+            # confirmatory test (the priority-1 lme_ns path ignores weights).
+            attr(gam_weights_original, "source") <- "data_adaptive_heteroscedasticity"
         }
     }
 
@@ -642,16 +650,23 @@ if (!exists(".KNOTS_MEMO_CACHE", mode = "environment")) {
 
     # Weights are not used in this path: gam_weights are inverse-variance
     # weights for mgcv, not directly transferable to nlme varFunc classes.
-    # NOTE: corAR1 uses the position of q in the global sorted q grid (obs_seq,
-    # see .fit_gam_paired_design), so with gaps (missing q) the correlation
-    # across a gap of d grid steps is rho^d, which is the correct AR(1) decay.
-    # nlme does not accept non-integer covariates in corAR1 (non-integer
-    # covariates route to continuous-time corARMA, which is numerically
-    # unstable here), so distance-based correlation in absolute q units on
-    # irregular non-grid-aligned q remains a known limitation.
-    fit <- try(nlme::lme(entropy ~ splines::ns(q, df = 3) * condition, random = ~1 |
-        subject, correlation = nlme::corAR1(form = ~obs_seq | subject/condition),
-        data = df, method = "ML"), silent = TRUE)
+    # AR(1) over ACTUAL q distances (audit R1): corCAR1(form = ~q | ...) gives
+    # Corr(e_i,e_j) = exp(-phi |q_i - q_j|). The previous grid-index corAR1
+    # modelled rho^|rank(q_i)-rank(q_j)|, which is valid only on equally
+    # spaced q grids; on irregular grids it can inflate type I (MC evidence:
+    # 0.165 vs 0.07 on q = (0, 0.01, 0.5, 1, 2) with distance correlation).
+    # See .build_ar1_cor() in sait_helpers.R. corCAR1 needs unique q within
+    # each subject x condition block (enforced by the duplicated-q rejection
+    # in .fit_gam_paired_design).
+    cor_builder <- .build_ar1_cor(df, grid_col = "obs_seq")
+    fit <- if (!is.null(cor_builder)) {
+        try(nlme::lme(entropy ~ splines::ns(q, df = 3) * condition, random = ~1 |
+            subject, correlation = cor_builder$cor_obj, data = df, method = "ML"),
+            silent = TRUE)
+    } else {
+        structure("no valid AR(1) correlation structure", class = "try-error")
+    }
+    cor_struct <- if (!is.null(cor_builder)) cor_builder$label else NA_character_
 
     if (inherits(fit, "try-error")) {
         return(empty_result)
@@ -685,7 +700,7 @@ if (!exists(".KNOTS_MEMO_CACHE", mode = "environment")) {
     }
 
     list(fit_null = NULL, fit_alt = fit, p_interaction = p_interaction, anova_result = an,
-        fit_meta = list(model_used = "lme_ns_ar1", fallback_level = 1L, correlation_structure = "ar1_within_subject_condition",
+        fit_meta = list(model_used = "lme_ns_ar1", fallback_level = 1L, correlation_structure = cor_struct,
             test_type = "marginal_F"))
 }
 
@@ -961,11 +976,13 @@ if (!exists(".KNOTS_MEMO_CACHE", mode = "environment")) {
         result$fallback_level <- fit_meta$fallback_level
         result$correlation_structure <- fit_meta$correlation_structure
         result$test_type <- fit_meta$test_type
+        result$weights_source <- if (!is.null(fit_meta$weights_source)) fit_meta$weights_source else NA_character_
     } else {
         result$model_used <- NA_character_
         result$fallback_level <- NA_integer_
         result$correlation_structure <- NA_character_
         result$test_type <- NA_character_
+        result$weights_source <- NA_character_
     }
 
     # Add residual normality testing results
@@ -1066,11 +1083,12 @@ if (!exists(".KNOTS_MEMO_CACHE", mode = "environment")) {
         drop = FALSE]
     rownames(df) <- NULL
 
-    # Step 3: AR(1) time covariate = position of q in the global sorted q grid
-    # (may contain gaps when q values are missing). corAR1 then models rho^|d|
-    # for the true grid distance d. A renumbered 1..n sequence would treat gaps
-    # as unit distance, overestimate the correlation and inflate the type I
-    # error (Monte Carlo validation: 0.080 -> 0.053 with 25% missing q).
+    # Step 3: Grid index = position of q in the global sorted q grid (may
+    # contain gaps when q values are missing). Used by the corAR1 fallback
+    # in .build_ar1_cor() and by the legacy mgcv::gamm paths below. The
+    # primary lme path (priority 1) uses corCAR1 over ACTUAL q distances,
+    # which is correct on irregular grids; the grid-index corAR1 is only
+    # a fallback (see .build_ar1_cor documentation).
     df$obs_seq <- match(df$q, sort(unique(df$q)))
 
     # Step 3b: Reject pseudoreplicated q. Duplicated q values within a subject
@@ -1138,12 +1156,32 @@ if (!exists(".KNOTS_MEMO_CACHE", mode = "environment")) {
     # Step 10: Compare models and extract p-value
     compare_result <- .compare_gam_models(fit_result$fit_null, fit_result$fit_alt)
 
+    # Weights provenance (audit R3). The priority-1 lme_ns path never uses
+    # weights; fallback levels 2-4 DO pass gam_weights into mgcv. If those
+    # weights were derived from Breusch-Pagan heteroscedasticity detection,
+    # the result is flagged and the user is warned: the model comparison that
+    # produced the p-value is shaped by a data-adaptive transformation.
+    weights_source <- "none"
+    if (!is.null(gam_weights)) {
+        weights_source <- attr(gam_weights, "source")
+        if (is.null(weights_source)) {
+            weights_source <- "user_provided"
+        }
+    }
+
     # Register the actual model path used for this gene so that mixed-method
     # result tables are interpretable
     fit_meta <- list(model_used = if (fallback_level == 4L) "gam_independence" else if (fallback_level ==
         3L) "gamm_nocorr" else "gamm_ar1", fallback_level = fallback_level, correlation_structure = if (fallback_level <=
-        2L) "ar1_within_subject_condition" else "none", test_type = if (fallback_level ==
-        4L) "anova_Chisq" else "LRT")
+        2L) "ar1_grid_within_subject_condition" else "none", test_type = if (fallback_level ==
+        4L) "anova_Chisq" else "LRT", weights_source = weights_source)
+
+    if (weights_source == "data_adaptive_heteroscedasticity") {
+        warning("[.fit_gam_paired_design] Data-adaptive heteroscedasticity weights were used by fallback level ",
+            fallback_level, " (", fit_meta$model_used,
+            "). This p-value is not from the calibrated unweighted confirmatory path; treat as sensitivity analysis.",
+            call. = FALSE)
+    }
 
     return(list(fit_null = fit_result$fit_null, fit_alt = fit_result$fit_alt, p_interaction = compare_result$p_interaction,
         anova_result = compare_result$anova_result, fit_meta = fit_meta))
@@ -1199,9 +1237,25 @@ if (!exists(".KNOTS_MEMO_CACHE", mode = "environment")) {
         }
     }
 
+    # Weights provenance (audit R3): the unpaired GAM is the confirmatory
+    # path here, and gam_weights are passed directly into mgcv. Flag
+    # data-adaptive (heteroscedasticity-detected) weights explicitly.
+    weights_source <- "none"
+    if (!is.null(gam_weights)) {
+        weights_source <- attr(gam_weights, "source")
+        if (is.null(weights_source)) {
+            weights_source <- "user_provided"
+        }
+    }
+    if (weights_source == "data_adaptive_heteroscedasticity") {
+        warning("[.fit_gam_unpaired_design] Data-adaptive heteroscedasticity weights were used in the confirmatory GAM. Treat this p-value as sensitivity analysis; consider the unweighted fit for primary inference.",
+            call. = FALSE)
+    }
+
     return(list(fit_null = fit_result$fit_null, fit_alt = fit_result$fit_alt, p_interaction = p_interaction,
         anova_result = anova_result, fit_meta = list(model_used = "gam_independence",
-            fallback_level = NA_integer_, correlation_structure = "none", test_type = "anova_F")))
+            fallback_level = NA_integer_, correlation_structure = "none", test_type = "anova_F",
+            weights_source = weights_source)))
 }
 
 

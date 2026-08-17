@@ -62,10 +62,15 @@
 #'
 #' ## Normalization
 #'
-#' When `norm = TRUE`, entropy/Hill numbers are scaled to [0, 1]:
-#'   - Divide by theoretical maximum at given \eqn{q}{q}
-#'   - Natural logarithms used for limits as \eqn{q \to 1}{q → 1}
-#'   - Results in dimensionless measure independent of species count
+#' When `norm = TRUE`, the **Tsallis entropy S_q** is scaled to [0, 1] by
+#' dividing by its theoretical maximum at the given \eqn{q}{q} (natural
+#' logarithms for the Shannon limit \eqn{q \to 1}{q → 1}); the result is a
+#' dimensionless measure independent of species count.
+#'
+#' **Hill numbers D_q are NEVER normalized**: `norm` only applies to the
+#' Tsallis entropy path (`what = "S"`). D_q is always returned on its native
+#' "effective number of species" scale, which already carries interpretable
+#' units — dividing it by its theoretical maximum would change the estimand.
 #' @examples
 #' x <- c(10, 5, 0)
 #' .calculate_tsallis_entropy(x, q = c(0.5, 1, 2), norm = TRUE)
@@ -138,7 +143,10 @@
 
     # Compute ONLY the requested quantity (previously both S and D were always
     # evaluated even when only one was requested: ~2x wasted work per vector).
-    tol <- sqrt(.Machine$double.eps)
+    # AUDIT S1: single package-wide q tolerance (TSENAT_Q_TOL defined in
+    # entropy_core.R) — .entropy_core() and .calc_S()/.calc_D() must agree on
+    # what counts as q = 0 / q = 1.
+    tol <- TSENAT_Q_TOL
     format_out <- function(v) {
         if (length(q) > 1) {
             names(v) <- paste0("q=", q)

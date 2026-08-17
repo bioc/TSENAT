@@ -31,9 +31,18 @@ seed <- get0("TSENAT_VALIDATION_SEED", envir = environment(),
         ifnotfound = as.integer(Sys.getenv("TSENAT_VALIDATION_SEED", "42"))))
 set.seed(seed)
 
-# testthat integration: skip on Bioconductor builds (long Monte Carlo suite)
+# testthat integration: the Monte Carlo suite is heavy and must NOT run under
+# R CMD check (it made CI exceed its 30-minute no-output timeout). Skipped by
+# default under testthat (Bioconductor builds always; elsewhere unless
+# explicitly requested). Run the full suite locally with:
+#   Rscript tests/testthat/run-validation.R
+# or opt in under testthat with env TSENAT_RUN_VALIDATION=true
+# (reps/seed via TSENAT_VALIDATION_REPS / TSENAT_VALIDATION_SEED).
 if (requireNamespace("testthat", quietly = TRUE) && testthat::is_testing()) {
     testthat::skip_on_bioc()
+    if (!isTRUE(as.logical(Sys.getenv("TSENAT_RUN_VALIDATION", "false")))) {
+        testthat::skip("Monte Carlo validation suite skipped under testthat; run tests/testthat/run-validation.R or set TSENAT_RUN_VALIDATION=true")
+    }
 }
 
 run_gee_corstr <- function(df, corstr) {

@@ -340,16 +340,21 @@
     df_model$condition <- factor(as.character(df_model$group))
     df_model <- df_model[order(as.character(df_model$subject), as.character(df_model$condition),
         df_model$q), , drop = FALSE]
-    # Grid index (may contain gaps when q values are missing): corAR1 models
-    # rho^|d| for the true grid distance; a renumbered 1..n sequence would
-    # treat gaps as unit distance and inflate the type I error (same as
-    # .fit_gam_paired_design).
+    # Grid index (may contain gaps when q values are missing) for the corAR1
+    # fallback. Primary: corCAR1 over ACTUAL q distances (audit R1) — see
+    # .build_ar1_cor() in sait_helpers.R. A renumbered 1..n sequence would
+    # treat gaps as unit distance and inflate the type I error.
     df_model$time_idx <- match(df_model$q, sort(unique(df_model$q)))
 
-    fit0 <- try(nlme::lme(formula_null, random = ~1 | subject, correlation = nlme::corAR1(form = ~time_idx |
-        subject/condition), data = df_model, method = "ML"), silent = TRUE)
-    fit1 <- try(nlme::lme(formula_alt, random = ~1 | subject, correlation = nlme::corAR1(form = ~time_idx |
-        subject/condition), data = df_model, method = "ML"), silent = TRUE)
+    cor_builder <- .build_ar1_cor(df_model, grid_col = "time_idx")
+    fit0 <- fit1 <- NULL
+    if (!is.null(cor_builder)) {
+        fit0 <- try(nlme::lme(formula_null, random = ~1 | subject, correlation = cor_builder$cor_obj,
+            data = df_model, method = "ML"), silent = TRUE)
+        fit1 <- try(nlme::lme(formula_alt, random = ~1 | subject, correlation = cor_builder$cor_obj,
+            data = df_model, method = "ML"), silent = TRUE)
+    }
+    used_cor_label <- if (!is.null(cor_builder)) cor_builder$label else NA_character_
 
     # Phase 16: Log fit errors for diagnosis
     if (inherits(fit0, "try-error") && verbose) {
@@ -368,7 +373,9 @@
     used_fit_method <- "nlme::lme"
     used_singular <- FALSE
 
-    if (inherits(fit0, "try-error") || inherits(fit1, "try-error")) {
+    fit_failed <- is.null(fit0) || is.null(fit1) || inherits(fit0, "try-error") ||
+        inherits(fit1, "try-error")
+    if (fit_failed) {
         if (progress || verbose) {
             message("[.lmm_interaction] nlme::lme failed; trying fallback models")
         }
@@ -429,7 +436,8 @@
     res <- data.frame(gene = g, p_interaction = lrt_result$p_value, p_lrt = lrt_result$p_value,
         slope_diff = slope_diff, fit_method = used_fit_method, singular = used_singular,
         arima_transformation = use_arima, ci_weighted = has_weights, n_subjects = lrt_result$n_subjects,
-        small_sample_flag = lrt_result$small_sample_flag, stringsAsFactors = FALSE)
+        small_sample_flag = lrt_result$small_sample_flag, correlation_structure = used_cor_label,
+        stringsAsFactors = FALSE)
     if (!is.null(msg))
         res$message <- msg
     res

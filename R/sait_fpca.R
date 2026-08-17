@@ -340,12 +340,23 @@
         pc_g1_subj <- .aggregate_by_subject(pc_vals, grp_vals, subj_vals, g1)
         pc_g2_subj <- .aggregate_by_subject(pc_vals, grp_vals, subj_vals, g2)
 
-        # Paired test requires both groups present
-        if (length(pc_g1_subj) >= 2 && length(pc_g2_subj) >= 2 && !anyNA(pc_g1_subj) &&
-            !anyNA(pc_g2_subj)) {
-            t_res <- try(stats::t.test(pc_g1_subj, pc_g2_subj, paired = TRUE), silent = TRUE)
-            if (!inherits(t_res, "try-error")) {
-                return(as.numeric(t_res$p.value))
+        # AUDIT R2: align on the COMMON subject set before the paired test.
+        # Aggregating per group independently yields group-specific subject
+        # orderings, so paired=TRUE would pair by POSITION and mispair
+        # subjects when the order differs between groups (e.g. A: S1 S2 S3,
+        # B: S2 S1 S3 would pair A_S1 with B_S2). Explicitly intersect and
+        # order both vectors by the shared subject IDs.
+        subj_common <- intersect(names(pc_g1_subj), names(pc_g2_subj))
+        if (length(subj_common) >= 2) {
+            pc_g1_subj <- pc_g1_subj[subj_common]
+            pc_g2_subj <- pc_g2_subj[subj_common]
+            # Paired test requires both groups present
+            if (!anyNA(pc_g1_subj) && !anyNA(pc_g2_subj)) {
+                t_res <- try(stats::t.test(pc_g1_subj, pc_g2_subj, paired = TRUE),
+                    silent = TRUE)
+                if (!inherits(t_res, "try-error")) {
+                    return(as.numeric(t_res$p.value))
+                }
             }
         }
     }

@@ -10,12 +10,22 @@
       (`.compute_arima_differences`, `.apply_arima_differencing`,
       `.apply_arima_differencing_fpca`) and their tests were deleted, and the
       LMM fallback `slope_diff` is now extracted from fixed effects
-      (`nlme::fixef`) instead of per-subject coefficients.
-      Rationale: `docs/architecture/ADR-006-no-arima-differencing-functional-q.md`.
-    * **Correlation structure**: AR(1) within subject × condition
-      using the q-grid index (`rho^|Δgrid|`, handles missing q) in GAMM and LMM;
-      GEE fits H(q) with a joint Wald test and a small-cluster F reference
+      (`nlme::fixef`) instead of per-subject coefficients..
+    * **Correlation structure**: AR(1)-type within subject × condition
+      modelled over **actual q distances** (`nlme::corCAR1`,
+      Corr(e_i, e_j) = exp(-φ|q_i - q_j|)) as the primary structure in GAMM
+      and LMM, so irregular q grids are handled correctly (the q-grid-index
+      `rho^|Δgrid|` form, which is valid only on equally spaced grids, is kept
+      as a documented fallback and for the legacy mgcv paths); GEE fits H(q)
+      with a joint Wald test and a small-cluster F reference
       (df = n_clusters − p); the AR(1) design effect is descriptive-only.
+    * **Salmon input integrity** (audit hardening): Salmon quantification
+      files are now matched by **transcript ID** rather than positional order;
+      transcript sets and sample identifiers must be unique and consistent
+      across files (a mismatch is a hard error, not a warning), and negative or
+      non-finite quantification values are rejected at input. Paired-design
+      bootstrap also validates the 1-control + 1-treatment-per-pair invariant
+      before resampling.
     * **Paired GAMM**: `nlme::lme` with `ns(q, df = 3) × condition` and a marginal
       F-test (mgcv gamm is singular on paired designs); no p-value underflow for
       strong signals (log-space recomputation) and pseudo-R² `effect_size`;
@@ -28,6 +38,12 @@
       exploratory-only and never modifies the confirmatory model (testthat lock).
     * **Robust M-estimation**: sandwich variance with robust
       SE/p-values/95% CIs.
+    * **Performance (ART)**: the Aligned Rank Transform no longer recomputes
+      ANOVAs for all effects per gene — only the q × condition interaction row
+      is extracted via `ARTool::artlm()` + `flat.anova()` (identical F and
+      p-values, ~3× faster on the ANOVA step). Parallel per-gene workers now
+      pin BLAS/OpenMP to a single thread to avoid core oversubscription
+      (ART vignette step measured 42 s → 3.3 s at nthreads = 3).
     * **Documented limitations**: unpaired ART slightly anti-conservative at
       small n (Conover-Iman `method='rt'` recommended for confirmatory
       unpaired inference); GEE mildly anti-conservative under strong

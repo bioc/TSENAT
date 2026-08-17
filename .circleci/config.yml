@@ -121,8 +121,11 @@ jobs:
           command: |
             export _R_CHECK_FORCE_SUGGESTS_=false
             export NOT_CRAN=true
+            # The heavy Monte Carlo validation suite is skipped under R CMD check
+            # (see tests/testthat/test-type1-calibration.R guard); run it locally
+            # with: Rscript tests/testthat/run-validation.R
             R CMD check --no-manual --ignore-vignettes *.tar.gz
-          no_output_timeout: 30m
+          no_output_timeout: 60m
       - run:
           name: Run Bioconductor checks
           command: |
@@ -131,7 +134,7 @@ jobs:
             else
               echo "Skipping Bioconductor checks (tools/run_biocheck.R not found)"
             fi
-          no_output_timeout: 30m
+          no_output_timeout: 60m
       - run:
           name: Generate coverage report and upload to Codecov
           environment:

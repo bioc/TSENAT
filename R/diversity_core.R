@@ -18,9 +18,12 @@
 #' - 'range': Range standardization [0,1] per gene (classic approach)
 #' - 'zscore': Z-score standardization per q-value: (S_q - mean) / sd
 #'   Useful for cross-study comparison; results in mean=0, sd=1
-#' - 'log_odds_ratio': Log-odds ratio relative to random expectation:
-#'   log(S_q / S_q_max) where S_q_max is entropy of uniform distribution
-#'   Interpretation: 0 = uniform, >0 = more structured than random
+#' - 'log_odds_ratio': Log-ratio of entropy to the uniform maximum:
+#'   log(S_q / S_q_max) where S_q_max is entropy of the uniform distribution.
+#'   Since S_q <= S_q_max always, values are <= 0:
+#'   0 = maximally uniform; < 0 = increasingly concentrated/less diverse.
+#'   The NAME is kept for backwards compatibility; mathematically this is a
+#'   log-relative-entropy ratio (no odds are involved), not an odds ratio.
 #' - 'relative_reference': Ratio to reference group mean (requires colData
 #' 'sample_type')
 #'   Interpretation: Reference group mean=1, >1 higher than reference

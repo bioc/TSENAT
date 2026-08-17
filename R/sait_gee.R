@@ -17,12 +17,16 @@
 #' 4. **Correlation Structure Selection**: Choose AR(1), exchangeable, or independence via QIC
 #' 5. **Model Fitting**: Fit null (main effects) and alternative (interaction) models
 #' 6. **Interaction Testing**: Extract p-value with bias correction for small clusters
-#' 7. **Kauermann-Carroll Correction**: Apply HC1 bias reduction for n_clusters < 30
+#' 7. **Small-Cluster Sandwich Correction**: HC1 bias reduction for n_clusters < 30
+#'    (empirical correction inspired by Kauermann & Carroll 2001, combined
+#'    with a t-reference; NOT a literal KC estimator)
 #'
 #' ## Key References
 #'
 #' - Zimmerman & Harville (1991): AR(1) for ordered covariate structures
-#' - Kauermann & Carroll (2001): Sandwich variance bias correction for small clusters
+#' - Kauermann & Carroll (2001): inspiration for small-cluster sandwich
+#'   variance bias reduction (the implementation below is an EMPIRICAL
+#'   small-cluster correction, not the literal KC estimator)
 #' - Pan (2001): QIC model selection criterion for GEE
 #' - Mancl & DeRouen (2001): Covariate-adjusted ANOVA-type tests with GEE
 #'
@@ -51,8 +55,10 @@
 #'   - `'ar1'`: Autoregressive order 1, Corr(i,j) = ρ^|i-j|
 #'   - `'exchangeable'`: Equal correlation across all pairs (no ordering assumed)
 #'   - `'independence'`: Null model, no within-subject correlation
-#' @param bias_correction logical; if TRUE (default), apply Kauermann-Carroll HC1
-#'   bias reduction when n_clusters < 30. Ensures Type I error control in small samples
+#' @param bias_correction logical; if TRUE (default), apply an empirical
+#'   small-cluster sandwich (HC1) bias reduction when n_clusters < 30, with a
+#'   t-reference (df = n_clusters - p). Inspired by Kauermann & Carroll (2001)
+#'   but NOT a literal KC estimator. Ensures Type I error control in small samples
 #' @param weights numeric or NULL; optional observation weights for heteroscedasticity
 #'   (e.g., from bootstrap CI computations). If provided, takes precedence over
 #'   internal heteroscedasticity detection
@@ -60,7 +66,7 @@
 #' @return data.frame (single row) with columns:
 #'   - **gene**: gene identifier (from `g` argument)
 #'   - **p_interaction**: p-value for q × group interaction (bias-corrected if applicable)
-#'   - **p_interaction_raw**: p-value before K-C correction (if applied)
+#'   - **p_interaction_raw**: p-value before small-cluster correction (if applied)
 #'   - **n_clusters**: number of subjects/clusters in analysis
 #'   - **bias_correction_applied**: logical; whether HC1 adjustment was performed
 #'   - **correlation_structure**: selected structure ('ar1', 'exchangeable', 'independence')
@@ -71,7 +77,9 @@
 #'   - **slope_diff**: estimated group slope difference from interaction coefficient
 #'   - **design_effect_ar1**: multiplier for effective sample size (D_eff)
 #'   - **rho_ar1_estimate**: estimated AR(1) autocorrelation from residuals
-#'   - **kc_bias_correction_applied**: logical; whether K-C correction was applied
+#'   - **kc_bias_correction_applied**: logical; whether the empirical
+#'     small-cluster sandwich correction was applied (column name kept for
+#'     backwards compatibility)
 #'   - **kc_multiplier**: HC1 adjustment multiplier (n_eff / (n_eff - p))
 #'   - **n_effective**: effective sample size after design effect reduction
 #'   - **kc_method**: method applied ('hc1', 'hc3', or 'kc')
@@ -700,14 +708,21 @@
 
 
 # ============================================================================
-# Kauermann-Carroll Bias Correction for GEE Sandwich Variance Estimation
+# Empirical Small-Cluster Sandwich Correction for GEE Variance Estimation
 # ============================================================================
 # Phase 9 Implementation (March 2026) Extended for Tsallis multi-q measurements
-# with AR(1) correlation structure References: - Kauermann & Carroll (2001). 'A
-# note on the efficiency of sandwich covariance matrix estimation.' JASA
-# 96(456): 1387-1396.  - Mancl & DeRouen (2001). 'A covariate-adjusted
-# ANOVA-type test for correlated data.' Biometrics 57(1): 126-131.  - Li &
-# Redden (2015). 'Comparing logistic and linear models: bias reduction via
+# with AR(1) correlation structure.
+#
+# AUDIT R4: this is NOT a literal Kauermann-Carroll estimator. It combines an
+# HC1-style sandwich variance multiplier, a t-reference with degrees of
+# freedom based on the number of clusters, and a descriptive AR(1) design
+# effect. It should be described as an EMPIRICAL small-cluster sandwich
+# correction (validated by Monte Carlo in test-gee-small-sample.R), not as
+# "the KC correction". References: - Kauermann & Carroll (2001). 'A note on
+# the efficiency of sandwich covariance matrix estimation.' JASA 96(456):
+# 1387-1396.  - Mancl & DeRouen (2001). 'A covariate-adjusted ANOVA-type test
+# for correlated data.' Biometrics 57(1): 126-131.  - Li & Redden (2015).
+# 'Comparing logistic and linear models: bias reduction via
 # Kauermann-Carroll adjustment.' Biometrical Journal 57(5): 808-820.
 # ============================================================================
 
@@ -783,7 +798,7 @@
 }
 
 # ============================================================================
-# MAIN: Kauermann-Carroll Bias Correction for GEE
+# MAIN: Empirical Small-Cluster Sandwich Correction for GEE
 # ============================================================================
 # @param p_value numeric; unadjusted p-value from Wald test @param z_statistic
 # numeric; Wald z-statistic (or coefficient / SE) @param vcov_sandwich_raw
@@ -849,9 +864,11 @@
     # The GEE sandwich estimator already accounts for
     # within-cluster dependence in the variance. Scaling the variance again by
     # a design-effect-reduced sample size (n_eff = n_clusters / D_eff) counts
-    # the dependence TWICE. HC1 therefore uses the number of CLUSTERS,
-    # following Kauermann & Carroll (2001). The design effect is retained as
-    # descriptive metadata only and never enters the variance multiplier.
+    # the dependence TWICE. The HC1 multiplier therefore uses the number of
+    # CLUSTERS (empirical small-cluster correction, inspired by Kauermann &
+    # Carroll 2001 but not the literal KC estimator). The design effect is
+    # retained as descriptive metadata only and never enters the variance
+    # multiplier.
     n_effective <- n_clusters
 
     # ========================================================================
@@ -867,7 +884,7 @@
         return(list(p_value = p_value, p_raw = p_value, z_corrected = z_statistic,
             vcov_corrected = vcov_sandwich_raw, multiplier = 1, n_clusters = n_clusters,
             n_parameters = n_parameters, n_effective = n_effective, design_effect = design_effect,
-            method_applied = "none", report = sprintf("No K-C correction (n_eff=%.1f > threshold=%d)",
+            method_applied = "none", report = sprintf("No small-cluster correction (n_eff=%.1f > threshold=%d)",
                 n_effective, correction_threshold)))
     }
 
@@ -928,9 +945,9 @@
     # ========================================================================
 
     method_label <- switch(bias_correction_method, hc1 = "HC1 (bias-reduced)", hc3 = "HC3 (leverage-adjusted)",
-        kc = "Kauermann-Carroll")
+        kc = "empirical small-cluster (KC-style)")
 
-    report <- sprintf("K-C Bias Correction (%s):\n  n_clusters=%d, n_parameters=%d\n  n_effective=%.1f (design_effect=%.2f)\n  HC multiplier=%.4f\n  p-value: %.4f -> %.4f%s",
+    report <- sprintf("Empirical small-cluster sandwich correction (%s):\n  n_clusters=%d, n_parameters=%d\n  n_effective=%.1f (design_effect=%.2f)\n  HC multiplier=%.4f\n  p-value: %.4f -> %.4f%s",
         method_label, n_clusters, n_parameters, n_effective, design_effect, multiplier,
         p_value, p_corrected, if (use_t_distribution)
             sprintf(" (df=%d, t-dist)", max(1, n_clusters - 1)) else " (normal)")

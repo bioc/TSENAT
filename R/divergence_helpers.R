@@ -194,6 +194,65 @@
 }
 
 
+#' Validate the paired-design invariant: at most 1 control + 1 treatment per pair
+#'
+#' AUDIT R5: pair-respecting bootstrap resampling requires a well-defined
+#' resampling unit. A pair that mixes both conditions with REPEATED
+#' observations in one of them (e.g., control + control + treatment) is
+#' rejected: its resampling unit is ambiguous. Incomplete/single-condition
+#' pairs are tolerated because the bootstrap machinery handles unmatched
+#' samples as unpaired units. Validate this BEFORE bootstrap; stop with an
+#' actionable message instead of silently skipping replicates.
+#'
+#' @param se SummarizedExperiment with sample metadata in colData
+#' @param pair_ids Named character vector (names = sample names, values = pair IDs)
+#' @param group_col character; colData column with group/condition labels
+#' @param control_group character; control group label
+#'
+#' @return invisible(TRUE) if the invariant holds; errors otherwise
+#' @noRd
+.validate_pair_structure <- function(se, pair_ids, group_col, control_group) {
+    cd <- SummarizedExperiment::colData(se)
+    if (is.null(pair_ids) || length(pair_ids) == 0) {
+        return(invisible(TRUE))
+    }
+    if (is.null(group_col) || !group_col %in% colnames(cd)) {
+        return(invisible(TRUE))  # No group info: cannot validate, stay permissive
+    }
+
+    groups <- as.character(cd[[group_col]])
+    names(groups) <- colnames(se)
+
+    bad_pairs <- character(0)
+    for (pid in unique(as.character(pair_ids))) {
+        idx <- which(as.character(pair_ids) == pid)
+        smp <- names(pair_ids)[idx]
+        if (length(smp) == 0) next
+        g <- groups[smp]
+        n_ctrl <- sum(g == control_group, na.rm = TRUE)
+        n_trt <- sum(g != control_group, na.rm = TRUE)
+        # Reject only pairs that mix both conditions AND contain repeated
+        # observations within a condition (ill-defined resampling unit).
+        # Incomplete or single-condition pairs are handled as unpaired units
+        # by the bootstrap machinery.
+        if (n_ctrl >= 1 && n_trt >= 1 && (n_ctrl > 1 || n_trt > 1)) {
+            bad_pairs <- c(bad_pairs, pid)
+        }
+    }
+
+    if (length(bad_pairs) > 0) {
+        stop("[.validate_pair_structure] Paired-design invariant violated: pair(s) ",
+            paste(sQuote(unique(bad_pairs)), collapse = ", "),
+            " contain repeated samples from the same condition (each pair may contain at most one control and one ",
+            "treatment sample; the pair is the resampling unit). ",
+            "Fix the pairing column in colData or set bootstrap = FALSE / paired = FALSE.",
+            call. = FALSE)
+    }
+
+    invisible(TRUE)
+}
+
+
 #' Resample Data Respecting Paired Structure
 #'
 #' When resampling paired data, both members of a pair are selected or discarded

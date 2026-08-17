@@ -519,10 +519,30 @@
             art_model <- ARTool::art(art_formula, data = data)
         }
 
-        art_anova <- stats::anova(art_model)
+        # OPTIMIZATION: stats::anova(art_model) recomputes ANOVAs for ALL
+        # effects (q, condition, q:condition). Only the interaction row is
+        # needed: artlm() + flat.anova() on that single term reproduces it
+        # EXACTLY (verified: identical F value and p-value) at ~1/3 of the
+        # cost. flat.anova is an unregistered S3 generic, so it is invoked
+        # through a wrapper whose environment is the ARTool namespace
+        # (UseMethod resolves methods in the caller's environment). Any
+        # failure falls back to the full anova.
+        interaction_term <- paste0(q_col, ":", condition_col)
+        art_anova <- NULL
+        try({
+            artlm_int <- ARTool::artlm(art_model, interaction_term)
+            flat_anova_ns <- evalq(function(m.l, type, test) flat.anova(m.l, type = type,
+                test = test), envir = asNamespace("ARTool"))
+            anova_int <- flat_anova_ns(artlm_int, type = "III", test = "F")
+            if ("Term" %in% colnames(anova_int) && interaction_term %in% anova_int[["Term"]]) {
+                art_anova <- anova_int
+            }
+        }, silent = TRUE)
+        if (is.null(art_anova)) {
+            art_anova <- stats::anova(art_model)
+        }
 
         # Find interaction row: match by Term column, or by row name
-        interaction_term <- paste0(q_col, ":", condition_col)
         if ("Term" %in% colnames(art_anova)) {
             int_idx <- which(art_anova[["Term"]] == interaction_term)
         } else {

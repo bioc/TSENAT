@@ -28,8 +28,10 @@
 #'   \itemize{
 #'     \item \code{'default'} - Simple normalization by theoretical maximum (current behavior)
 #'     \item \code{'zscore'} - Z-score normalization per q-value
-#'     \item \code{'log_odds_ratio'} - Log-odds ratio relative to max entropy (q and 
-#' isoform-aware)
+#'     \item \code{'log_odds_ratio'} - Log-ratio of entropy to the uniform maximum
+#'   (q and isoform-aware). Values are <= 0: 0 = uniform, < 0 = more
+#'   concentrated. Name kept for backwards compatibility; this is a
+#'   log-relative-entropy ratio, not an odds ratio.
 #'     \item \code{'relative_reference'} - Divide by reference group mean (requires reference_group)
 #'     \item \code{NULL} - No post-hoc normalization (default)
 #'   }

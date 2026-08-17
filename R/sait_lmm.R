@@ -108,10 +108,9 @@
         # Create time index for AR(1) ordering by q within each subject x condition
         df$condition <- factor(as.character(df$group))
         df <- df[order(as.character(df$subject), as.character(df$condition), df$q), , drop = FALSE]
-        # Grid index (may contain gaps when q values are missing): corAR1
-        # models rho^|d| for the true grid distance; a renumbered 1..n
-        # sequence would treat gaps as unit distance (same as
-        # .fit_gam_paired_design).
+        # Grid index (may contain gaps when q values are missing) for the
+        # corAR1 fallback. Primary: corCAR1 over ACTUAL q distances (audit
+        # R1) — see .build_ar1_cor() in sait_helpers.R.
         df$time_idx <- match(df$q, sort(unique(df$q)))
 
         # Phase 15: Ensure factor levels are properly set before fitting to
@@ -124,15 +123,23 @@
         }
 
         # Fit models (verbose parameter only affects messaging, not model fitting)
-        fit0_ar1 <- nlme::lme(entropy ~ q + group, random = ~1 | subject, correlation = nlme::corAR1(form = ~time_idx |
-            subject/condition), data = df, method = "ML")
-        fit1_ar1 <- nlme::lme(entropy ~ q * group, random = ~1 | subject, correlation = nlme::corAR1(form = ~time_idx |
-            subject/condition), data = df, method = "ML")
+        cor_builder <- .build_ar1_cor(df, grid_col = "time_idx")
+        fit0_ar1 <- fit1_ar1 <- NULL
+        if (!is.null(cor_builder)) {
+            fit0_ar1 <- try(nlme::lme(entropy ~ q + group, random = ~1 | subject,
+                correlation = cor_builder$cor_obj, data = df, method = "ML"),
+                silent = TRUE)
+            fit1_ar1 <- try(nlme::lme(entropy ~ q * group, random = ~1 | subject,
+                correlation = cor_builder$cor_obj, data = df, method = "ML"),
+                silent = TRUE)
+        }
 
-        if (!inherits(fit0_ar1, "try-error") && !inherits(fit1_ar1, "try-error")) {
+        if (!inherits(fit0_ar1, "try-error") && !inherits(fit1_ar1, "try-error") &&
+            !is.null(fit0_ar1) && !is.null(fit1_ar1)) {
             if (verbose)
                 message("[.try_lmm_ar1] AR(1) correlation structure fitted successfully")
-            return(list(fit0 = fit0_ar1, fit1 = fit1_ar1, method = "nlme_ar1"))
+            return(list(fit0 = fit0_ar1, fit1 = fit1_ar1, method = "nlme_ar1",
+                correlation_structure = cor_builder$label))
         }
         NULL
     }, error = function(e) {

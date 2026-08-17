@@ -708,7 +708,7 @@
         p <- t(t(counts)/col_sums_safe)
 
         # Use tolerance for q == 1 comparison (consistent with C++)
-        q_tol <- 1e-6
+        q_tol <- TSENAT_Q_TOL
         if (abs(q - 1) < q_tol) {
             # Shannon entropy: H = -sum(p_i * log(p_i))
             # Use scale-relative epsilon based on actual probability magnitudes

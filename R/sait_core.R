@@ -74,12 +74,15 @@
 #'   }
 #'   Zimmerman & Harville (1991) validate AR(1) for ordered data.
 #'   This parameter only affects `method='gee'`.
-#' @param bias_correction Logical; whether to apply Kauermann-Carroll (K-C)
-#'   bias correction for GEE with small number of clusters (default: TRUE).
-#'   When TRUE and the number of clusters is less than 20, uses t-distribution
-#'   instead of normal distribution for p-value computation, which maintains
-#'   Type I error rate for small sample GEE analyses. Reference:
-#'   Li & Redden (2015), Statistics in Medicine. This parameter only affects
+#' @param bias_correction Logical; whether to apply the empirical small-cluster
+#'   sandwich correction for GEE with a small number of clusters
+#'   (default: TRUE). When TRUE and the number of clusters is less than 30, an
+#'   HC1-style sandwich variance multiplier is applied and a t-distribution
+#'   (df = n_clusters - p) is used instead of the normal distribution for
+#'   p-value computation, which maintains Type I error control for small-sample
+#'   GEE analyses (Monte-Carlo validated in test-gee-small-sample.R). Inspired
+#'   by Kauermann & Carroll (2001) and Li & Redden (2015), Statistics in
+#'   Medicine, but NOT a literal KC estimator. This parameter only affects
 #'   `method='gee'`.
 #' @param regularization Dimensionality reduction method for FPCA analysis:
 #'   one of \code{c('pca', 'lasso', 'elasticnet')} (default: 'pca').
@@ -100,13 +103,19 @@
 #'   hypotheses is the set of GENES. The dependence relevant to FWER/FDR is the
 #'   dependence between gene p-values, not the AR(1) dependence between
 #'   q-values within a gene. Under arbitrary dependence use
-#'   `'benjamini-yekutieli'` (FDR) or `'westfall-young'` (FWER, validated
-#'   permutation). Hochberg assumes positive regression dependence between
-#'   GENE p-values, which is not guaranteed by any AR(1) property of q.
+#'   `'benjamini-yekutieli'` or `'bh'` (FDR) or `'westfall-young'` (FWER,
+#'   validated permutation). Hochberg assumes positive regression dependence
+#'   between GENE p-values, which is not guaranteed by any AR(1) property of
+#'   q; 'hochberg' is kept as the default for backwards compatibility and
+#'   because the within-gene q-level p-values (the family this parameter
+#'   corrects) are AR(1)-correlated along q.
 #'   \itemize{
 #'     \item `'hochberg'`: Hochberg stepup procedure (FWER <= alpha under positive
 #'       regression dependence). Closed-form, computationally efficient.
 #'       Valid only if the dependence condition on gene p-values holds.
+#'     \item `'bh'`: Benjamini-Hochberg FDR procedure (audit M10). Controls
+#'       FDR under positive regression dependence; for a dependence-robust
+#'       FDR guarantee use `'benjamini-yekutieli'`.
 #'     \item `'westfall-young'`: True Westfall-Young permutation procedure
 #'       (FWER <= alpha). Uses resampling to empirically control FWER by
 #'       tracking the minima across all tests. More powerful than Hochberg under
@@ -261,7 +270,7 @@
     paired = FALSE, nthreads = 1, assay_name = "diversity", pcorr = "BH", verbose = FALSE,
     bias_correction = TRUE, regularization = c("pca", "lasso", "elasticnet", "gamsel",
         "spline"), corstr = c("ar1", "exchangeable", "independence", "auto"), multicorr = c("hochberg",
-        "westfall-young", "benjamini-yekutieli"), storey = FALSE, wy_randomizations = 1000,
+        "westfall-young", "benjamini-yekutieli", "bh"), storey = FALSE, wy_randomizations = 1000,
     adaptive_knots = TRUE, block_col = NULL, strata_col = NULL,
     permutation_scheme = c("auto", "within_subject", "within_block",
         "within_strata", "unpaired_q"), return_model_data = FALSE) {

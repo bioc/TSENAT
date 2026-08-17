@@ -474,6 +474,13 @@
         nthreads, progress)
     pair_ids <- exec_setup$pair_ids
 
+    # AUDIT R5: validate the paired-design invariant (exactly 1 control + 1
+    # treatment per pair) before any bootstrap resampling. A pair with, e.g.,
+    # control + control + treatment has an ill-defined resampling unit.
+    if (!is.null(pair_ids) && isTRUE(bootstrap)) {
+        .validate_pair_structure(se, pair_ids, group_col, control_group)
+    }
+
     # =========================================================================
     # EXECUTE DIVERGENCE COMPUTATION (SEQUENTIAL OR PARALLEL)
     # =========================================================================

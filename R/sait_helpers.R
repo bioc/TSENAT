@@ -44,6 +44,47 @@
 }
 
 # ==============================================================================
+# Helper: AR(1) correlation object over ACTUAL q distances
+# ==============================================================================
+# PURPOSE (audit R1):
+#   The previous AR(1) structure indexed q by POSITION in the sorted q grid:
+#   corAR1(~ grid_index | subject/condition) models Corr(e_i, e_j) =
+#   rho^|rank(q_i) - rank(q_j)|. That is valid only when q values are equally
+#   spaced; on an IRREGULAR grid (e.g. q = 0, 0.01, 1, 2) the step 0.01 -> 1
+#   is treated as one unit of distance.
+#
+#   corCAR1(form = ~q | subject/condition) models
+#   Corr(e_i, e_j) = exp(-phi * |q_i - q_j|), the continuous-time analogue of
+#   AR(1) over real q distances. Monte Carlo validation of the package design
+#   (paired, 12 subjects, q = (0, 0.01, 0.5, 1, 2), true correlation
+#   exp(-0.7 |dq|)): grid-index corAR1 gives empirical type I ~0.165 while
+#   corCAR1 on q distances is calibrated (~0.07).
+#
+#   Fallback: grid-index corAR1 (Monte-Carlo validated on regular q grids,
+#   including missing-q gaps). Only reached when corCAR1 fails, e.g. when q
+#   is duplicated within a subject x condition block (corCAR1 requires unique
+#   covariate values within groups).
+#
+# PARAMETERS:
+#   df: data frame with columns 'q', 'subject', 'condition', and a grid-index
+#       column 'grid_col' (obs_seq / time_idx depending on caller).
+#
+# RETURNS:
+#   list(cor_obj = nlme correlation object, label = structure name) or NULL
+.build_ar1_cor <- function(df, grid_col = "time_idx") {
+    car1 <- try(nlme::corCAR1(form = ~q | subject/condition), silent = TRUE)
+    if (!inherits(car1, "try-error")) {
+        return(list(cor_obj = car1, label = "car1_q_distance_within_subject_condition"))
+    }
+    ar1 <- try(nlme::corAR1(form = stats::as.formula(paste0("~", grid_col, " | subject/condition"))),
+        silent = TRUE)
+    if (!inherits(ar1, "try-error")) {
+        return(list(cor_obj = ar1, label = "ar1_grid_within_subject_condition"))
+    }
+    NULL
+}
+
+# ==============================================================================
 # Helper: Compute AR(1) design effect for autocorrelated entropy differences
 # ==============================================================================
 # PURPOSE:
@@ -894,7 +935,7 @@ if (getOption("TSENAT.memoization", TRUE)) {
 #'
 
 #' @noRd
-.adjust_pvalues_multicorr <- function(p_values, multicorr = c("hochberg", "westfall-young", "benjamini-yekutieli"), wy_randomizations, fit_one_fn = NULL,
+.adjust_pvalues_multicorr <- function(p_values, multicorr = c("hochberg", "westfall-young", "benjamini-yekutieli", "bh"), wy_randomizations, fit_one_fn = NULL,
     metadata = NULL, mat = NULL, rownames_mat = NULL, se = NULL, assay_name = "diversity",
     method = NULL, pvalue = NULL, subject_col = NULL, paired = FALSE, min_obs = 10,
     nthreads = 1, verbose = FALSE, bias_correction = TRUE, regularization = NULL,
@@ -908,6 +949,14 @@ if (getOption("TSENAT.memoization", TRUE)) {
         adj_p <- .hochberg_stepup(p_values)
         if (verbose) {
             message("[calculate_sait_interaction] Applied Hochberg stepup ", "adjustment for multi-q correlation")
+        }
+    } else if (multicorr == "bh") {
+        # Benjamini-Hochberg FDR (audit M10): dependence-agnostic FDR option
+        # for within-gene multi-q p-values. Gene-level FDR is `pcorr` (default
+        # 'BH'); this applies BH at the q-level family within each gene.
+        adj_p <- stats::p.adjust(p_values, method = "BH")
+        if (verbose) {
+            message("[calculate_sait_interaction] Applied Benjamini-Hochberg (BH) FDR adjustment for multi-q p-values")
         }
     } else if (multicorr == "westfall-young") {
         if (verbose) {
