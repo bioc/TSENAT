@@ -34,7 +34,7 @@ retrieval.
 
 Access results via the unified \code{results(obj, type = ...)} accessor method:
 - \code{type='diversity'} for Tsallis entropy across q-values
-- \code{type = "sait"} for regularized/penalized regression (GAM, LMM, GEE, FPCA) interaction results
+- \code{type = 'sait'} for regularized/penalized regression (GAM, LMM, GEE, FPCA) interaction results
 - \code{type='rank_test'} for Conover-Iman Rank Transform results
 - \code{type='divergence'} for divergence metrics
 - \code{type='jackknife'} for jackknife resampling results

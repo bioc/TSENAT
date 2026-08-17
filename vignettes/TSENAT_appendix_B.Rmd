@@ -46,10 +46,10 @@ The primary goal of this vignette is to validate that discoveries of scale-depen
 
 **Method 1: Generalized Additive Mixed Models (GAMM)** with functional q-curve structure.
 
-- Framework: Semi-parametric model combining flexible smooth functions (regression splines in paired designs) with mixed-effects structure; assumes additive model Y = f₁(q) + f₂(condition) + f₃(q, condition) + subject-intercept + ε where f terms are smooth rather than linear.
+- Framework: Semi-parametric model combining flexible smooth functions (regression splines in paired designs) with mixed-effects structure; assumes additive model $Y = f_1(q) + f_2(condition) + f_3(q, condition)$ + subject-intercept + $\varepsilon$ where f terms are smooth rather than linear.
 - Paired design structure: Uses random intercepts by subject (~1|subject) with AR(1) correlation structure to accommodate repeated entropy measurements across q-values within each subject. Paired models are fit via `nlme::lme` with natural regression splines (`ns(q, df = 3) × condition`) and a marginal F-test for the interaction; this hierarchical approach preserves paired sample structure while modeling autocorrelation in q-ordered measurements.
 - Distributional assumption: Uses Gaussian residuals (standard for mixed-effects models); automatically detects bounded support [0,1] entropy but applies Gaussian family because the paired mixed-model paths (`nlme::lme` / `mgcv::gamm()`) do not support extended families in paired designs.
-- Treatment of entropic structure: q is treated as a deterministic functional argument of the Tsallis statistic, not as a time index. The confirmatory hypothesis is the functional interaction — H0: β(q) = 0 for all q, tested on the ORIGINAL entropy curve H(q). The AR(1) structure in `nlme::corAR1()` is a working covariance model for the functional residuals, validated by Monte Carlo simulation.
+- Treatment of entropic structure: q is treated as a deterministic functional argument of the Tsallis statistic, not as a time index. The confirmatory hypothesis is the functional interaction — $H_0: \beta(q) = 0$ for all q, tested on the ORIGINAL entropy curve H(q). The AR(1) structure in `nlme::corAR1()` is a working covariance model for the functional residuals, validated by Monte Carlo simulation.
 - Heteroscedasticity handling: Automatically detects variance heterogeneity (Breusch-Pagan test); however, heteroscedasticity-based variance weights are not applied in paired designs due to paired mixed-model path limitations (`nlme::lme` / `mgcv::gamm()`).
 - Key advantage: Captures smooth nonlinear q × condition interactions while accommodating paired sample correlation structure through random intercepts and AR(1) correlation modeling.
 
@@ -184,7 +184,7 @@ ART avoids these issues through alignment and ranking — stripping main effects
 
 2. **Paired Design for Ordered q-Value Structure**
 
-Tsallis entropy has a fundamental sequential property: entropy curves are smooth functions of q. As q increases from 0 (rare-species-emphasizing) to ∞ (common-species-emphasizing), entropy values change systematically. This ordered structure is critical to interpreting q-dependent patterns and exhibits **AR(1) autocorrelation**: consecutive q-values produce correlated entropy estimates.
+Tsallis entropy has a fundamental sequential property: entropy curves are smooth functions of q. As q increases from 0 (rare-species-emphasizing) to $\infty$ (common-species-emphasizing), entropy values change systematically. This ordered structure is critical to interpreting q-dependent patterns and exhibits **AR(1) autocorrelation**: consecutive q-values produce correlated entropy estimates.
 
 ART handles this structure through its alignment step: within-subject ranking after stripping main effects preserves the pairing structure while removing the influence of AR(1) dependence [@S271; @S272]. Because aligned ranks are constructed from residuals after removing main effects, autocorrelation in the original entropy values does not propagate into the test statistic — rank-based tests are invariant to monotonic transformations of the data, and alignment renders the residuals approximately exchangeable under the null hypothesis of no interaction [@S019; @C018]. However, this robustness is not absolute: strong autocorrelation can reduce effective sample size and affect power even when the test remains valid.
 
@@ -196,7 +196,7 @@ $$F_{q \times \text{condition}} = \frac{MS_{\text{interaction}}}{MS_{\text{resid
 
 where:
 
-- Main effects are stripped via alignment: residuals = original − main effect estimates
+- Main effects are stripped via alignment: residuals = original - main effect estimates
 - Aligned data are then ranked: $R = \text{rank}(\text{aligned residuals})$ (within-subject for paired designs)
 - Two-way ANOVA decomposes aligned ranked data: $R = \mu + \alpha_q + \beta_{\text{condition}} + \gamma_{q \times \text{condition}} + \epsilon$
 - $MS_{\text{interaction}}$ = sum of squares for $q \times$ condition interaction / degrees of freedom
@@ -237,7 +237,7 @@ if (!is.null(check_results) && !is.null(check_results$assumptions_table)) {
 ```
 
 
-**Interpretation of Results:** The exchangeability test detects strong serial correlation (p ≈ 0), indicating that consecutive samples are more correlated than expected by chance. This violation is **not problematic** for the Aligned Rank Transform because ART's alignment step removes main effects before ranking, after which the aligned residuals are approximately exchangeable under the null hypothesis of no interaction [@S270; @S271]. While strong autocorrelation can reduce effective sample size and affect power, the test itself remains valid. The three reasons outlined above (distributional robustness, paired ordered structure handling, and proper interaction testing via alignment) together make ART ideally suited for multi-q entropy validation without requiring strong distributional assumptions.
+**Interpretation of Results:** The exchangeability test detects strong serial correlation ($p \approx 0$), indicating that consecutive samples are more correlated than expected by chance. This violation is **not problematic** for the Aligned Rank Transform because ART's alignment step removes main effects before ranking, after which the aligned residuals are approximately exchangeable under the null hypothesis of no interaction [@S270; @S271]. While strong autocorrelation can reduce effective sample size and affect power, the test itself remains valid. The three reasons outlined above (distributional robustness, paired ordered structure handling, and proper interaction testing via alignment) together make ART ideally suited for multi-q entropy validation without requiring strong distributional assumptions.
 
 ## Aligned Rank Transform (ART): Testing q × Condition Interactions
 
@@ -339,7 +339,7 @@ if (nrow(rank_sig) > 0) {
     knitr::kable(rank_display, 
                  caption = "**Supplementary Table 16 | Top genes identified by Aligned Rank Transform (ART).** Ranked by adjusted p-value; comparison with GAMM (main vignette Table 3) reveals method-specific sensitivities.",
                  col.names = c("Gene", "P-value", "Adj. P-value", "F-Statistic", 
-                               "Effect Size (η²)", "Interaction Class")[1:ncol(rank_display)],
+                               "Effect Size (eta-squared)", "Interaction Class")[1:ncol(rank_display)],
                  row.names = FALSE)
   }
 }

@@ -586,10 +586,10 @@
     } else {
         for (i in seq_len(n)) {
             denom <- 1 - p[i]
-            # Guard against NA/NaN in denom before using in if() statement
+            # Guard against NA/NaN in denom before using in if() statement.
+            # Tsallis entropy is scale-invariant; no log_base division.
             jackknife_estimates[i] <- if (!is.na(denom) && !is.nan(denom) && denom >
                 1e-10)
-                # Tsallis entropy is scale-invariant; no log_base division
                 (1/(q - 1)) * (1 - sum((p/denom)^q)) else NA_real_
         }
     }
@@ -629,7 +629,8 @@
     total_count <- sum(x)
     if (total_count < 10) {
         warning("Total count (", total_count, ") below recommended minimum (10-20).\n",
-            "Jackknife estimates may be unreliable (jackknife resampling literature, e.g., Zhang & Cao 2023).\n", "Consider aggregating samples or filtering genes with low abundance.")
+            "Jackknife estimates may be unreliable (jackknife resampling literature, e.g., Zhang & Cao 2023).\n",
+            "Consider aggregating samples or filtering genes with low abundance.")
     }
 }
 
@@ -800,8 +801,9 @@ print.tsenat_jackknife_list <- function(x, ...) {
     }
 
     # Create summary_df from sait_res
-    summary_df <- data.frame(gene = sait_res$gene, gene_name = sait_res$gene_name, p_interaction = sait_res$p_interaction,
-        adj_p_interaction = sait_res$adj_p_interaction, stringsAsFactors = FALSE)
+    summary_df <- data.frame(gene = sait_res$gene, gene_name = sait_res$gene_name,
+        p_interaction = sait_res$p_interaction, adj_p_interaction = sait_res$adj_p_interaction,
+        stringsAsFactors = FALSE)
 
     # Sort by adjusted p-value (most significant first)
     summary_df <- summary_df[order(summary_df$adj_p_interaction, na.last = TRUE),

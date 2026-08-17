@@ -124,6 +124,15 @@ jobs:
             R CMD check --no-manual --ignore-vignettes *.tar.gz
           no_output_timeout: 30m
       - run:
+          name: Run Bioconductor checks
+          command: |
+            if [ -f tools/run_biocheck.R ]; then
+              Rscript tools/run_biocheck.R
+            else
+              echo "Skipping Bioconductor checks (tools/run_biocheck.R not found)"
+            fi
+          no_output_timeout: 30m
+      - run:
           name: Generate coverage report and upload to Codecov
           environment:
             CC: /usr/bin/gcc

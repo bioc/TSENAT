@@ -195,30 +195,21 @@
         return(NULL)
     }
 
-    # ===== BIAS CORRECTION & OUTPUT PROCESSING =====
-    # .gam_bias_correct removed — the ad-hoc p-value multiplier
-    # (adjustment_factor <- 1 + (20 - n_eff)/20) had no theoretical basis and
-    # cited a non-existent reference. Raw p-values from valid ML-fitted GAMMs
-    # are returned directly.
+    # ===== BIAS CORRECTION & OUTPUT PROCESSING ===== .gam_bias_correct removed
+    # — the ad-hoc p-value multiplier (adjustment_factor <- 1 + (20 -
+    # n_eff)/20) had no theoretical basis and cited a non-existent reference.
+    # Raw p-values from valid ML-fitted GAMMs are returned directly.
     n_subjects_bc <- if (!is.null(subject))
         length(unique(na.omit(subject))) else NULL
     n_obs <- prep_result$n_samples
     p_val <- fit_result$p_interaction
-    if (is.null(p_val) || length(p_val) == 0) p_val <- NA_real_
-    bc_result <- list(
-        p_value = p_val,
-        p_raw = p_val,  # Intentionally identical: bias correction removed
-        bias_correction_applied = FALSE,
-        n_observations = n_obs,
-        n_samples = n_obs,
-        n_subjects = n_subjects_bc,
-        n_effective = n_obs,
-        design_effect_ar1 = NA_real_,
-        rho_estimate = NA_real_,
-        rho_data_driven = FALSE,
-        correction_method = "none",
-        correction_rationale = "Bias correction removed"
-    )
+    if (is.null(p_val) || length(p_val) == 0)
+        p_val <- NA_real_
+    # p_raw intentionally identical to p_value: bias correction removed
+    bc_result <- list(p_value = p_val, p_raw = p_val, bias_correction_applied = FALSE,
+        n_observations = n_obs, n_samples = n_obs, n_subjects = n_subjects_bc, n_effective = n_obs,
+        design_effect_ar1 = NA_real_, rho_estimate = NA_real_, rho_data_driven = FALSE,
+        correction_method = "none", correction_rationale = "Bias correction removed")
 
     # Extract statistics from fitted model
     stats <- .extract_gam_statistics(fit_result$fit_alt, fit_result$anova_result)
@@ -255,8 +246,8 @@ if (!exists(".KNOTS_MEMO_CACHE", mode = "environment")) {
     .KNOTS_MEMO_CACHE <- new.env(hash = TRUE, parent = emptyenv())
 }
 
-# Clear memoization caches between independent analyses
-# to prevent stale cached values from corrupting results across datasets.
+# Clear memoization caches between independent analyses to prevent stale cached
+# values from corrupting results across datasets.
 .clear_gam_memo_cache <- function() {
     if (exists(".GAM_MEMO_CACHE", mode = "environment")) {
         rm(list = ls(.GAM_MEMO_CACHE), envir = .GAM_MEMO_CACHE)
@@ -397,11 +388,11 @@ if (!exists(".KNOTS_MEMO_CACHE", mode = "environment")) {
 # ===============================================================================
 # HELPER FUNCTION: Handle preprocessing weights
 # ===============================================================================
-# No ARIMA differencing on the raw entropy curve.
-# q is a deterministic functional argument, not time: differencing H(q) is a
-# discrete-derivative transform, a DIFFERENT hypothesis (derivative contrast)
-# than the functional interaction test. This helper only handles the weights
-# (computed on the original data) and reports use_arima = FALSE.
+# No ARIMA differencing on the raw entropy curve.  q is a deterministic
+# functional argument, not time: differencing H(q) is a discrete-derivative
+# transform, a DIFFERENT hypothesis (derivative contrast) than the functional
+# interaction test. This helper only handles the weights (computed on the
+# original data) and reports use_arima = FALSE.
 .handle_arima_and_weights <- function(df, q_vals, subject, gam_weights_original) {
     use_arima <- FALSE
     gam_weights <- gam_weights_original
@@ -413,8 +404,7 @@ if (!exists(".KNOTS_MEMO_CACHE", mode = "environment")) {
         df$weight <- gam_weights
     }
 
-    return(list(df = df, use_arima = use_arima, gam_weights = gam_weights,
-        n_samples = nrow(df)))
+    return(list(df = df, use_arima = use_arima, gam_weights = gam_weights, n_samples = nrow(df)))
 }
 
 # ===============================================================================
@@ -450,10 +440,10 @@ if (!exists(".KNOTS_MEMO_CACHE", mode = "environment")) {
 # ===============================================================================
 # HELPER FUNCTION: Fit single GAMM with AR(1) model
 # ===============================================================================
-# Correlation is corAR1(~ obs_seq | subject/condition) so the
-# AR(1) is estimated over q within each subject x condition block. The legacy
-# form corAR1(~ obs_seq | subject) treated the condition-interleaved sequence
-# as one series.
+# Correlation is corAR1(~ obs_seq | subject/condition) so the AR(1) is
+# estimated over q within each subject x condition block. The legacy form
+# corAR1(~ obs_seq | subject) treated the condition-interleaved sequence as one
+# series.
 .fit_gamm_ar1_single <- function(formula, df, family_gam, gam_weights) {
     # Helper to fit GAMM with AR(1) correlation Used internally by
     # .fit_gamm_ar1
@@ -464,8 +454,7 @@ if (!exists(".KNOTS_MEMO_CACHE", mode = "environment")) {
             method = "ML"), silent = TRUE)
     } else {
         fit <- try(mgcv::gamm(formula = formula, random = list(subject = ~1), correlation = nlme::corAR1(form = ~obs_seq |
-            subject/condition), family = family_gam, data = df,
-            method = "ML"), silent = TRUE)
+            subject/condition), family = family_gam, data = df, method = "ML"), silent = TRUE)
     }
 
     return(fit)
@@ -551,9 +540,9 @@ if (!exists(".KNOTS_MEMO_CACHE", mode = "environment")) {
     on.exit(options(old_warn))
 
     if (!is.null(fit_null$lme) && !is.null(fit_alt$lme)) {
-        # GAMM fitted with method="ML" — standard anova() on LME
-        # components is now valid (no REML bias). avoids mgcv::compareML()
-        # which may not be available in all mgcv versions.
+        # GAMM fitted with method='ML' — standard anova() on LME components is
+        # now valid (no REML bias). avoids mgcv::compareML() which may not be
+        # available in all mgcv versions.
         an <- try(anova(fit_null$lme, fit_alt$lme), silent = TRUE)
         if (!inherits(an, "try-error") && nrow(an) >= 2) {
             if ("p-value" %in% colnames(an)) {
@@ -599,15 +588,15 @@ if (!exists(".KNOTS_MEMO_CACHE", mode = "environment")) {
             family = family_gam, weights = gam_weights, data = df), silent = TRUE)
         # Include main-effect s(q) in alt model for nested comparison
         fit_alt <- try(mgcv::gam(entropy ~ group + s(q, bs = "tp", k = k_q_marginal) +
-            s(q, bs = "tp", k = k_q_marginal, by = group), family = family_gam,
-            weights = gam_weights, data = df), silent = TRUE)
+            s(q, bs = "tp", k = k_q_marginal, by = group), family = family_gam, weights = gam_weights,
+            data = df), silent = TRUE)
     } else {
         fit_null <- try(mgcv::gam(entropy ~ group + s(q, bs = "tp", k = k_q_marginal),
             family = family_gam, data = df), silent = TRUE)
         # Include main-effect s(q) in alt model for nested comparison
         fit_alt <- try(mgcv::gam(entropy ~ group + s(q, bs = "tp", k = k_q_marginal) +
-            s(q, bs = "tp", k = k_q_marginal, by = group), family = family_gam,
-            data = df), silent = TRUE)
+            s(q, bs = "tp", k = k_q_marginal, by = group), family = family_gam, data = df),
+            silent = TRUE)
     }
 
     return(list(fit_null = fit_null, fit_alt = fit_alt))
@@ -628,25 +617,24 @@ if (!exists(".KNOTS_MEMO_CACHE", mode = "environment")) {
 # ===============================================================================
 # HELPER FUNCTION: Fit GAMM with AR(1) via regression splines in nlme::lme
 # ===============================================================================
-# GAMM singularity (validation suite test-type1-calibration.R):
-# mgcv::gamm with s(q) + s(q, by = group) is singular on paired designs
-# (null-space collinearity in the lme fixed-effects matrix: both smooths
-# share the linear q trend). The calibrated equivalent is a classical mixed
-# model with a regression-spline basis, a subject random intercept and AR(1)
-# within subject x condition:
-# entropy ~ ns(q, df = 3) * condition. The marginal F-test for the
+# GAMM singularity (validation suite test-type1-calibration.R): mgcv::gamm with
+# s(q) + s(q, by = group) is singular on paired designs (null-space
+# collinearity in the lme fixed-effects matrix: both smooths share the linear q
+# trend). The calibrated equivalent is a classical mixed model with a
+# regression-spline basis, a subject random intercept and AR(1) within subject
+# x condition: entropy ~ ns(q, df = 3) * condition. The marginal F-test for the
 # interaction is well calibrated (validated at rho = 0, .2, .5, .8, .95).
 .fit_gamm_lme_ns <- function(df, gam_weights = NULL) {
-    empty_result <- list(fit_null = NULL, fit_alt = NULL,
-        p_interaction = NA_real_, anova_result = NULL)
+    empty_result <- list(fit_null = NULL, fit_alt = NULL, p_interaction = NA_real_,
+        anova_result = NULL)
 
     if (!requireNamespace("nlme", quietly = TRUE) || !requireNamespace("splines",
         quietly = TRUE)) {
         return(empty_result)
     }
 
-    # ns(q, df = 3) requires at least 4 distinct q values (post-ARIMA data
-    # may have fewer)
+    # ns(q, df = 3) requires at least 4 distinct q values (post-ARIMA data may
+    # have fewer)
     if (length(unique(na.omit(df$q))) < 4 || length(unique(na.omit(df$subject))) <
         2) {
         return(empty_result)
@@ -654,17 +642,15 @@ if (!exists(".KNOTS_MEMO_CACHE", mode = "environment")) {
 
     # Weights are not used in this path: gam_weights are inverse-variance
     # weights for mgcv, not directly transferable to nlme varFunc classes.
-    # NOTE: corAR1 uses the position of q in the global sorted q
-    # grid (obs_seq, see .fit_gam_paired_design), so with gaps (missing q)
-    # the correlation across a gap of d grid steps is rho^d, which is the
-    # correct AR(1) decay. nlme does not accept non-integer covariates in
-    # corAR1 (non-integer covariates route to continuous-time corARMA, which
-    # is numerically unstable here), so distance-based correlation in
-    # absolute q units on irregular non-grid-aligned q remains a known
-    # limitation.
-    fit <- try(nlme::lme(entropy ~ splines::ns(q, df = 3) * condition,
-        random = ~1 | subject,
-        correlation = nlme::corAR1(form = ~obs_seq | subject/condition),
+    # NOTE: corAR1 uses the position of q in the global sorted q grid (obs_seq,
+    # see .fit_gam_paired_design), so with gaps (missing q) the correlation
+    # across a gap of d grid steps is rho^d, which is the correct AR(1) decay.
+    # nlme does not accept non-integer covariates in corAR1 (non-integer
+    # covariates route to continuous-time corARMA, which is numerically
+    # unstable here), so distance-based correlation in absolute q units on
+    # irregular non-grid-aligned q remains a known limitation.
+    fit <- try(nlme::lme(entropy ~ splines::ns(q, df = 3) * condition, random = ~1 |
+        subject, correlation = nlme::corAR1(form = ~obs_seq | subject/condition),
         data = df, method = "ML"), silent = TRUE)
 
     if (inherits(fit, "try-error")) {
@@ -682,26 +668,24 @@ if (!exists(".KNOTS_MEMO_CACHE", mode = "environment")) {
     }
 
     # nlme's marginal anova can underflow the p-value to exactly 0 for strong
-    # signals (F >= ~30 in the validated design). Recompute from the table's
-    # F, numDF and denDF with log-space pf so tiny p-values remain
-    # representable (e.g., 1e-139 instead of 0).
+    # signals (F >= ~30 in the validated design). Recompute from the table's F,
+    # numDF and denDF with log-space pf so tiny p-values remain representable
+    # (e.g., 1e-139 instead of 0).
     p_interaction <- as.numeric(an$`p-value`[irow])
     if (p_interaction == 0) {
         f_val <- as.numeric(an$`F-value`[irow])
         df1 <- as.numeric(an$numDF[irow])
         df2 <- as.numeric(an$denDF[irow])
-        if (is.finite(f_val) && is.finite(df1) && is.finite(df2) && df1 > 0 &&
-            df2 > 0) {
+        if (is.finite(f_val) && is.finite(df1) && is.finite(df2) && df1 > 0 && df2 >
+            0) {
             lp <- stats::pf(f_val, df1, df2, lower.tail = FALSE, log.p = TRUE)
-            p_interaction <- if (lp < log(.Machine$double.xmin)) .Machine$double.xmin else
-                exp(lp)
+            p_interaction <- if (lp < log(.Machine$double.xmin))
+                .Machine$double.xmin else exp(lp)
         }
     }
 
-    list(fit_null = NULL, fit_alt = fit,
-        p_interaction = p_interaction, anova_result = an,
-        fit_meta = list(model_used = "lme_ns_ar1", fallback_level = 1L,
-            correlation_structure = "ar1_within_subject_condition",
+    list(fit_null = NULL, fit_alt = fit, p_interaction = p_interaction, anova_result = an,
+        fit_meta = list(model_used = "lme_ns_ar1", fallback_level = 1L, correlation_structure = "ar1_within_subject_condition",
             test_type = "marginal_F"))
 }
 
@@ -742,9 +726,8 @@ if (!exists(".KNOTS_MEMO_CACHE", mode = "environment")) {
     if (!is.null(anova_result) && nrow(anova_result) >= 2 && !inherits(anova_result,
         "try-error")) {
         tryCatch({
-            # GAMM: anova.lme uses "L.Ratio" column
-            # GAM (F-test): anova.gam uses "F" column
-            # GAM (Chisq): anova.gam uses "Deviance" column
+            # GAMM: anova.lme uses 'L.Ratio' column GAM (F-test): anova.gam
+            # uses 'F' column GAM (Chisq): anova.gam uses 'Deviance' column
             if ("L.Ratio" %in% colnames(anova_result)) {
                 test_statistic <- as.numeric(anova_result[2, "L.Ratio"])[1]
             } else if ("F-value" %in% colnames(anova_result)) {
@@ -821,8 +804,10 @@ if (!exists(".KNOTS_MEMO_CACHE", mode = "environment")) {
                 y <- nlme::getResponse(fit_alt)
                 r <- as.numeric(residuals(fit_alt, type = "response"))
                 ss_tot <- sum((y - mean(y, na.rm = TRUE))^2, na.rm = TRUE)
-                r2 <- if (ss_tot > 0) 1 - sum(r^2, na.rm = TRUE)/ss_tot else NA_real_
-                if (is.finite(r2)) max(0, min(1, r2)) else NA_real_
+                r2 <- if (ss_tot > 0)
+                  1 - sum(r^2, na.rm = TRUE)/ss_tot else NA_real_
+                if (is.finite(r2))
+                  max(0, min(1, r2)) else NA_real_
             }, error = function(e) NA_real_)
         }
 
@@ -835,10 +820,10 @@ if (!exists(".KNOTS_MEMO_CACHE", mode = "environment")) {
 }
 
 # ===============================================================================
-# HELPER FUNCTION: Compute slope difference between groups
-# GAM slope_diff = predicted entropy slope difference (ΔH/Δq) between
-# groups, computed from predictions at min/max q. GEE slope_diff = interaction
-# coefficient (q:group). These have different units — not directly comparable.
+# HELPER FUNCTION: Compute slope difference between groups GAM slope_diff =
+# predicted entropy slope difference (ΔH/Δq) between groups, computed from
+# predictions at min/max q. GEE slope_diff = interaction coefficient (q:group).
+# These have different units — not directly comparable.
 # ===============================================================================
 # Extracts slope_diff from GAM by computing predicted slopes for each group
 .compute_slope_diff <- function(fit_alt, df, q_vals, subject) {
@@ -856,14 +841,12 @@ if (!exists(".KNOTS_MEMO_CACHE", mode = "environment")) {
                   for (g_idx in seq_along(unique_groups)) {
                     # The lme model uses `condition`; the caller's df may not
                     # have that column, but group == condition
-                    pred_grid <- data.frame(q = c(q_range[1], q_range[2]),
-                      condition = factor(rep(unique_groups[g_idx], 2),
-                        levels = levels(df$group)))
-                    preds <- tryCatch(predict(fit_alt, newdata = pred_grid,
-                      level = 0), error = function(e) NULL)
+                    pred_grid <- data.frame(q = c(q_range[1], q_range[2]), condition = factor(rep(unique_groups[g_idx],
+                      2), levels = levels(df$group)))
+                    preds <- tryCatch(predict(fit_alt, newdata = pred_grid, level = 0),
+                      error = function(e) NULL)
                     if (!is.null(preds) && length(preds) == 2 && all(is.finite(preds))) {
-                      pred_slopes[g_idx] <- (preds[2] - preds[1])/(q_range[2] -
-                        q_range[1])
+                      pred_slopes[g_idx] <- (preds[2] - preds[1])/(q_range[2] - q_range[1])
                     }
                   }
                   if (all(is.finite(pred_slopes))) {
@@ -887,10 +870,10 @@ if (!exists(".KNOTS_MEMO_CACHE", mode = "environment")) {
                   pred_grid <- data.frame(q = c(q_range[1], q_range[2]), group = factor(rep(unique_groups[g_idx],
                     2), levels = levels(df$group)))
 
-                  # Population-level (marginal) predictions: the
-                  # $gam component of a gamm fit excludes the subject random
-                  # effect, so no subject column is used. Never condition on
-                  # an arbitrary subject's random effect.
+                  # Population-level (marginal) predictions: the $gam component
+                  # of a gamm fit excludes the subject random effect, so no
+                  # subject column is used. Never condition on an arbitrary
+                  # subject's random effect.
                   preds <- tryCatch(predict(gam_obj, newdata = pred_grid, type = "response",
                     se.fit = FALSE), error = function(e) NULL)
 
@@ -920,16 +903,21 @@ if (!exists(".KNOTS_MEMO_CACHE", mode = "environment")) {
     model_converged, slope_diff, fit_alt, df, bounded_result, use_arima, subject,
     fit_meta = NULL) {
     # Safety: ensure all bc_result values are length-1 scalars
-    p_val <- if (length(bc_result$p_value) == 1) bc_result$p_value else NA_real_
-    p_raw <- if (length(bc_result$p_raw) == 1) bc_result$p_raw else NA_real_
-    n_obs <- if (length(bc_result$n_observations) == 1) bc_result$n_observations else NA_real_
-    n_sub <- if (length(bc_result$n_subjects) == 1) bc_result$n_subjects else NA_integer_
-    n_eff <- if (length(bc_result$n_effective) == 1) bc_result$n_effective else NA_real_
-    rho <- if (length(bc_result$rho_estimate) == 1) bc_result$rho_estimate else NA_real_
+    p_val <- if (length(bc_result$p_value) == 1)
+        bc_result$p_value else NA_real_
+    p_raw <- if (length(bc_result$p_raw) == 1)
+        bc_result$p_raw else NA_real_
+    n_obs <- if (length(bc_result$n_observations) == 1)
+        bc_result$n_observations else NA_real_
+    n_sub <- if (length(bc_result$n_subjects) == 1)
+        bc_result$n_subjects else NA_integer_
+    n_eff <- if (length(bc_result$n_effective) == 1)
+        bc_result$n_effective else NA_real_
+    rho <- if (length(bc_result$rho_estimate) == 1)
+        bc_result$rho_estimate else NA_real_
     # Return result with bias correction information
-    result <- data.frame(gene = g, p_interaction = p_val, p_raw = p_raw,
-        n_observations = n_obs, n_subjects = n_sub,
-        n_effective = n_eff, rho_ar1 = rho, stringsAsFactors = FALSE)
+    result <- data.frame(gene = g, p_interaction = p_val, p_raw = p_raw, n_observations = n_obs,
+        n_subjects = n_sub, n_effective = n_eff, rho_ar1 = rho, stringsAsFactors = FALSE)
 
     # Explicitly add effect size, test statistic, and df columns
     result$test_statistic <- test_statistic
@@ -966,8 +954,8 @@ if (!exists(".KNOTS_MEMO_CACHE", mode = "environment")) {
         "mgcv::gamm"
     }
 
-    # Register the actual model path used for this gene so that
-    # mixed-method result tables are interpretable
+    # Register the actual model path used for this gene so that mixed-method
+    # result tables are interpretable
     if (!is.null(fit_meta)) {
         result$model_used <- fit_meta$model_used
         result$fallback_level <- fit_meta$fallback_level
@@ -981,7 +969,8 @@ if (!exists(".KNOTS_MEMO_CACHE", mode = "environment")) {
     }
 
     # Add residual normality testing results
-    model_type_norm <- if (inherits(fit_alt, "lme")) "lme" else if (!is.null(subject))
+    model_type_norm <- if (inherits(fit_alt, "lme"))
+        "lme" else if (!is.null(subject))
         "gamm" else "gam"
     shapiro_result <- .test_residual_normality(model = fit_alt, model_type = model_type_norm,
         verbose = FALSE)
@@ -1066,27 +1055,27 @@ if (!exists(".KNOTS_MEMO_CACHE", mode = "environment")) {
         df$subject <- factor(subject)
     }
 
-    # Step 2: Sort by subject/condition/q for AR(1) ordering requirements
-    # The previous ordering (subject, q) interleaved
-    # condition and q within each subject, so a single AR(1) series mixed
-    # A(q1), B(q1), A(q2), B(q2), ... The AR(1) correlation is now defined
-    # over q WITHIN each subject x condition block, matching the
-    # recommended structure corAR1(~ q | subject/condition).
+    # Step 2: Sort by subject/condition/q for AR(1) ordering requirements The
+    # previous ordering (subject, q) interleaved condition and q within each
+    # subject, so a single AR(1) series mixed A(q1), B(q1), A(q2), B(q2), ...
+    # The AR(1) correlation is now defined over q WITHIN each subject x
+    # condition block, matching the recommended structure corAR1(~ q |
+    # subject/condition).
     df$condition <- factor(as.character(df$group))
-    df <- df[order(as.character(df$subject), as.character(df$condition), df$q), , drop = FALSE]
+    df <- df[order(as.character(df$subject), as.character(df$condition), df$q), ,
+        drop = FALSE]
     rownames(df) <- NULL
 
-    # Step 3: AR(1) time covariate = position of q in the global sorted q
-    # grid (may contain gaps when q values are missing). corAR1 then models
-    # rho^|d| for the true grid distance d. A renumbered 1..n sequence would
-    # treat gaps as unit distance, overestimate the correlation and inflate
-    # the type I error (Monte Carlo validation: 0.080 -> 0.053 with 25%
-    # missing q).
+    # Step 3: AR(1) time covariate = position of q in the global sorted q grid
+    # (may contain gaps when q values are missing). corAR1 then models rho^|d|
+    # for the true grid distance d. A renumbered 1..n sequence would treat gaps
+    # as unit distance, overestimate the correlation and inflate the type I
+    # error (Monte Carlo validation: 0.080 -> 0.053 with 25% missing q).
     df$obs_seq <- match(df$q, sort(unique(df$q)))
 
-    # Step 3b: Reject pseudoreplicated q. Duplicated q
-    # values within a subject x condition block are the same functional
-    # observation appearing twice, not new independent evidence.
+    # Step 3b: Reject pseudoreplicated q. Duplicated q values within a subject
+    # x condition block are the same functional observation appearing twice,
+    # not new independent evidence.
     q_dup <- tapply(df$q, paste(as.character(df$subject), as.character(df$condition)),
         anyDuplicated)
     if (any(q_dup > 0, na.rm = TRUE)) {
@@ -1108,8 +1097,8 @@ if (!exists(".KNOTS_MEMO_CACHE", mode = "environment")) {
     k_q_interaction <- as.integer(max(3L, min(k_q/2, 4L)))
 
     # Step 5b: PRIORITY 1 - GAMM with AR(1) via regression splines (lme).
-    # Calibrated path (see .fit_gamm_lme_ns); the legacy mgcv::gamm
-    # formulation with s(q)+s(q,by=group) is singular on paired designs.
+    # Calibrated path (see .fit_gamm_lme_ns); the legacy mgcv::gamm formulation
+    # with s(q)+s(q,by=group) is singular on paired designs.
     if (is.null(family_gam$family) || family_gam$family == "gaussian") {
         lme_ns_result <- .fit_gamm_lme_ns(df, gam_weights)
         if (!is.na(lme_ns_result$p_interaction)) {
@@ -1149,14 +1138,12 @@ if (!exists(".KNOTS_MEMO_CACHE", mode = "environment")) {
     # Step 10: Compare models and extract p-value
     compare_result <- .compare_gam_models(fit_result$fit_null, fit_result$fit_alt)
 
-    # Register the actual model path used for this gene so that
-    # mixed-method result tables are interpretable
-    fit_meta <- list(
-        model_used = if (fallback_level == 4L) "gam_independence" else if (fallback_level ==
-            3L) "gamm_nocorr" else "gamm_ar1",
-        fallback_level = fallback_level,
-        correlation_structure = if (fallback_level <= 2L) "ar1_within_subject_condition" else "none",
-        test_type = if (fallback_level == 4L) "anova_Chisq" else "LRT")
+    # Register the actual model path used for this gene so that mixed-method
+    # result tables are interpretable
+    fit_meta <- list(model_used = if (fallback_level == 4L) "gam_independence" else if (fallback_level ==
+        3L) "gamm_nocorr" else "gamm_ar1", fallback_level = fallback_level, correlation_structure = if (fallback_level <=
+        2L) "ar1_within_subject_condition" else "none", test_type = if (fallback_level ==
+        4L) "anova_Chisq" else "LRT")
 
     return(list(fit_null = fit_result$fit_null, fit_alt = fit_result$fit_alt, p_interaction = compare_result$p_interaction,
         anova_result = compare_result$anova_result, fit_meta = fit_meta))
@@ -1213,9 +1200,8 @@ if (!exists(".KNOTS_MEMO_CACHE", mode = "environment")) {
     }
 
     return(list(fit_null = fit_result$fit_null, fit_alt = fit_result$fit_alt, p_interaction = p_interaction,
-        anova_result = anova_result,
-        fit_meta = list(model_used = "gam_independence", fallback_level = NA_integer_,
-            correlation_structure = "none", test_type = "anova_F")))
+        anova_result = anova_result, fit_meta = list(model_used = "gam_independence",
+            fallback_level = NA_integer_, correlation_structure = "none", test_type = "anova_F")))
 }
 
 
@@ -1224,9 +1210,8 @@ if (!exists(".KNOTS_MEMO_CACHE", mode = "environment")) {
 # GAM regularization helper: applies spline constraints or GAMSEL for variable
 # selection Supports pca (no regularization), gamsel (automatic variable
 # selection), and spline (controlled smoothness) modes. Based on papers
-# Chouldechova & Hastie (2015), Annals of Applied Statistics, CRAN
-# R Package 'gamsel' (2023), Chouldechova & Hastie (1986), Annals of Applied
-# Statistics.
+# Chouldechova & Hastie (2015), Annals of Applied Statistics, CRAN R Package
+# 'gamsel' (2023), Chouldechova & Hastie (1986), Annals of Applied Statistics.
 .gam_regularization <- function(entropy_vals, q_vals, group_vec, regularization = c("pca",
     "gamsel", "spline")) {
     regularization <- match.arg(regularization)

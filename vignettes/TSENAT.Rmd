@@ -144,7 +144,7 @@ Entropy quantifies precisely this: the complexity, richness, and balance of isof
 
 ### Tsallis Entropy: Definition and Intuition
 
-For a discrete probability vector p=(p₁,…,pₙ) representing isoform proportions within a gene, Tsallis entropy is defined as:
+For a discrete probability vector $p = (p_1, \ldots, p_n)$ representing isoform proportions within a gene, Tsallis entropy is defined as:
 
 $$S_q(p)=\frac{1-\sum_{i=1}^{n}p_i^q}{q-1}$$
 
@@ -293,7 +293,7 @@ on differential transcript usage, see [this paper](https://doi.org/10.1186/s1305
 analysis <- filter_analysis(analysis, stringency = "medium")
 ```
 
-The `stringency = "medium"` parameter keeps transcripts present in $\geq$50% of samples 
+The `stringency = "medium"` parameter keeps transcripts present in $\geq 50\%$ of samples 
 with TPM values above the median of mean gene TPM. This balances noise reduction with 
 preservation of isoform diversity needed for meaningful entropy calculations.
 
@@ -516,7 +516,7 @@ if (!is.null(sait_res) && is.data.frame(sait_res) && nrow(sait_res) > 0) {
 
 **Interpretation:**
 
-- **Effect Size**: Proportion of variance in entropy explained by the fitted model, ranging from 0 to 1 (deviance explained for GAM paths; model pseudo-R² for the paired regression-spline path). Larger values indicate stronger scale-dependent effects, but note that this deviance/R² scale differs from classical η² and does not share the same interpretive thresholds (Cohen's conventions for η² do not directly apply).
+- **Effect Size**: Proportion of variance in entropy explained by the fitted model, ranging from 0 to 1 (deviance explained for GAM paths; model pseudo-$R^2$ for the paired regression-spline path). Larger values indicate stronger scale-dependent effects, but note that this deviance/$R^2$ scale differs from classical $\eta^2$ and does not share the same interpretive thresholds (Cohen's conventions for $\eta^2$ do not directly apply).
 - **Test Statistic** ($F$): F-statistic for the smooth interaction term, quantifying the signal-to-noise ratio of the scale-dependent effect.
 - **Model Converged**: TRUE if the GAM optimization converged successfully; FALSE indicates convergence failure (results for that gene are unreliable and should be excluded).
 - **Heteroscedasticity**: TRUE indicates variance heterogeneity was detected across the q-spectrum (assumption violated, results warrant caution).
@@ -809,7 +809,7 @@ Interpreting the Q-Spectrum Curve:
   each category reveal different regulatory strategies.
 
 - **q=1 (KL divergence)**: The middle point corresponds to ordinary Kullback-Leibler divergence [@K001; @I060], 
-  where the Tsallis divergence reduces to standard KL divergence in the limit q→1. This weights all isoforms equally.
+  where the Tsallis divergence reduces to standard KL divergence in the limit $q \to 1$. This weights all isoforms equally.
 
 
 We can also plot the global divergence spectrum across all genes. 
@@ -891,7 +891,7 @@ Objective: Validate q-value * group interaction detection results from statistic
 
 20. Jost, L. (2006). "Entropy and Diversity." *Oikos*, 113(2), 363–375. https://doi.org/10.1111/j.2006.0030-1299.14714.x
 
-21. Jose, J., & Lal, P. S. (2013). "Application of ARIMA(1,1,0) Model for Predicting Time Delay of Search Engine Crawlers." *Informatica Economică*, 17(4), 26–39. https://doi.org/10.12948/issn14531305/17.4.2013.03
+21. Jose, J., & Lal, P. S. (2013). "Application of ARIMA(1,1,0) Model for Predicting Time Delay of Search Engine Crawlers." *Informatica Economic\u{a}*, 17(4), 26–39. https://doi.org/10.12948/issn14531305/17.4.2013.03
 
 22. Kullback, S., & Leibler, R. A. (1951). "On information and sufficiency." *Annals of Mathematical Statistics*, 22(1), 79–86. https://doi.org/10.1214/aoms/1177729694
 
