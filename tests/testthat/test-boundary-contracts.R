@@ -137,16 +137,19 @@ test_that("F: pseudocount = 'auto' with TPM input is rejected", {
 })
 
 test_that("G: pseudocount = 'auto' is estimated from the resolved counts of a tximport-style list", {
-    counts <- matrix(stats::rpois(20, lambda = 10), nrow = 5)
-    rownames(counts) <- paste0("TX", 1:5)
+    # Each gene gets >= 2 transcripts: with a single transcript the normalized
+    # Shannon entropy is NaN by design (0/0), independent of pseudocount
+    # resolution.
+    counts <- matrix(stats::rpois(24, lambda = 10), nrow = 6)
+    rownames(counts) <- paste0("TX", 1:6)
     colnames(counts) <- paste0("S", 1:4)
     lst <- list(
         counts = counts,
         abundance = counts/rowSums(counts) * 1e6,
-        length = rep(1000, 5),
+        length = rep(1000, 6),
         countsFromAbundance = "no"
     )
-    genes <- c("G1", "G1", "G2", "G2", "G3")
+    genes <- c("G1", "G1", "G2", "G2", "G3", "G3")
 
     res <- .calculate_diversity(lst, genes = genes, q = 1,
         pseudocount = "auto", min_valid_frac = 0, verbose = FALSE)

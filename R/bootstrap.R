@@ -464,6 +464,58 @@ divergence_bootstrap_flexible_cpp_wrapper <- function(x, y, x_pair_ids, y_pair_i
 }
 
 # ============================================================================
+# BOOTSTRAP RESAMPLING INPUT PREPARATION (auditx follow-up, 2026-08)
+# ============================================================================
+# Prepares the resampling input so that the bootstrap's multinomial
+# probabilities equal the point-estimate proportions EXACTLY.
+#
+# Point estimator: T(x, l, c) = (x/l + c) / sum(x/l + c)
+# (effective-length division FIRST, pseudocount on the effective-abundance
+# scale, then normalization to proportions).
+#
+# The read-level bootstrap draws a multinomial whose total must equal the
+# original depth sum(x). Embedding the pseudocount BEFORE the depth rescale
+#   x_eff = (x/l + c) * sum(x) / sum(x/l + c)
+# preserves both properties: the probabilities equal T(x, l, c) exactly (the
+# scale factor cancels in the ratio) and the total equals sum(x). The returned
+# pseudocount is therefore 0 -- it is already embedded in x_eff.
+#
+# The previous implementation rescaled the normalized abundances FIRST and
+# only then added the pseudocount: ((x/l)*k + c) does not factor with k, so
+# the resampling probabilities disagreed with the point estimate whenever
+# c > 0 and the effective lengths vary within the unit.
+#
+# Without effective lengths nothing is transformed: the kernels' own
+# pseudocount addition already yields T(x, NULL, c) exactly.
+#
+# Returns list(x, pseudocount, scale_k); scale_k is the depth-rescaling factor
+# (1 when no rescaling occurs).
+.prepare_bootstrap_resample <- function(x, effective_length = NULL, pseudocount = 0) {
+    scale_k <- 1
+    x_eff <- x
+    pseudocount_eff <- pseudocount
+    if (!is.null(effective_length) && length(effective_length) == length(x)) {
+        x_abund <- x/effective_length
+        # Zero out NaN/Inf values from zero effective_lengths
+        x_abund[!is.finite(x_abund)] <- 0
+        x_adj <- x_abund + pseudocount
+        sum_original <- sum(x)
+        sum_adj <- sum(x_adj)
+        if (sum_adj > 0) {
+            scale_k <- sum_original/sum_adj
+            x_eff <- x_adj * scale_k
+            pseudocount_eff <- 0  # already embedded in x_eff
+        } else {
+            # Degenerate (all-zero after adjustment): keep the normalized
+            # abundances; downstream guards handle the zero total.
+            x_eff <- x_abund
+            scale_k <- 1
+        }
+    }
+    list(x = x_eff, pseudocount = pseudocount_eff, scale_k = scale_k)
+}
+
+# ============================================================================
 # OPTIMIZED BOOTSTRAP RESAMPLE (C++ accelerated when available)
 # ============================================================================
 
@@ -479,49 +531,27 @@ divergence_bootstrap_flexible_cpp_wrapper <- function(x, y, x_pair_ids, y_pair_i
     counts_matrix = NULL) {
     resample_by <- match.arg(resample_by)
     # ==================================================================
-    # CRITICAL FIX (March 2026): Effective Length Normalization
+    # BOOTSTRAP RESAMPLING TRANSFORMATION (auditx follow-up, 2026-08)
     # ==================================================================
-    # PROBLEM:
-    #   Point estimate (stored in SE) was calculated from: counts / effective_length
-    #   Bootstrap must preserve the PROPORTIONS from normalization, but scale
-    #   back for resampling to match the point estimate.
+    # INVARIANT: the bootstrap must resample from EXACTLY the point-estimate
+    # proportions T(x, l, c) = (x/l + c) / sum(x/l + c).
     #
-    # CORRECT APPROACH:
-    #   1. x_normalized = x / effective_length (adjust proportions)
-    #   2. x_rescaled = x_normalized * (sum(x) / sum(x_normalized))
-    #      (preserve proportions, restore scale)
-    #   3. Bootstrap resamples from x_rescaled → distribution has same
-    #      proportions as x_normalized
-    #   4. Entropy calculated matches point estimate
-    #
-    # ENSURES:
-    #   ✓ Bootstrap CIs contain the point estimate
-    #   ✓ Both use same data transformation
-
-    x_for_bootstrap <- x
-    if (!is.null(effective_length) && length(effective_length) == length(x)) {
-        # Normalize by effective length to adjust proportions
-        x_normalized <- x/effective_length
-        # Zero out any NaN/Inf values from zero effective_lengths
-        x_normalized[!is.finite(x_normalized)] <- 0
-
-        sum_original <- sum(x)
-        sum_normalized <- sum(x_normalized)
-
-        # Scale back to original magnitude while preserving normalized
-        # proportions This allows proper multinomial resampling while
-        # maintaining data transformation consistency
-        if (sum_normalized > 0) {
-            x_for_bootstrap <- x_normalized * (sum_original/sum_normalized)
-        } else {
-            # If all effective_length are zero/infinite, fall back to original
-            x_for_bootstrap <- x
-        }
-    } else if (!is.null(effective_length)) {
+    # .prepare_bootstrap_resample() embeds the pseudocount on the
+    # effective-abundance scale and rescales to the original depth, so the
+    # multinomial probabilities equal T(x, l, c) exactly and the total equals
+    # sum(x). The previous implementation rescaled the normalized abundances
+    # but added the pseudocount AFTER the rescale, which broke the
+    # factorization when c > 0 (the pseudocount no longer cancelled with the
+    # scale factor). With c = 0 the two formulations are identical.
+    if (!is.null(effective_length) && length(effective_length) != length(x)) {
         warning("effective_length provided but length mismatch: length(effective_length)=",
             if (!is.null(effective_length))
                 length(effective_length) else "NULL", " vs length(x)=", length(x), call. = FALSE)
     }
+    pseudocount_original <- pseudocount
+    prep <- .prepare_bootstrap_resample(x, effective_length, pseudocount)
+    x_for_bootstrap <- prep$x
+    pseudocount <- prep$pseudocount
 
     # Dispatch to C++ block bootstrap for paired samples
     if (paired) {
@@ -557,15 +587,27 @@ divergence_bootstrap_flexible_cpp_wrapper <- function(x, y, x_pair_ids, y_pair_i
     # resamples individual reads (multinomial) and only captures sampling noise.
     if (resample_by == "replicate") {
         if (!is.null(counts_matrix) && is.matrix(counts_matrix)) {
+            # Replicate-level resampling applies the point-estimator
+            # transformation T(x, l, c) = (x/l + c)/sum(x/l + c) to the
+            # resampled samples. The vector preparation above does not touch
+            # counts_matrix, so apply the effective-length division here and
+            # embed the pseudocount on the abundance scale (the C++ kernel
+            # then adds 0).
+            if (!is.null(effective_length) && length(effective_length) == nrow(counts_matrix)) {
+                counts_matrix <- sweep(counts_matrix, 1, effective_length, "/") + pseudocount_original
+                pseudocount_matrix <- 0
+            } else {
+                pseudocount_matrix <- pseudocount_original
+            }
             # Use C++ accelerated replicate bootstrap on transcript × sample matrix
             if (what == "S") {
                 bootstrap_dist <- bootstrap_replicate_cpp_wrapper(
                     counts = counts_matrix, q = q, normalize = norm,
-                    nboot = nboot, log_base = log_base, pseudocount = pseudocount)
+                    nboot = nboot, log_base = log_base, pseudocount = pseudocount_matrix)
             } else if (what == "D") {
                 bootstrap_dist <- bootstrap_replicate_cpp_wrapper(
                     counts = counts_matrix, q = q, normalize = FALSE,
-                    nboot = nboot, log_base = log_base, pseudocount = pseudocount)
+                    nboot = nboot, log_base = log_base, pseudocount = pseudocount_matrix)
                 if (abs(q - 1) < 1e-06) {
                     bootstrap_dist <- exp(bootstrap_dist)
                 } else {

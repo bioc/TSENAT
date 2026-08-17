@@ -700,7 +700,7 @@ if (!exists(".KNOTS_MEMO_CACHE", mode = "environment")) {
     }
 
     list(fit_null = NULL, fit_alt = fit, p_interaction = p_interaction, anova_result = an,
-        fit_meta = list(model_used = "lme_ns_ar1", fallback_level = 1L, correlation_structure = cor_struct,
+        fit_meta = list(model_used = "lme_ns_car1", fallback_level = 1L, correlation_structure = cor_struct,
             test_type = "marginal_F"))
 }
 
@@ -960,9 +960,12 @@ if (!exists(".KNOTS_MEMO_CACHE", mode = "environment")) {
     result$heteroscedasticity_detected <- bounded_result$family_info$heteroscedastic
     result$variance_ratio_q <- bounded_result$family_info$var_ratio_q
 
-    # Add fit method tag
+    # Add fit method tag. The lme path is the primary paired GAMM:
+    # nlme::lme with ns(q, df=3) * condition and a continuous CAR(1)
+    # correlation over ACTUAL q distances (corCAR1); the grid-index AR(1)
+    # form is only a fallback (ar1_grid_within_subject_condition).
     result$fit_method <- if (inherits(fit_alt, "lme")) {
-        "lme_ns_ar1"
+        "lme_ns_car1"
     } else if (use_arima) {
         "mgcv::gamm_arima(1,1,0)"
     } else {

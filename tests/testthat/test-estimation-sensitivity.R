@@ -36,11 +36,17 @@ if (requireNamespace("testthat", quietly = TRUE) && testthat::is_testing()) {
 }
 
 # Load the package from source (to validate ITS implementation);
-# in the BBS environment (copied tests, no DESCRIPTION) use the installed package
-pkg_loaded <- tryCatch({
-    pkgload::load_all(file.path(script_dir, "..", ".."), quiet = TRUE)
-    TRUE
-}, error = function(e) requireNamespace("TSENAT", quietly = TRUE))
+# in the BBS environment (copied tests, no DESCRIPTION) use the installed package.
+# Under testthat the package is already loaded; load_all() here would unload
+# the installed namespace and break the whole run (covr/R CMD check).
+pkg_loaded <- if (requireNamespace("testthat", quietly = TRUE) && testthat::is_testing()) {
+    requireNamespace("TSENAT", quietly = TRUE)
+} else {
+    tryCatch({
+        pkgload::load_all(file.path(script_dir, "..", ".."), quiet = TRUE)
+        TRUE
+    }, error = function(e) requireNamespace("TSENAT", quietly = TRUE))
+}
 
 entropy_fn <- if (pkg_loaded && exists(".entropy_core", where = asNamespace("TSENAT"))) {
     get(".entropy_core", envir = asNamespace("TSENAT"))

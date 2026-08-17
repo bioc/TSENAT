@@ -285,26 +285,20 @@
     q <- as.numeric(q)
     n_q <- length(q)
 
-    # Same effective_length transformation as .bootstrap_compute_ci
-    x_for_calc <- x
-    effective_length_for_calc <- NULL
-    if (!is.null(effective_length) && length(effective_length) == length(x)) {
-        x_normalized <- x/effective_length
-        x_normalized[!is.finite(x_normalized)] <- 0
-        sum_original <- sum(x)
-        sum_normalized <- sum(x_normalized)
-        if (sum_normalized > 0) {
-            x_for_calc <- x_normalized * (sum_original/sum_normalized)
-        }
-    }
+    # Same resampling-input transformation as .bootstrap_compute_ci:
+    # p_hat must equal the point-estimate proportions exactly (see
+    # .prepare_bootstrap_resample in R/bootstrap.R).
+    prep <- .prepare_bootstrap_resample(x, effective_length, pseudocount)
+    x_for_calc <- prep$x
+    pseudocount_eff <- prep$pseudocount
 
     # ONE C++ call: nboot x n_q matrix (same resample for all q)
     dist_matrix <- if (what == "S") {
         bootstrap_compute_multi_q_cpp_wrapper(x = x_for_calc, q = q, normalize = norm,
-            nboot = nboot, log_base = log_base, pseudocount = pseudocount)
+            nboot = nboot, log_base = log_base, pseudocount = pseudocount_eff)
     } else {
         mat <- bootstrap_compute_multi_q_cpp_wrapper(x = x_for_calc, q = q, normalize = FALSE,
-            nboot = nboot, log_base = log_base, pseudocount = pseudocount)
+            nboot = nboot, log_base = log_base, pseudocount = pseudocount_eff)
         # Hill number conversion per q (same as the single-q path)
         for (j in seq_len(n_q)) {
             qv <- q[j]
@@ -343,9 +337,11 @@
             next
         }
 
-        point_est <- .calculate_tsallis_entropy(x_for_calc, q = q_val, norm = norm,
+        # Point estimate from the estimator itself on the raw input (same
+        # transformation as the resampling probabilities, by construction).
+        point_est <- .calculate_tsallis_entropy(x, q = q_val, norm = norm,
             what = what, log_base = log_base, pseudocount = pseudocount,
-            effective_length = effective_length_for_calc)
+            effective_length = effective_length)
         ci_result <- .ci_percentile(dist_j, ci = ci)
         diag_list <- .bootstrap_compute_diag(point_est, dist_j, use_job, paired = FALSE,
             x = x_for_calc, q = q_val, norm = norm, nboot = nboot, ci = ci,
@@ -462,39 +458,37 @@
     what, paired = FALSE, effective_length = NULL, min_valid_frac = 0.75,
     resample_by = c("read", "replicate"), counts_matrix = NULL) {
     resample_by <- match.arg(resample_by)
-    # CRITICAL: Apply effective_length normalization BEFORE point estimate &
-    # bootstrap resampling This ensures both use the same data transformation
-    # and bootstrap CIs contain the point estimate
-    x_for_calc <- x
-    if (!is.null(effective_length) && length(effective_length) == length(x)) {
-        # Normalize by effective length (same as .tsallis_row and
-        # .calculate_tsallis_entropy do)
-        x_normalized <- x/effective_length
-        x_normalized[!is.finite(x_normalized)] <- 0
-        sum_original <- sum(x)
-        sum_normalized <- sum(x_normalized)
-        if (sum_normalized > 0) {
-            # Scale back proportions to original magnitude for resampling
-            # validity
-            x_for_calc <- x_normalized * (sum_original/sum_normalized)
-        }
-        # Now pass effective_length=NULL since we've already applied the
-        # transformation
-        effective_length_for_calc <- NULL
-    } else {
-        effective_length_for_calc <- effective_length
+    # BOOTSTRAP INVARIANT (auditx follow-up, 2026-08): the bootstrap must
+    # resample from EXACTLY the point-estimate proportions
+    # T(x, l, c) = (x/l + c) / sum(x/l + c). The point estimate is computed by
+    # the estimator itself on the raw input; the resampling input is prepared
+    # by .prepare_bootstrap_resample(), which embeds the pseudocount on the
+    # effective-abundance scale and rescales to the original depth (the scale
+    # factor cancels in the probabilities, so p_hat = T(x, l, c) exactly).
+    # Previously the point estimate was computed on depth-rescaled values with
+    # the pseudocount added afterwards, which does not factor with the scale
+    # factor and therefore disagreed with the assay's stored estimate when
+    # c > 0.
+    point_est <- .calculate_tsallis_entropy(x, q = q, norm = norm, what = what,
+        log_base = log_base, pseudocount = pseudocount, effective_length = effective_length)
+
+    prep <- .prepare_bootstrap_resample(x, effective_length, pseudocount)
+    x_for_calc <- prep$x
+    pseudocount_eff <- prep$pseudocount
+
+    # Replicate-level input (transcripts × samples) receives the same T:
+    # divide by effective length and embed the pseudocount per value.
+    if (!is.null(counts_matrix) && is.matrix(counts_matrix) && !is.null(effective_length) &&
+        length(effective_length) == nrow(counts_matrix)) {
+        counts_matrix <- sweep(counts_matrix, 1, effective_length, "/") + pseudocount
+        pseudocount_eff <- 0
     }
 
-    point_est <- .calculate_tsallis_entropy(x_for_calc, q = q, norm = norm, what = what,
-        log_base = log_base, pseudocount = pseudocount, effective_length = effective_length_for_calc)
-
-
-
-    # Use quality-controlled bootstrap resampling on already-normalized data
-    # Pass effective_length=NULL since normalization was already applied above
+    # Use quality-controlled bootstrap resampling on the prepared data
+    # Pass effective_length=NULL since the transformation is already applied
     # Enforces min_valid_frac by regenerating invalid replicates
     bootstrap_dist <- .bootstrap_resample_with_quality_control(x_for_calc, q = q,
-        norm = norm, nboot = nboot, log_base = log_base, pseudocount = pseudocount,
+        norm = norm, nboot = nboot, log_base = log_base, pseudocount = pseudocount_eff,
         what = what, paired = paired, effective_length = NULL, min_valid_frac = min_valid_frac,
         resample_by = resample_by, counts_matrix = counts_matrix)
 
@@ -512,9 +506,10 @@
         ci_result <- .ci_percentile(bootstrap_dist, ci = ci)
         accel_factor <- NA_real_
     } else {
-        # Pass x_for_calc (already normalized) and pre-computed point_est
+        # Pass the prepared resampling input and its embedded pseudocount; the
+        # BCa jackknife inside .ci_bca evaluates the same transformation T.
         ci_result <- .ci_bca(x_for_calc, bootstrap_dist, q = q, norm = norm, ci = ci, log_base = log_base,
-            pseudocount = pseudocount, what = what, point_est = point_est)
+            pseudocount = pseudocount_eff, what = what, point_est = point_est)
         accel_factor <- if (!is.null(ci_result$a))
             ci_result$a else NA_real_
     }

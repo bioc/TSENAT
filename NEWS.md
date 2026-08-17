@@ -42,6 +42,22 @@
       strong signals (log-space recomputation) and pseudo-R² `effect_size`;
       `slope_diff` from population-level predictions; fit metadata records
       `model_used`/`fallback_level`/`correlation_structure`/`test_type`.
+    * **Bootstrap resampling invariant**: the read-level bootstrap now
+      resamples from exactly the point-estimate proportions
+      `(x/l + c)/sum(x/l + c)` — the pseudocount is embedded on the
+      effective-abundance scale BEFORE the depth rescale (previously it was
+      added after the rescale, breaking the factorization for `c > 0` and
+      shifting the resampling probabilities away from the assay estimate);
+      the CI point estimate is computed by the estimator itself on the raw
+      input, and q = 0 bootstrap replicates now carry the support
+      distribution of the multinomial draws (`entropy_cpp` q = 0 counts
+      positive entries — zero-proportion bins no longer count as species).
+      Locked by `test-bootstrap-invariant.R`.
+    * **Provenance rename**: the primary paired GAMM metadata
+      `fit_method`/`model_used` is now `lme_ns_car1` (continuous CAR(1)
+      correlation over ACTUAL q distances), reserving
+      `ar1_grid_within_subject_condition` for the grid-index fallback;
+      previously the primary path was mislabelled `lme_ns_ar1`.
     * **Westfall–Young schemes**: `block_col`, `strata_col` and
       `permutation_scheme` with exchangeability validation (confounded
       blocks/strata rejected).

@@ -45,7 +45,7 @@ double entropy_cpp(NumericVector p, double q = 1.0, bool normalize = true, doubl
   if (p_clean.size() == 0) return NA_REAL;
   
   // Filter out negative values only (zeros contribute 0 to entropy, no renormalization needed)
-  // AUDIT FIX #17: Removed >1e-10 threshold — zeros are valid and contribute zero in all branches.
+  // Removed >1e-10 threshold — zeros are valid and contribute zero in all branches.
   // Per-term >1e-15 guards are retained in the Shannon loop for numerical stability.
   LogicalVector valid = (p_clean >= 0);
   NumericVector p_valid = p_clean[valid];
@@ -71,15 +71,24 @@ double entropy_cpp(NumericVector p, double q = 1.0, bool normalize = true, doubl
   double q_tol = 1e-6;
   
   // Special case for q ≈ 0 (species richness)
-  // AUDIT FIX #5: Tsallis S_0 = n - 1 (richness minus one), NOT log(n).
+  // Tsallis S_0 = n - 1 (richness minus one), NOT log(n).
   // Reference: Tsallis (1988), "Possible generalization of Boltzmann-Gibbs statistics"
+  // Richness is the count of POSITIVE entries
+  // (raw support) — zero-proportion entries must NOT count as species. This
+  // matches the R point estimator's raw pre-pseudocount support convention
+  // and lets q=0 bootstrap replicates carry the support distribution of the
+  // multinomial draws instead of degenerating to the full vector length.
   if (q < q_tol) {
-    entropy = static_cast<double>(n) - 1.0;  // Tsallis q=0: S_0 = richness - 1
+    int n_pos = 0;
+    for (int i = 0; i < n; i++) {
+      if (p_valid[i] > 0) n_pos++;
+    }
+    entropy = static_cast<double>(n_pos) - 1.0;  // Tsallis q=0: S_0 = support - 1
     if (normalize) {
-      if (n <= 1) {
+      if (n_pos <= 1) {
         entropy = 0.0;  // Single species or none: normalized entropy is 0
       } else {
-        entropy = entropy / (static_cast<double>(n) - 1.0);  // max = n-1
+        entropy = entropy / (static_cast<double>(n_pos) - 1.0);  // max = n-1
       }
     }
     return entropy;
@@ -116,7 +125,7 @@ double entropy_cpp(NumericVector p, double q = 1.0, bool normalize = true, doubl
       double max_entropy;
       
       if (q < q_tol) {
-        // AUDIT FIX #5: Tsallis q=0: max entropy = n - 1 (richness minus one)
+        // Tsallis q=0: max entropy = n - 1 (richness minus one)
         max_entropy = static_cast<double>(n) - 1.0;
       } else if (std::abs(q - 1.0) < q_tol) {
         // Shannon: max = log(n)
@@ -251,7 +260,7 @@ List jackknife_resampling_cpp(NumericMatrix counts, double q = 1.0,
   if (valid_count <= 1) {
     jackknife_se = NA_REAL;  // Need at least 2 valid estimates for SE
   } else {
-    // AUDIT FIX #50: Use valid_count (non-NA estimates) not n_obs (total).
+    // Use valid_count (non-NA estimates) not n_obs (total).
     // When some jackknife estimates are NA, n_obs overestimates sample size.
     jackknife_se = std::sqrt(((valid_count - 1.0) / valid_count) * se_sum);
   }
@@ -276,6 +285,18 @@ List jackknife_resampling_cpp(NumericMatrix counts, double q = 1.0,
 // The bottleneck in R is: apply(bootstrap_samples, 2, entropy_calc)
 // This eliminates R function call overhead and vectorizes the entropy loop.
 
+// BOOTSTRAP CONTRACT: the caller passes resampling
+// input prepared by R (.prepare_bootstrap_resample in R/bootstrap.R) so that
+// the multinomial probabilities p_hat below equal the point-estimate
+// proportions T(x, l, c) = (x/l + c)/sum(x/l + c) EXACTLY -- with effective
+// lengths the pseudocount is embedded in the values on the abundance scale and
+// `pseudocount` arrives as 0. The pseudocount therefore enters the RESAMPLING
+// probabilities only; each replicate is evaluated on its DRAWN proportions,
+// which (a) centers the distribution at the point estimate, and (b) preserves
+// the q=0 raw-support semantics of the point estimator (adding a pseudocount
+// at evaluation time would turn every drawn zero into an expressed isoform
+// and degenerate S0).
+
 // [[Rcpp::export(rng = false)]]
 NumericVector bootstrap_compute_cpp(NumericVector x, int nboot = 1000, 
                                     double q = 1.0, bool normalize = true, 
@@ -298,7 +319,8 @@ NumericVector bootstrap_compute_cpp(NumericVector x, int nboot = 1000,
     Rcpp::stop("nboot must be at least 1");
   }
   
-  // Adjust counts with pseudocount (scalar)
+  // Build the resampling probabilities from the (pseudocount-adjusted) input
+  // values; see the BOOTSTRAP CONTRACT note above.
   NumericVector x_adj = x + pseudocount;
   double total = sum(x_adj);
   
@@ -308,7 +330,8 @@ NumericVector bootstrap_compute_cpp(NumericVector x, int nboot = 1000,
     return NumericVector(nboot, NA_REAL);
   }
   
-  // Compute proportions from original data (for resampling)
+  // Proportions for the multinomial resampling (equal to the point-estimate
+  // proportions by construction of the input).
   NumericVector p_hat = x_adj / total;
   
   // Pre-allocate result vector
@@ -370,6 +393,11 @@ NumericVector bootstrap_compute_cpp(NumericVector x, int nboot = 1000,
 // and every q is evaluated on that same resample, which (a) removes the
 // O(Q*B) resampling cost down to O(B), and (b) preserves the joint
 // correlation structure across q. Buffers are preallocated outside the loop.
+//
+// Multi-q analogue of bootstrap_compute_cpp: same BOOTSTRAP CONTRACT -- the
+// resampling probabilities equal the point-estimate proportions exactly, the
+// pseudocount enters p_hat only, and every q (including q = 0) is evaluated
+// on the DRAWN proportions of the shared resample.
 //
 // [[Rcpp::export(rng = false)]]
 NumericMatrix bootstrap_compute_multi_q_cpp(NumericVector x, NumericVector q,
@@ -438,12 +466,18 @@ NumericMatrix bootstrap_compute_multi_q_cpp(NumericVector x, NumericVector q,
 }
 
 // ============================================================================
-// REPLICATE-LEVEL BOOTSTRAP (AUDIT FIX #11)
+// REPLICATE-LEVEL BOOTSTRAP
 // ============================================================================
 // Resamples entire replicate columns (samples) with replacement, then recomputes
 // the statistic on the resampled aggregate. This captures biological variability
 // across replicates, unlike the multinomial read-level bootstrap which only
 // captures sampling (multinomial) noise.
+//
+// BOOTSTRAP CONTRACT: the pseudocount is part of the point-estimator
+// transformation T = (y + c)/sum(y + c), applied per value to the resampled
+// samples. The effective-length division is performed by the R caller before
+// this kernel is invoked, so the pseudocount here already sits on the
+// effective-abundance scale.
 //
 // Input:  counts matrix (transcripts × samples)
 // Output: vector of nboot entropy values
@@ -575,6 +609,13 @@ NumericVector bootstrap_replicate_cpp(NumericMatrix counts, int nboot = 1000,
 // Input x has pairs (x[0],x[1]), (x[2],x[3]), ..., (x[2n-2],x[2n-1])
 // Each bootstrap replicate resamples n_pairs pairs with replacement.
 
+// BOOTSTRAP CONTRACT: pairs are resampled with equal probability
+// (non-parametric), and the point-estimator transformation
+// T = (y + c)/sum(y + c) is applied to each resampled vector at EVALUATION
+// time. This differs from the multinomial kernels, where the pseudocount
+// enters the resampling probabilities and evaluation is count-based (so
+// q = 0 replicates there carry the support distribution of the draws).
+
 // [[Rcpp::export(rng = false)]]
 NumericVector block_bootstrap_compute_cpp(NumericVector x, int nboot = 1000, 
                                           double q = 1.0, bool normalize = true, 
@@ -605,10 +646,12 @@ NumericVector block_bootstrap_compute_cpp(NumericVector x, int nboot = 1000,
   
   int n_pairs = n / 2;
   
-  // Adjust counts with pseudocount (scalar) - but keep raw x for resampling
-  // pseudocount will be applied during entropy calculation, not here
+  // x_adj is only used for the zero-total guard: pairs are resampled
+  // non-parametrically from x (via pair indices) below, and the
+  // point-estimator transformation T = (y + c)/sum(y + c) is applied at
+  // evaluation time (see the BOOTSTRAP CONTRACT note above).
   NumericVector x_adj = x + pseudocount;
-  double total = sum(x_adj);  // Total with pseudocount for computing proportions
+  double total = sum(x_adj);  // Total with pseudocount for the zero guard
   
   if (total <= 0) {
     // Return vector of NAs for zero-count genes (consistent with non-bootstrap behavior)
@@ -642,8 +685,8 @@ NumericVector block_bootstrap_compute_cpp(NumericVector x, int nboot = 1000,
       boot_sample[2 * p + 1] = x[original_idx2];
     }
     
-    // BUG FIX: Apply pseudocount to bootstrap sample proportions for entropy calc
-    // Add pseudocount for consistency with bootstrap_compute_cpp
+    // BOOTSTRAP CONTRACT: apply T = (y + c)/sum(y + c) to the resampled pair
+    // vector (the pseudocount is part of the point-estimator transformation).
     NumericVector boot_sample_adj = boot_sample + pseudocount;
     double boot_total = sum(boot_sample_adj);
     // Compute proportions from adjusted bootstrap sample
@@ -675,7 +718,7 @@ NumericVector block_bootstrap_compute_cpp(NumericVector x, int nboot = 1000,
 //   2. jis_jackknife_influences_cpp() - Leave-one-out for all transcripts
 //   3. jis_bootstrap_delta_cpp() - Bootstrap delta statistics
 //
-// MATRIX ORIENTATION (AUDIT FIX #19):
+// MATRIX ORIENTATION:
 //   rows    = transcripts (isoforms)
 //   columns = samples (replicates)
 //   All three functions compute entropy per-column (per-sample) over transcript
@@ -711,7 +754,7 @@ NumericVector jis_tsallis_entropy_cpp(NumericMatrix counts,
   }
   
   // Get fixed n_tx if provided, else use current dimensions
-  // AUDIT FIX #18: When n_tx_fixed > 0, use it for normalization in both full
+  // When n_tx_fixed > 0, use it for normalization in both full
   // and leave-one-out entropy calls. The R caller (jackknife_isoform_switching.R)
   // passes the original n_tx explicitly — the -1 default is safe only when used
   // outside jackknife context. DO NOT rely on -1 default for jackknife.
@@ -743,7 +786,7 @@ NumericVector jis_tsallis_entropy_cpp(NumericMatrix counts,
     double q_tol = 1e-6;
     
     if (q < q_tol) {
-      // AUDIT FIX #5: Tsallis q=0: S_0 = n_nonzero - 1, NOT log(n)
+      // Tsallis q=0: S_0 = n_nonzero - 1, NOT log(n)
       // Consistent with entropy_cpp fix above.
       int n_nonzero = 0;
       for (size_t i = 0; i < p.n_elem; i++) {
@@ -1073,7 +1116,7 @@ List jis_bootstrap_delta_cpp(NumericMatrix counts_A,
     // Effect size (normalized mean delta)
     effect_sizes[i] = std::abs(mean_delta);
     
-    // AUDIT FIX #7: Two-tailed bootstrap p-value with null-centering.
+    // Two-tailed bootstrap p-value with null-centering.
     // Center bootstrap deltas by subtracting their mean (null hypothesis: delta = 0),
     // then compute p = proportion of |centered| >= |observed|.
     // This is the standard bootstrap hypothesis test (Efron & Tibshirani 1993, Ch. 16).
@@ -1124,7 +1167,7 @@ double tsallis_divergence_cpp(NumericVector p, NumericVector r, double q = 1.0,
     return NA_REAL;
   }
   
-  // AUDIT FIX #25: Warn when vectors have different lengths.
+  // Warn when vectors have different lengths.
   // The divergence bootstrap functions pre-truncate to min length before calling,
   // so this warning only fires on direct API misuse.
   int n_p = static_cast<int>(p.size());

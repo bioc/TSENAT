@@ -2149,7 +2149,8 @@ test_that(".compare_gam_models handles models with different smooth terms", {
 })
 
 # ════════════════════════════════════════════════════════════════════════════════
-# Fix (2026-08): p-value underflow and effect size in the lme_ns_ar1 path
+# Fix (2026-08): p-value underflow and effect size in the lme_ns_car1 path
+# (nlme::lme + ns(q, df=3) * condition with CAR(1) over actual q distances)
 # ════════════════════════════════════════════════════════════════════════════════
 
 test_that(".gam_interaction lme path does not underflow p to 0 on strong signal", {
@@ -2178,5 +2179,5 @@ test_that(".gam_interaction lme path does not underflow p to 0 on strong signal"
     expect_true(res$p_interaction < 0.05)       # strong signal detected
     expect_true(!is.na(res$effect_size))        # pseudo-R² from the lme path
     expect_true(res$effect_size >= 0 && res$effect_size <= 1)
-    expect_identical(res$fit_method, "lme_ns_ar1")
+    expect_identical(res$fit_method, "lme_ns_car1")
 })

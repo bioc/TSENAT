@@ -18,7 +18,10 @@ script_dir <- get0("TSENAT_VALIDATION_DIR", envir = environment(),
 sys.source(file.path(script_dir, "helpers.R"), envir = environment())
 
 pkg_root <- normalizePath(file.path(script_dir, "..", ".."))
-if (file.exists(file.path(pkg_root, "DESCRIPTION"))) {
+# Under testthat the package is already loaded; load_all() here would unload
+# the installed namespace and break the whole run (covr/R CMD check).
+if (!(requireNamespace("testthat", quietly = TRUE) && testthat::is_testing()) &&
+    file.exists(file.path(pkg_root, "DESCRIPTION"))) {
     suppressMessages(pkgload::load_all(pkg_root, quiet = TRUE))
 }
 art_test <- getFromNamespace(".test_q_condition_interaction_art", "TSENAT")
