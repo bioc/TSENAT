@@ -61,6 +61,11 @@
 #' parameter.
 #'   Raises error if TPM not available and `use_tpm = TRUE`.
 #'
+#' @param quantity \code{character}. Quantity to visualize:
+#'   `"abundance"` plots raw counts (or TPM when `use_tpm = TRUE`),
+#'   `"usage"` plots each transcript's proportion of its gene total per
+#'   sample (default: `"abundance"`).
+#'
 #' @param verbose \code{logical}. If \code{TRUE}, print diagnostic messages
 #'   during plotting (default: FALSE).
 #'

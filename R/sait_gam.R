@@ -760,7 +760,7 @@ if (!exists(".KNOTS_MEMO_CACHE", mode = "environment")) {
             } else if ("F-value" %in% colnames(anova_result)) {
                 # nlme marginal F table (lme_ns AR(1) path): the last row is
                 # the interaction
-                test_statistic <- as.numeric(tail(anova_result$`F-value`, 1))[1]
+                test_statistic <- as.numeric(utils::tail(anova_result$`F-value`, 1))[1]
             } else if ("F" %in% colnames(anova_result)) {
                 test_statistic <- as.numeric(anova_result[2, "F"])[1]
             } else if ("Deviance" %in% colnames(anova_result)) {
@@ -819,7 +819,7 @@ if (!exists(".KNOTS_MEMO_CACHE", mode = "environment")) {
         # residual df taken from the denDF of the marginal interaction F-test
         if (inherits(fit_alt, "lme")) {
             if (!is.null(anova_result) && "denDF" %in% colnames(anova_result)) {
-                df_residual <- as.numeric(tail(anova_result$denDF, 1))[1]
+                df_residual <- as.numeric(utils::tail(anova_result$denDF, 1))[1]
                 if (!is.finite(df_residual)) {
                   df_residual <- NA_real_
                 }
