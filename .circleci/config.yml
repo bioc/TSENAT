@@ -38,7 +38,7 @@ commands:
           name: Configure R for faster package installation
           command: |
             mkdir -p ~/.config/R
-            cat >> ~/.Rprofile <<'EOF'
+            cat >> ~/.Rprofile \<<'EOF'
             # Prefer binary packages over source compilation (speeds up installation)
             options(install.packages.check.source = "no")
             # Cap parallel compilation: CI containers have few cores and little
@@ -66,7 +66,7 @@ jobs:
       - run:
           name: Install package dependencies
           command: |
-            Rscript - <<'EOF'
+            Rscript - \<<'EOF'
             if (!requireNamespace("BiocManager", quietly = TRUE)) {
               install.packages("BiocManager")
             }
