@@ -25,7 +25,7 @@ commands:
             
             apt-get install -y --no-install-recommends \
               build-essential gfortran gcc-13 g++-13 liblapack-dev libblas-dev \
-              libxml2-dev libssl-dev libcurl4-openssl-dev libgit2-dev \
+              libxml2-dev libssl-dev libcurl4-openssl-dev libgit2-dev libuv1-dev \
               pandoc openssh-client git python3-pip \
               libharfbuzz-dev libfribidi-dev libfreetype6-dev libpng-dev libtiff5-dev libjpeg-dev \
               fontconfig libfontconfig1-dev pkg-config
