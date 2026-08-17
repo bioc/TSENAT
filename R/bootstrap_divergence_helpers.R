@@ -23,14 +23,19 @@
 
     # Handle edge cases
     if (abs(q - 1) < 1e-10) {
-        # KL divergence (q -> 1 limit)
+        # KL divergence (q -> 1 limit), natural log, then log_base conversion
+        # Single definition, no double log_base division).
         idx <- p > 0
         if (sum(idx) == 0)
             return(NA_real_)
-        divergence <- sum(p[idx] * log(p[idx]/r[idx], base = log_base))
+        divergence <- sum(p[idx] * log(p[idx]/r[idx]))
+        divergence <- divergence/log(log_base)
     } else if (q > 0) {
         # General Tsallis divergence (Furuichi 2006)
-        # D_q(p||r) = (1/(q-1)) * (1 - sum(p^q * r^(1-q)))
+        # D_q(p||r) = (sum(p^q * r^(1-q)) - 1) / (q - 1)
+        # Canonical SIGNED form matching .tsallis_divergence_scalar/
+        # .tsallis_divergence_vector and the C++ kernel: NO abs(). Only tiny
+        # negative numerical roundoff is clamped to zero.
 
         p_power <- p^q
         r_power <- r^(1 - q)
@@ -48,7 +53,9 @@
         }
 
         # Apply Furuichi formula
-        divergence <- (1 - sum_term)/(q - 1)
+        divergence <- (sum_term - 1)/(q - 1)
+        if (divergence < 0 && divergence > -1e-12)
+            divergence <- 0
     } else {
         # Invalid q value
         return(NA_real_)
@@ -57,18 +64,6 @@
     # Handle invalid results
     if (is.nan(divergence) || !is.finite(divergence)) {
         return(NA_real_)
-    }
-
-    # BUG FIX: Handle sign correctly for q < 1 When q < 1, (q - 1) is negative,
-    # so formula naturally produces positive divergence Ensure non-negativity
-    # as divergence should always be >= 0
-    divergence <- abs(divergence)
-
-    # Log_base normalization only applies to the
-    # q→1 (KL divergence) limit. For q≠1, Tsallis divergence is scale-invariant
-    # and does not involve a logarithm base.
-    if (abs(q - 1) < 1e-10 && log_base != exp(1)) {
-        divergence <- divergence/log(log_base)
     }
 
     # Normalize if requested

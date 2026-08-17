@@ -528,6 +528,24 @@ test_that(".detect_pair_ids detects paired_samples column", {
   expect_true(all(names(result$pair_ids) == c("s1", "s2", "s3", "s4", "s5")))
 })
 
+test_that(".detect_pair_ids rejects columns where every ID appears once", {
+  # A column of all-unique IDs (e.g., a sample/subject ID) is
+  # not a pair structure and must not be accepted as one.
+  se <- SummarizedExperiment::SummarizedExperiment(
+    assays = list(counts = matrix(1:20, nrow = 4, ncol = 5)),
+    colData = data.frame(
+      subject_id = c("subj_1", "subj_2", "subj_3", "subj_4", "subj_5")
+    )
+  )
+  colnames(se) <- c("s1", "s2", "s3", "s4", "s5")
+  
+  result <- TSENAT:::.detect_pair_ids(se)
+  
+  expect_null(result$pair_ids)
+  expect_true(is.na(result$column_name))
+  expect_equal(result$num_pairs, 0)
+})
+
 # =====================================================================
 # Tests for .jis_resample_paired_data
 # =====================================================================

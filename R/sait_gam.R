@@ -648,8 +648,20 @@ if (!exists(".KNOTS_MEMO_CACHE", mode = "environment")) {
         return(empty_result)
     }
 
-    # Weights are not used in this path: gam_weights are inverse-variance
-    # weights for mgcv, not directly transferable to nlme varFunc classes.
+    # The primary paired lme path cannot represent mgcv-style
+    # inverse-variance weights (no direct nlme varFunc equivalent). Supplied
+    # weights are IGNORED here; surface that to the user and record the source
+    # in fit_meta so result provenance shows the weights were not used.
+    weights_source <- "none"
+    if (!is.null(gam_weights)) {
+        weights_source <- attr(gam_weights, "source", exact = TRUE)
+        if (is.null(weights_source))
+            weights_source <- "user_provided"
+        warning("Weights are not used by the primary paired model path (lme_ns_car1): ",
+            "the supplied ", weights_source, " weights only apply to the GAM/GAMM paths. ",
+            "If weighting is required for the paired analysis, select a GAM-based method explicitly.",
+            call. = FALSE)
+    }
     # AR(1) over ACTUAL q distances: corCAR1(form = ~q | ...) gives
     # Corr(e_i,e_j) = exp(-phi |q_i - q_j|). The previous grid-index corAR1
     # modelled rho^|rank(q_i)-rank(q_j)|, which is valid only on equally
@@ -701,7 +713,7 @@ if (!exists(".KNOTS_MEMO_CACHE", mode = "environment")) {
 
     list(fit_null = NULL, fit_alt = fit, p_interaction = p_interaction, anova_result = an,
         fit_meta = list(model_used = "lme_ns_car1", fallback_level = 1L, correlation_structure = cor_struct,
-            test_type = "marginal_F"))
+            test_type = "marginal_F", weights_source = weights_source))
 }
 
 # ===============================================================================

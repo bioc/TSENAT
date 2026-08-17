@@ -209,30 +209,26 @@
     pair_ids <- NULL
     pairing_info <- ""
 
-    if (isTRUE(bootstrap)) {
-        # Use isTRUE to safely handle NA Auto-detect paired samples
+    if (isTRUE(bootstrap) && isTRUE(paired)) {
+        # Paired flag is EXPLICIT and authoritative: pair-
+        # respecting resampling only happens when the caller requested a
+        # paired design. paired=FALSE must never silently switch to paired
+        # bootstrap merely because colData contains a pairing-like column.
         pair_detected <- .detect_pair_ids(se)
 
         if (pair_detected$num_pairs > 0) {
             pair_ids <- pair_detected$pair_ids
             pairing_info <- sprintf(" [paired: %d unique pairs from '%s' column]",
                 pair_detected$num_pairs, pair_detected$column_name)
-
-            if (isFALSE(paired) && progress) {
-                # Use isFALSE to safely handle NA
-                message("NOTE: Paired sample structure detected in '", pair_detected$column_name,
-                  "' column.\n", "      Using pair-respecting bootstrap resampling.")
-            }
         } else {
-            if (isTRUE(paired)) {
-                # Use isTRUE to safely handle NA
-                warning("paired=TRUE but no pair ID column detected in colData. ",
-                    "Using independent bootstrap resampling instead. ",
-                    "This ignores within-pair correlation and may produce ",
-                    "anti-conservative confidence intervals.",
-                    call. = FALSE)
-            }
+            warning("paired=TRUE but no pair ID column detected in colData. ",
+                "Using independent bootstrap resampling instead. ",
+                "This ignores within-pair correlation and may produce ",
+                "anti-conservative confidence intervals.",
+                call. = FALSE)
         }
+    } else if (isTRUE(bootstrap) && isFALSE(paired) && progress) {
+        message("paired=FALSE: using independent (unpaired) bootstrap resampling.")
     }
 
     if (progress) {
@@ -309,11 +305,14 @@
     rownames(row_data_df) <- row_data_df$gene_name
     rownames(assay_matrix) <- row_data_df$gene_name
 
-    # Populate generic estimate/lower_ci/upper_ci columns using reference q
-    # value (q=1)
+    # Populate generic estimate/lower_ci/upper_ci columns ONLY from an exact
+    # q=1 column (auditxx P0 #2). Aliasing to the NEAREST q silently reports a
+    # different estimand (e.g., the q=0.5 or q=0 divergence) as if it were the
+    # reference q=1. When q=1 was not requested, the generic columns are NA.
     q_ref <- 1
-    q_idx <- which.min(abs(q - q_ref))
-    if (length(q_idx) > 0 && q_idx <= length(q)) {
+    q_tol <- 1e-10
+    q_idx <- which(abs(q - q_ref) < q_tol)
+    if (length(q_idx) == 1 && q_idx <= length(q)) {
         ref_q <- q[q_idx]
         estimate_col <- paste0("estimate_q", ref_q)
         lower_ci_col <- paste0("lower_ci_q", ref_q)
@@ -326,6 +325,11 @@
             row_data_df$upper_ci <- row_data_df[[upper_ci_col]]
             row_data_df$ci_width <- row_data_df[[ci_width_col]]
         }
+    } else {
+        row_data_df$estimate <- NA_real_
+        row_data_df$lower_ci <- NA_real_
+        row_data_df$upper_ci <- NA_real_
+        row_data_df$ci_width <- NA_real_
     }
 
     # Apply normalization if requested

@@ -158,7 +158,7 @@ test_that("calculate_divergence handles parallel processing", {
     expect_is(result_seq, "SummarizedExperiment")
     expect_false(all(is.na(rowData(result_seq)$estimate)))
 })
-test_that("calculate_divergence auto-detects paired samples", {
+test_that("calculate_divergence honors the explicit paired flag (no silent autodetection)", {
     skip_if_not_installed("SummarizedExperiment")
     
     set.seed(46)
@@ -177,7 +177,23 @@ test_that("calculate_divergence auto-detects paired samples", {
     SummarizedExperiment::colData(se)$condition <- factor(c(rep("Normal", 4), rep("Tumor", 4)))
     SummarizedExperiment::colData(se)$paired_samples <- c("A", "B", "C", "D", "A", "B", "C", "D")
     
-    # Test with bootstrap=TRUE (triggers auto-detection)
+    # Paired=FALSE is authoritative. Even though a
+    # pairing-like column exists, the bootstrap must stay unpaired unless the
+    # caller explicitly requests paired=TRUE.
+    exec_false <- TSENAT:::.prepare_divergence_execution(
+        se = se, bootstrap = TRUE, paired = FALSE,
+        nboot = 10, method = "percentile", nthreads = 1, progress = FALSE
+    )
+    expect_null(exec_false$pair_ids)
+    
+    exec_true <- TSENAT:::.prepare_divergence_execution(
+        se = se, bootstrap = TRUE, paired = TRUE,
+        nboot = 10, method = "percentile", nthreads = 1, progress = FALSE
+    )
+    expect_false(is.null(exec_true$pair_ids))
+    expect_equal(exec_true$pair_ids[["S1"]], exec_true$pair_ids[["S5"]])
+    
+    # End-to-end: paired=FALSE + bootstrap must still produce valid results
     result <- .calculate_divergence(
         se = se,
         bootstrap = TRUE,
@@ -197,6 +213,39 @@ test_that("calculate_divergence auto-detects paired samples", {
     # Should have CIs from bootstrap
     expect_false(all(is.na(rd$lower_ci)))
     expect_false(all(is.na(rd$upper_ci)))
+})
+
+test_that("generic estimate columns require exact q=1 (no nearest-q aliasing)", {
+    skip_if_not_installed("SummarizedExperiment")
+    
+    set.seed(49)
+    se <- create_count_se(
+        n_genes = 12,
+        n_samples = 6,
+        n_control = 3,
+        lambda = 100,
+        seed = 49
+    )
+    colnames(se) <- paste0("S", seq_len(ncol(se)))
+    SummarizedExperiment::colData(se)$condition <- factor(c(rep("A", 3), rep("B", 3)))
+    
+    # q contains exactly 1 -> generic columns populated from the q=1 column
+    res_has1 <- .calculate_divergence(
+        se = se, q = c(0.5, 1, 2), control_group = "A", progress = FALSE
+    )
+    rd1 <- rowData(res_has1)
+    expect_false(all(is.na(rd1$estimate)))
+    expect_equal(rd1$estimate, rd1$estimate_q1)
+    
+    # q does NOT contain 1 -> generic columns must be NA, never aliased to
+    # the nearest q (AUDITXX P0 #2).
+    res_no1 <- .calculate_divergence(
+        se = se, q = c(0, 2), control_group = "A", progress = FALSE
+    )
+    rd0 <- rowData(res_no1)
+    expect_true(all(is.na(rd0$estimate)))
+    expect_true(all(is.na(rd0$lower_ci)))
+    expect_true(all(is.na(rd0$upper_ci)))
 })
 
 test_that("calculate_divergence works without paired_samples column", {

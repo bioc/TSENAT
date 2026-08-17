@@ -184,6 +184,14 @@
             unique_pairs <- unique(pair_ids)
             samples_per_pair <- table(pair_ids)
 
+            # Structural validation: a pairing column must
+            # actually PAIR observations. A column in which every identifier
+            # appears once (e.g., a plain sample/subject ID) is not a pair
+            # structure; skip it and try the next candidate.
+            if (sum(samples_per_pair >= 2) == 0) {
+                next
+            }
+
             return(list(pair_ids = pair_ids, column_name = col_name, num_pairs = length(unique_pairs),
                 samples_per_pair = samples_per_pair))
         }
