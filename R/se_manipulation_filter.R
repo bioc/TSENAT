@@ -47,6 +47,9 @@
 #'   paired design stringency. Options:
 #'   - 'soft' (permissive): 25% of samples (min 2), min_tpm = Q1 (25th %ile)
 #'   - 'medium' (balanced): 50% of samples (min 3), min_tpm = Q2 (median)
+#'     The median threshold is a CONVENIENCE default: for confirmatory
+#'     analyses, specify an explicit, pre-specified threshold rather than
+#'     relying on the dataset-dependent median.
 #'   - 'severe' (stringent): 75% of samples, min_tpm = Q3 (75th %ile)
 #'   - NULL (default): use explicit `min_samples` and `min_tpm`
 #' When stringency is specified, all three filtering parameters are

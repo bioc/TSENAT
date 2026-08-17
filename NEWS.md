@@ -25,8 +25,12 @@
       across files (a mismatch is a hard error, not a warning), and negative or
       non-finite quantification values are rejected at input. Paired-design
       bootstrap also validates the 1-control + 1-treatment-per-pair invariant
-      before resampling.
-    * **Paired GAMM**: `nlme::lme` with `ns(q, df = 3) × condition` and a marginal
+      before resampling.    * **TPM/effective-length contract**: diversity is computed from raw
+      counts with effective-length correction; `tpm = TRUE` together with an
+      `effective_length` (parameter or SummarizedExperiment metadata) is now
+      a hard error, since TPM already incorporates effective-length
+      normalization (double normalization rejected). TPM remains available
+      for abundance-based filtering/QC.    * **Paired GAMM**: `nlme::lme` with `ns(q, df = 3) × condition` and a marginal
       F-test (mgcv gamm is singular on paired designs); no p-value underflow for
       strong signals (log-space recomputation) and pseudo-R² `effect_size`;
       `slope_diff` from population-level predictions; fit metadata records

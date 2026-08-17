@@ -132,6 +132,14 @@
 #' \code{analysis@config} with 
 #' priority resolution (explicit > \code{@config} > default).
 #'
+#' **Counts, TPM and effective length:**
+#' The wrapper always computes entropy from the RAW count assay with
+#' effective-length correction (`tpm = FALSE` internally). The TPM matrix
+#' stored in metadata by \code{build_analysis()} is used only for
+#' filtering/QC (e.g., \code{filter_analysis()}). Because TPM already
+#' incorporates effective-length normalization, the two are never combined in
+#' a single computation (combining them at the core level is a hard error).
+#'
 #' **Diversity Spectrum Computation:**
 #' By default, this function computes and saves a diversity spectrum (aggregated
 #' statistics across all q-values and  groups) when 

@@ -184,7 +184,7 @@ analysis <- suppressWarnings(calculate_sait(
 ))
 
 # View top interaction results using unified accessor (first 3 genes)
-res <- results(analysis, type = 'sait')
+res <- results(analysis, type = "sait")
 if (!is.null(res)) head(res, 3)
 }
 

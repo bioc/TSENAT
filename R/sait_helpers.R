@@ -72,6 +72,17 @@
 # RETURNS:
 #   list(cor_obj = nlme correlation object, label = structure name) or NULL
 .build_ar1_cor <- function(df, grid_col = "time_idx") {
+    # Duplicated q within a subject x condition block is
+    # pseudoreplication. Validate it DETERMINISTICALLY before constructing any
+    # correlation object: constructing corCAR1 does not validate the data, and
+    # nlme discovers the problem only at fit time (which previously made the
+    # intended corCAR1->corAR1 fallback silently unreachable).
+    dup_rows <- duplicated(df[c("subject", "condition", "q")])
+    if (any(dup_rows)) {
+        stop("[.build_ar1_cor] Duplicated q values within a subject x condition block are pseudoreplicated observations; the paired AR(1) model requires a unique q per block. Remove duplicates or use an unpaired method.",
+            call. = FALSE)
+    }
+
     car1 <- try(nlme::corCAR1(form = ~q | subject/condition), silent = TRUE)
     if (!inherits(car1, "try-error")) {
         return(list(cor_obj = car1, label = "car1_q_distance_within_subject_condition"))
@@ -195,10 +206,12 @@
 # Helper: Knot Selection for Tsallis Entropy Curve Fitting
 # ==============================================================================
 # MATHEMATICAL FOUNDATION:
-#   Tsallis entropy H_q is MATHEMATICALLY GUARANTEED to be monotone decreasing
-#   in q. Therefore, k-selection uses a simple fixed formula based on the
-#   number of unique q-values. This ensures adequate smoothing without
-#   noise-driven over-complexity.
+#   The theoretical Tsallis entropy H_q of a FIXED distribution is monotone
+#   decreasing in q. TSENAT therefore uses a parsimonious fixed formula for
+#   the spline basis dimension based on the number of unique q-values. Note
+#   that the fitted empirical spline is NOT constrained to be monotone: the
+#   mathematical property concerns the population functional, not noisy
+#   finite-sample estimates.
 #
 # KNOT SELECTION FORMULA:
 #   k = max(min_k, min(max_k, n_q_unique - 1))
@@ -219,8 +232,10 @@
 # RESIDUAL DIAGNOSTICS: Shapiro-Wilk Normality Testing
 # ==============================================================================
 # PURPOSE:
-#   Verify that residuals from GAM/LMM/GEE models satisfy normality assumption.
-#   This is a standard diagnostic for validating statistical model assumptions.
+#   Residual-normality DIAGNOSTIC for GAM/LMM/GEE models. Shapiro-Wilk does
+#   NOT establish Gaussianity: with large n it detects trivial deviations, with
+#   small n it has little power. Interpret p-values together with QQ plots and
+#   model robustness; the result is descriptive, not a validity gate.
 #
 # DATABASE EVIDENCE (March 2026):
 #   - Alberghina & Westerhoff (2001): Foundations of Systems Biology
@@ -231,9 +246,10 @@
 #   Shapiro-Wilk test on model residuals (tests H0: residuals are normal)
 #   Standard Practice: Applied universally in statistical modeling literature
 #
-# INTERPRETATION:
-#   - p > 0.05: Fail to reject H0 → Residuals appear normal [OK]
-#   - p ≤ 0.05: Reject H0 → Residuals show significant departure from normality [?]
+# INTERPRETATION (descriptive, not a validity gate):
+#   - p > 0.05: no strong evidence of non-normality in this sample
+#   - p <= 0.05: evidence of departure; inspect QQ plots and consider
+#     robustness/sensitivity analyses (do NOT automatically reject the model)
 #
 # IMPLEMENTATION:
 #   Extract residuals from fitted model, apply shapiro.test()
@@ -340,8 +356,8 @@
 
     if (verbose) {
         status_text <- if (is_normal)
-            "PASS [OK]" else "FAIL ?"
-        message(sprintf("[.test_residual_normality] %s (p=%.4f, n=%d residuals)",
+            "residuals appear normal" else "non-normality detected"
+        message(sprintf("[.test_residual_normality] %s (p=%.4f, n=%d residuals; descriptive diagnostic)",
             status_text, p_value, n_res))
     }
 
@@ -426,7 +442,11 @@ if (getOption("TSENAT.memoization", TRUE)) {
 # heteroscedasticity ignored Solution: Detect heteroscedasticity and apply
 # appropriate variance adjustment/weighting
 
-# Detect heteroscedasticity using Breusch-Pagan test
+# Detect heteroscedasticity using a BP-STYLE auxiliary-regression diagnostic.
+# This is NOT the standard Breusch-Pagan test: the classical BP assumptions do
+# not hold for correlated repeated-q observations, and the auxiliary model
+# log(residuals^2 + 1e-8) ~ q + group is a heuristic. It is a diagnostic only
+# and must not control the confirmatory model.
 .detect_heteroscedasticity <- function(df, q_vals, group_vec, verbose = FALSE) {
     # Fit OLS to get residuals
     fit_ols <- try(lm(entropy ~ q + group, data = df), silent = TRUE)

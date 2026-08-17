@@ -58,10 +58,6 @@ in metadata from `build_analysis()` or `.build_se()` with `tpm`
 parameter.
   Raises error if TPM not available and `use_tpm = TRUE`.}
 
-\item{quantity}{\code{character}. What to plot: 'abundance' (raw transcript
-counts) or 'usage' (counts normalized by the gene total per sample, i.e.
-the per-sample isoform proportion). Default: 'abundance'.}
-
 \item{width}{\code{numeric} or \code{NULL}. Output image width in inches. 
 If NULL, automatically calculated based on number of genes (default: ~13
 inches per column).}

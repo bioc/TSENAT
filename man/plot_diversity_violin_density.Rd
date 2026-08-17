@@ -25,10 +25,6 @@ containing
 as an image.
   If provided, the plot will be saved with appropriate dimensions.
   Default: NULL (no file output, only return object).}
-
-\item{q}{Numeric or NULL. Optional q value to select when the object stores
-multiple q values. If NULL (default), the object must contain exactly one
-q value, otherwise an error is raised.}
 }
 \value{
 A `ggplot2` object showing a 1x2 grid with violin plot on the

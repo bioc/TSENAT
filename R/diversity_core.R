@@ -8,6 +8,11 @@
 #' For SummarizedExperiment: looks for an assay named 'tpm'; if found, uses it;
 #' otherwise falls back to the assay specified by `assayno` parameter and warns
 #' if `tpm=TRUE`.
+#' Mutually exclusive with `effective_length`: TPM already incorporates
+#' effective-length normalization, so supplying both `tpm = TRUE` and an
+#' `effective_length` (as a parameter OR via SummarizedExperiment metadata)
+#' is a hard error (double normalization). Use raw counts (`tpm = FALSE`)
+#' together with `effective_length` when length correction is desired.
 #' @param genes Character vector assigning each transcript (row) to a gene.
 #' Must have length equal to nrow(x) or the number of transcripts in `x`.
 #' @param norm Logical or character; normalization/standardization mode
@@ -92,6 +97,9 @@
 #' (EffectiveLength column).
 #' Example: load(readcounts.RData'); .calculate_diversity(readcounts,
 #' effective_length=effective_length)
+#' Only valid together with raw counts (`tpm = FALSE`): combining with
+#' `tpm = TRUE` stops with an error, because TPM already incorporates
+#' effective-length normalization (double normalization rejected).
 #' @param bootstrap Logical; if TRUE, compute bootstrap confidence intervals
 #' around
 #' Tsallis entropy point estimates using \code{.
@@ -175,10 +183,11 @@
 #' borrowing (Bayesian shrinkage methods), improving
 #' stability
 #'   for genes with few expressed isoforms.
-#' [OK] Bootstrap properties: Papers Li (2023), R Package 'hillR' show that entropy
-#' estimates with
-#' pseudocount >= 0.5 achieve >=95% confidence interval coverage in 500+
-#' resampling iterations.
+#' [OK] Bootstrap properties: Coverage depends on sample size, sequencing
+#' depth, estimator, sparsity and the bootstrap scheme. Simulation evidence
+#' (Li 2023, R Package 'hillR') supports coverage near the nominal level under
+#' regular conditions, but TSENAT's own validation suite identifies scenarios
+#' where coverage deteriorates, particularly at low depth (see NEWS.md).
 #' [OK] Multi-q analysis: van Erven & Harremoës (2014) and the RNA-seq power
 #' analysis literature (Ching et al. 2014; Yu et al. 2017; Qiao et al. 2018;
 #' Vieth & Enard 2019) establish
@@ -426,6 +435,14 @@
             if (verbose && show_messages)
                 message("[OK] Found effective_length in input metadata")
         }
+    }
+
+    # AUDIT3 #9: TPM already incorporates effective-length normalization.
+    # Applying effective-length correction to TPM would double-normalize and
+    # produce a quantity that is neither NumReads/L_eff nor TPM composition.
+    if (isTRUE(tpm) && !is.null(effective_length)) {
+        stop("[.prepare_diversity_data] tpm = TRUE with effective_length is invalid: TPM already incorporates effective-length normalization. Use raw counts (tpm = FALSE) with effective-length correction, or set effective_length = NULL when analysing TPM.",
+            call. = FALSE)
     }
 
     # Calculate diversity

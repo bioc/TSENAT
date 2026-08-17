@@ -131,6 +131,9 @@ analysis <- build_analysis(
     effective_length = effective_length,
     config = config
 )
+# Roles: tpm -> abundance QC in filter_analysis(); effective_length ->
+# length-normalized entropy from RAW counts. The two are mutually exclusive
+# in a single computation (TPM already incorporates length normalization).
 
 # Apply filtering for quality control
 analysis <- filter_analysis(

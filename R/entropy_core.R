@@ -11,12 +11,17 @@
 #' @param norm Logical. Normalize by maximum entropy. Default: FALSE
 #' @param log_base Numeric. Logarithm base. Default: exp(1) (natural log)
 #' @param q_tol Numeric. Tolerance for detecting q=1 case. Default: TSENAT_Q_TOL (1e-6)
+#' @param n_present Integer or NULL. Raw support count (number of categories
+#' with positive RAW counts, BEFORE pseudocount regularization). When not NULL,
+#' the q=0 branch returns n_present - 1 instead of counting positive
+#' proportions, so pseudocounts never alter the q=0 support statistic (audit3).
 #'
 #' @return Numeric. Entropy value
 #'
 
 #' @noRd
-.entropy_core <- function(proportions, q = 1, norm = FALSE, log_base = exp(1), q_tol = TSENAT_Q_TOL) {
+.entropy_core <- function(proportions, q = 1, norm = FALSE, log_base = exp(1), q_tol = TSENAT_Q_TOL,
+    n_present = NULL) {
     # Input validation
     if (!is.numeric(proportions) || length(proportions) == 0) {
         return(NA_real_)
@@ -58,7 +63,10 @@
     # to species richness). Using sum(p > 0) instead of length(p) to exclude
     # zero-proportion isoforms.
     if (q < q_tol) {
-        H <- sum(p > 0) - 1
+        # AUDIT3 RED 2: q=0 uses RAW support (pre-pseudocount) when known, so
+        # pseudocount regularization never inflates the support statistic to
+        # the annotated universe.
+        H <- (if (!is.null(n_present)) n_present else sum(p > 0)) - 1
         return(H)
     }
 
@@ -151,13 +159,15 @@ TSENAT_Q_TOL <- 1e-06
 
     # Apply to each row
     entropy_vals <- apply(counts, 1, function(row) {
+        # Raw support BEFORE pseudocount (q=0 policy)
+        support_raw <- sum(row > 0)
         # Add pseudocount and normalize
         total <- sum(row, na.rm = TRUE) + length(row) * pseudocount
         if (total <= 0)
             return(NA_real_)
 
         p <- (row + pseudocount)/total
-        .entropy_core(p, q = q, norm = norm, log_base = log_base)
+        .entropy_core(p, q = q, norm = norm, log_base = log_base, n_present = support_raw)
     })
 
     return(unname(entropy_vals))
@@ -234,16 +244,18 @@ TSENAT_Q_TOL <- 1e-06
     if (total <= 0)
         return(NA_real_)
 
+    # Raw support BEFORE pseudocount (q=0 policy, audit3)
+    support_raw <- sum(counts > 0)
+
     p <- (counts + pseudocount)/total
     n <- length(p)
 
     # Calculate entropy using standardized core logic
     if (q < q_tol) {
-        # Tsallis entropy at q=0: S_0 = n_nonzero - 1
-        # Consistent with .entropy_core() and entropy_cpp
-        # Not the Hill number / effective richness D_0 = n.
-        p_nonzero <- p[p > 0]
-        entropy <- length(p_nonzero) - 1
+        # Tsallis entropy at q=0: S_0 = n_nonzero - 1 on RAW support, so a
+        # positive pseudocount never inflates richness to the annotated
+        # universe.
+        entropy <- support_raw - 1
     } else if (abs(q - 1) < q_tol) {
         # Shannon entropy as q -> 1
         p_nonzero <- p[p > 0]

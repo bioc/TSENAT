@@ -31,7 +31,7 @@ $$S_q = \frac{1 - \sum_{i=1}^{n} p_i^q}{q - 1}$$
 
 This elegant formula unifies diverse diversity concepts at specific entropic indices (q-values):
 
-- **q = 0**: Support richness — the number of isoforms with positive support. Every positive-support isoform contributes equally; it does not weight rare abundance values.
+- **q = 0**: Support richness — the number of isoforms with positive support. Every positive-support isoform contributes equally; it does not weight rare abundance values. q = 0 is evaluated on the RAW (pre-pseudocount) support, so pseudocount regularization does not change it.
 - **q = 1**: Shannon entropy — Standard information-theoretic measure; balanced weighting across scales.
 - **q = 2**: Gini-Simpson entropy — emphasizes dominant isoforms and relatively downweights rare isoforms.
 
@@ -116,6 +116,8 @@ analysis <- build_analysis(
   tpm = tpm,
   effective_length = effective_length)
 ```
+
+Both `tpm` and `effective_length` are stored in the analysis object's metadata, where they serve distinct roles: `tpm` is used by `filter_analysis()` for abundance-based quality control, while `effective_length` is used by `calculate_diversity()` for length-normalized entropy computed from **raw counts**.
 
 ### Orchestration Function
 

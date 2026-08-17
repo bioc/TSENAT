@@ -382,7 +382,7 @@ if (!exists(".KNOTS_MEMO_CACHE", mode = "environment")) {
         weights_result <- .estimate_variance_weights(df, q_vals, method = "power")
         if (!is.null(weights_result)) {
             gam_weights_original <- weights_result$weights  # Store original weights
-            # AUDIT R3: weights derived from a Breusch-Pagan detection on a
+            # Weights derived from a Breusch-Pagan detection on a
             # misspecified linear mean model + inverse squared-residual fit
             # are DATA-ADAPTIVE. They must never silently shape the primary
             # confirmatory test (the priority-1 lme_ns path ignores weights).
@@ -650,23 +650,23 @@ if (!exists(".KNOTS_MEMO_CACHE", mode = "environment")) {
 
     # Weights are not used in this path: gam_weights are inverse-variance
     # weights for mgcv, not directly transferable to nlme varFunc classes.
-    # AR(1) over ACTUAL q distances (audit R1): corCAR1(form = ~q | ...) gives
+    # AR(1) over ACTUAL q distances: corCAR1(form = ~q | ...) gives
     # Corr(e_i,e_j) = exp(-phi |q_i - q_j|). The previous grid-index corAR1
     # modelled rho^|rank(q_i)-rank(q_j)|, which is valid only on equally
     # spaced q grids; on irregular grids it can inflate type I (MC evidence:
     # 0.165 vs 0.07 on q = (0, 0.01, 0.5, 1, 2) with distance correlation).
     # See .build_ar1_cor() in sait_helpers.R. corCAR1 needs unique q within
-    # each subject x condition block (enforced by the duplicated-q rejection
-    # in .fit_gam_paired_design).
-    cor_builder <- .build_ar1_cor(df, grid_col = "obs_seq")
-    fit <- if (!is.null(cor_builder)) {
-        try(nlme::lme(entropy ~ splines::ns(q, df = 3) * condition, random = ~1 |
-            subject, correlation = cor_builder$cor_obj, data = df, method = "ML"),
-            silent = TRUE)
-    } else {
-        structure("no valid AR(1) correlation structure", class = "try-error")
+    # each subject x condition block (validated DETERMINISTICALLY by
+    # .build_ar1_cor; the duplicated-q pre-check in .fit_gam_paired_design is
+    # an additional early rejection).
+    cor_builder <- try(.build_ar1_cor(df, grid_col = "obs_seq"), silent = TRUE)
+    if (inherits(cor_builder, "try-error")) {
+        return(empty_result)
     }
-    cor_struct <- if (!is.null(cor_builder)) cor_builder$label else NA_character_
+    fit <- try(nlme::lme(entropy ~ splines::ns(q, df = 3) * condition, random = ~1 |
+        subject, correlation = cor_builder$cor_obj, data = df, method = "ML"),
+        silent = TRUE)
+    cor_struct <- cor_builder$label
 
     if (inherits(fit, "try-error")) {
         return(empty_result)
@@ -1156,7 +1156,7 @@ if (!exists(".KNOTS_MEMO_CACHE", mode = "environment")) {
     # Step 10: Compare models and extract p-value
     compare_result <- .compare_gam_models(fit_result$fit_null, fit_result$fit_alt)
 
-    # Weights provenance (audit R3). The priority-1 lme_ns path never uses
+    # Weights provenance. The priority-1 lme_ns path never uses
     # weights; fallback levels 2-4 DO pass gam_weights into mgcv. If those
     # weights were derived from Breusch-Pagan heteroscedasticity detection,
     # the result is flagged and the user is warned: the model comparison that
@@ -1237,7 +1237,7 @@ if (!exists(".KNOTS_MEMO_CACHE", mode = "environment")) {
         }
     }
 
-    # Weights provenance (audit R3): the unpaired GAM is the confirmatory
+    # Weights provenance: the unpaired GAM is the confirmatory
     # path here, and gam_weights are passed directly into mgcv. Flag
     # data-adaptive (heteroscedasticity-detected) weights explicitly.
     weights_source <- "none"

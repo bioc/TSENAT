@@ -90,7 +90,7 @@ counts across samples within each condition:
   D_q(P||Q) = (sum_i P_i^q * Q_i^(1-q) - 1) / (q - 1)   for q > 0, q != 1
   D_1(P||Q) = sum_i P_i * log(P_i / Q_i)                 (KL limit)
 }
-q = 0 convention: \eqn{D_0(P||Q) = 1 - \sum_{i: P_i > 0} Q_i} (the Q-mass on P's
+q = 0 convention: D_0(P||Q) = 1 - sum_{i: P_i > 0} Q_i (the Q-mass on P's
 zero support, with 0^0 = 0). Under pseudocount regularization all bins are
 positive and D_0 = 0.
 Measures how much isoform composition changes from control to condition.

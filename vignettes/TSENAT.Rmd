@@ -105,6 +105,9 @@ analysis <- build_analysis(
   config = config,
   tpm = tpm,
   effective_length = effective_length)
+# Roles: tpm -> abundance QC in filter_analysis(); effective_length ->
+# length-normalized entropy from RAW counts. The two are mutually exclusive
+# in a single computation (TPM already incorporates length normalization).
 
 # Filter low-abundance transcripts
 analysis <- filter_analysis(analysis)
@@ -226,6 +229,9 @@ Now we will load the example dataset and associated metadata:
 # - readcounts: Salmon NumReads (raw fragment counts with EM-based ambiguity resolution)
 # - tpm: Salmon TPM matrix (length and library-normalized expression)
 # - effective_length: Salmon EffectiveLength vector (accounts for fragment length distribution)
+# Roles: tpm -> abundance QC in filter_analysis(); effective_length ->
+# length-normalized entropy from RAW counts. The two are mutually exclusive
+# in a single computation (TPM already incorporates length normalization).
 data(readcounts)
 
 readcounts <- as.matrix(readcounts)
@@ -271,11 +277,18 @@ analysis <- build_analysis(
   tpm = tpm,
   effective_length = effective_length
 )
+# Roles: tpm -> abundance QC in filter_analysis(); effective_length ->
+# length-normalized entropy from RAW counts. The two are mutually exclusive
+# in a single computation (TPM already incorporates length normalization).
 
 ```
 
 The `TSENATAnalysis` object contains a `SummarizedExperiment` with transcript-level 
-counts and gene annotations extracted from the GFF3 file.
+counts and gene annotations extracted from the GFF3 file. The `tpm` matrix and the
+`effective_length` vector serve distinct roles: `tpm` drives abundance-based filtering,
+whereas `effective_length` is consumed by `calculate_diversity()` for length-normalized
+entropy computed from raw counts. The two are never combined in a single computation,
+since TPM already incorporates effective-length normalization.
 
 To reduce noise and improve statistical power, we should filter out lowly-expressed transcripts. 
 Expression estimates of transcript isoforms with zero or low expression might be highly 

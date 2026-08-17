@@ -87,19 +87,23 @@
         stop("x must be numeric")
     }
 
-    # Discontinuity guard (final audit): for q != 1 the Tsallis entropy is
+    # Discontinuity guard (audit3): for q != 1 the Tsallis entropy is
     # log-base invariant, while the Shannon value at q = 1 is divided by
-    # log(log_base). A multi-q spectrum spanning both sides of 1 therefore
-    # has an artificial jump at q = 1 when log_base != exp(1).
-    if (length(q) > 1 && abs(log_base - exp(1)) > 1e-10 && any(q < 1) && any(q >
-        1)) {
-        warning("[.calculate_tsallis_entropy] log_base != exp(1) with q values on both sides of 1: the Tsallis entropy for q != 1 is log-base invariant, so the q-spectrum is discontinuous at q = 1. Use log_base = exp(1) for multi-q spectra.",
+    # log(log_base). A multi-q spectrum therefore has an artificial jump at
+    # q = 1 when log_base != exp(1). Non-natural bases are only supported for
+    # single-q analyses.
+    if (length(q) > 1 && abs(log_base - exp(1)) > 1e-10) {
+        stop("[.calculate_tsallis_entropy] log_base != exp(1) is only supported for single-q analyses: for q != 1 the Tsallis entropy is log-base invariant, so a multi-q spectrum would be discontinuous at q = 1. Use log_base = exp(1) for multi-q spectra.",
             call. = FALSE)
     }
 
     # Apply pseudocount if specified BEFORE length normalization or proportion
     # calculation Handles both scalar and vector pseudocounts Vector
     # pseudocounts are applied per-isoform (row-wise for matrices)
+    # AUDIT3 RED 2: raw support is captured BEFORE pseudocount regularization,
+    # so q=0 keeps its observed-support meaning.
+    support_raw <- if (is.matrix(x))
+        rowSums(x > 0) else sum(x > 0)
     if (any(pseudocount > 0)) {
         if (is.matrix(x) && length(pseudocount) > 1) {
             # Per-isoform pseudocounts: apply row-wise via sweep
@@ -167,15 +171,17 @@
 
     if (what == "S") {
         return(format_out(.calc_S(p = p, q = q, tol = tol, n = n, log_base = log_base,
-            norm = norm)))
+            norm = norm, support_raw = support_raw)))
     }
     if (what == "D") {
-        return(format_out(.calc_D(p = p, q = q, tol = tol, log_base = log_base)))
+        return(format_out(.calc_D(p = p, q = q, tol = tol, log_base = log_base,
+            support_raw = support_raw)))
     }
 
     # both
-    S_vec <- .calc_S(p = p, q = q, tol = tol, n = n, log_base = log_base, norm = norm)
-    D_vec <- .calc_D(p = p, q = q, tol = tol, log_base = log_base)
+    S_vec <- .calc_S(p = p, q = q, tol = tol, n = n, log_base = log_base, norm = norm,
+        support_raw = support_raw)
+    D_vec <- .calc_D(p = p, q = q, tol = tol, log_base = log_base, support_raw = support_raw)
     names(S_vec) <- paste0("q=", q)
     names(D_vec) <- paste0("q=", q)
     return(list(S = S_vec, D = D_vec))
@@ -326,7 +332,10 @@
         result[pos_mask, col_idx] <- log(s_vals[pos_mask]/s_max_vec[pos_mask],
             base = log_base)
         if (any(neg_mask)) {
-            # Floor at log(1e-10) to indicate near-zero entropy
+            # DOCUMENTED NUMERICAL TRUNCATION (audit3): the mathematical value
+            # is log(0/S_max) = -Inf. We floor at log(1e-10) for plotting
+            # stability; this is a display/visualization truncation, not the
+            # mathematical value.
             result[neg_mask, col_idx] <- log(1e-10, base = log_base)
         }
     }
@@ -387,12 +396,14 @@
 
 # Helpers for Tsallis entropy calculations
 
-.calc_S <- function(p, q, tol, n, log_base, norm) {
+.calc_S <- function(p, q, tol, n, log_base, norm, support_raw = NULL) {
     vapply(q, function(qi) {
         if (abs(qi) < tol) {
-            # q=0: Species richness (number of nonzero species) - 1 S_0 =
-            # count(p > 0) - 1
-            richness <- sum(p > 0) - 1
+            # q=0: Species richness (number of RAW-support species) - 1.
+            # support_raw is pre-pseudocount support; pseudocounts never
+            # inflate q=0 richness to the annotated universe (audit3).
+            richness <- (if (!is.null(support_raw) && length(support_raw) == 1) support_raw else sum(p >
+                0)) - 1
             if (norm) {
                 if (n <= 1) {
                   # Single isoform: normalized richness is undefined
@@ -434,12 +445,14 @@
     }, numeric(1))
 }
 
-.calc_D <- function(p, q, tol, log_base) {
+.calc_D <- function(p, q, tol, log_base, support_raw = NULL) {
     vapply(q, function(qi) {
         if (abs(qi) < tol) {
-            # q=0: Hill number D_0 = number of nonzero species (true species
-            # richness) D_0 = count(p > 0)
-            D0 <- sum(p > 0)
+            # q=0: Hill number D_0 = number of RAW-support species (true
+            # effective richness); pseudocounts never inflate it to the
+            # annotated universe (audit3).
+            D0 <- if (!is.null(support_raw) && length(support_raw) == 1)
+                support_raw else sum(p > 0)
             return(D0)
         } else if (abs(qi - 1) < tol) {
             sh <- -sum(ifelse(p > 0, p * log(p, base = log_base), 0))
@@ -734,9 +747,12 @@
 
 #' Estimate Pseudocounts for Tsallis Entropy Calculation
 #'
-#' Computes library size-adjusted pseudocounts using size-factor normalization,
-#' a principled approach recommended in edgeR (Robinson et al. 2010) and DESeq2
-#' (Love et al. 2014) for regularization of count-based diversity analysis.
+#' Computes a GLOBAL sequencing-depth-scaled pseudocount heuristic:
+#' `log2(mean_library_size / 1e6 + 1)`. This is NOT a sample-specific
+#' size-factor adjustment: the same scalar is added to every sample, so its
+#' relative influence is larger in shallow samples. Sample-specific size
+#' factors are computed only as descriptive diagnostics and do not enter the
+#' pseudocount formula (audit3).
 #'
 #' @param se SummarizedExperiment or Matrix; raw count matrix (genes x samples).
 #'            If SummarizedExperiment, assay(se) is extracted.
@@ -751,21 +767,19 @@
 #'  total_counts}.
 #'
 #' @details
-#' This function computes pseudocounts via size-factor adjustment:
+#' This function computes a depth-scaled pseudocount heuristic:
 #'
-#' 1. Computes library size factors: `size_factors = colSums(counts) /
-#' mean(colSums(counts))`
+#' 1. Computes library size factors (descriptive only): `size_factors =
+#' colSums(counts) / mean(colSums(counts))`
 #' 2. Calculates mean library size: `mean_lib_size = mean(colSums(counts))`
 #' 3. Returns pseudocount: `log2(mean_lib_size / 1e6 + 1)`
 #'
 #' The pseudocount scales with the overall sequencing depth, ensuring
 #' appropriate
 #' regularization regardless of the count magnitude (e.g., RNA-seq vs.
-#' ribo-seq data).
-#'
-#' This approach is widely used in differential expression analysis and provides
-#' a heuristic but effective way to normalize pseudocount strength across
-#' datasets.
+#' ribo-seq data). It is a global heuristic: the size factors do NOT enter the
+#' formula, so regularization strength differs between shallow and deep
+#' samples.
 #'
 #' **References for this approach:**
 #' - Robinson et al. (2010, edgeR): Method of using compositional invariants
@@ -875,7 +889,7 @@
 
     # Data validation and diagnostics
     if (verbose)
-        message("Pseudocount Estimation (Size-Factor Adjustment, Option B)")
+        message("Pseudocount Estimation (Sequencing-Depth-Scaled Heuristic)")
 
     n_genes <- nrow(raw_counts)
     n_samples <- ncol(raw_counts)

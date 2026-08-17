@@ -341,12 +341,15 @@
     df_model <- df_model[order(as.character(df_model$subject), as.character(df_model$condition),
         df_model$q), , drop = FALSE]
     # Grid index (may contain gaps when q values are missing) for the corAR1
-    # fallback. Primary: corCAR1 over ACTUAL q distances (audit R1) — see
+    # fallback. Primary: corCAR1 over ACTUAL q distances — see
     # .build_ar1_cor() in sait_helpers.R. A renumbered 1..n sequence would
     # treat gaps as unit distance and inflate the type I error.
     df_model$time_idx <- match(df_model$q, sort(unique(df_model$q)))
 
-    cor_builder <- .build_ar1_cor(df_model, grid_col = "time_idx")
+    cor_builder <- try(.build_ar1_cor(df_model, grid_col = "time_idx"), silent = TRUE)
+    if (inherits(cor_builder, "try-error")) {
+        cor_builder <- NULL
+    }
     fit0 <- fit1 <- NULL
     if (!is.null(cor_builder)) {
         fit0 <- try(nlme::lme(formula_null, random = ~1 | subject, correlation = cor_builder$cor_obj,

@@ -109,8 +109,8 @@
         df$condition <- factor(as.character(df$group))
         df <- df[order(as.character(df$subject), as.character(df$condition), df$q), , drop = FALSE]
         # Grid index (may contain gaps when q values are missing) for the
-        # corAR1 fallback. Primary: corCAR1 over ACTUAL q distances (audit
-        # R1) — see .build_ar1_cor() in sait_helpers.R.
+        # corAR1 fallback. Primary: corCAR1 over ACTUAL q distances
+        # see .build_ar1_cor() in sait_helpers.R.
         df$time_idx <- match(df$q, sort(unique(df$q)))
 
         # Phase 15: Ensure factor levels are properly set before fitting to
@@ -123,9 +123,9 @@
         }
 
         # Fit models (verbose parameter only affects messaging, not model fitting)
-        cor_builder <- .build_ar1_cor(df, grid_col = "time_idx")
+        cor_builder <- try(.build_ar1_cor(df, grid_col = "time_idx"), silent = TRUE)
         fit0_ar1 <- fit1_ar1 <- NULL
-        if (!is.null(cor_builder)) {
+        if (!inherits(cor_builder, "try-error") && !is.null(cor_builder)) {
             fit0_ar1 <- try(nlme::lme(entropy ~ q + group, random = ~1 | subject,
                 correlation = cor_builder$cor_obj, data = df, method = "ML"),
                 silent = TRUE)
