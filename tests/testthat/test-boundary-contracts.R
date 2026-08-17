@@ -25,6 +25,13 @@ test_that("A: q=0 entropy uses raw support, independent of pseudocount", {
     e_pc <- .entropy_single(x, q = 0, norm = FALSE, pseudocount = 0.5)
     expect_equal(e_pc, 0)
     expect_equal(e_pc, e_no_pc)
+
+    # audit final2 exact regression: pseudocount = 0 vs 1 must agree at q = 0
+    expect_equal(
+        .calculate_tsallis_entropy(c(100, 0, 0), q = 0, pseudocount = 0),
+        .calculate_tsallis_entropy(c(100, 0, 0), q = 0, pseudocount = 1),
+        tolerance = 1e-12
+    )
 })
 
 test_that("B: log_base != exp(1) is rejected for multi-q spectra", {
@@ -87,4 +94,64 @@ test_that("D: tpm = TRUE with effective_length is rejected (no double normalizat
         .calculate_diversity(se, genes = genes, q = 1, tpm = TRUE, verbose = FALSE),
         "effective_length"
     )
+})
+
+test_that("E: pseudocount is added AFTER effective-length normalization", {
+    x <- c(100, 0, 0)
+    qs <- c(0.5, 1, 2)
+
+    # With zero-count transcripts, swapping their effective lengths must not
+    # change the entropy: the pseudocount is constant on the
+    # effective-abundance scale. (It would vary under the old
+    # pseudocount-before-length order, where the prior shrinks by 1/L_eff.)
+    e1 <- .calculate_tsallis_entropy(x, q = qs, what = "S", norm = FALSE,
+        pseudocount = 1, effective_length = c(1, 10, 100))
+    e2 <- .calculate_tsallis_entropy(x, q = qs, what = "S", norm = FALSE,
+        pseudocount = 1, effective_length = c(1, 100, 10))
+    expect_equal(e1, e2, tolerance = 1e-12)
+
+    # Manual q=1 (Shannon) check: effective abundances then pseudocount
+    a <- c(100/1, 0/10, 0/100) + 1
+    p <- a/sum(a)
+    expect_equal(unname(e1["q=1"]), -sum(p * log(p)), tolerance = 1e-10)
+})
+
+test_that("F: pseudocount = 'auto' with TPM input is rejected", {
+    skip_if_not_installed("SummarizedExperiment")
+
+    se <- SummarizedExperiment::SummarizedExperiment(
+        assays = list(
+            counts = matrix(stats::rpois(12, lambda = 5), nrow = 4),
+            tpm = matrix(stats::runif(12, 0, 50), nrow = 4)
+        ),
+        colData = S4Vectors::DataFrame(sample = paste0("S", 1:3))
+    )
+    rownames(se) <- paste0("TX", 1:4)
+    genes <- c("G1", "G1", "G2", "G2")
+
+    expect_error(
+        .calculate_diversity(se, genes = genes, q = 1, tpm = TRUE,
+            pseudocount = "auto", verbose = FALSE),
+        "'auto'"
+    )
+})
+
+test_that("G: pseudocount = 'auto' is estimated from the resolved counts of a tximport-style list", {
+    counts <- matrix(stats::rpois(20, lambda = 10), nrow = 5)
+    rownames(counts) <- paste0("TX", 1:5)
+    colnames(counts) <- paste0("S", 1:4)
+    lst <- list(
+        counts = counts,
+        abundance = counts/rowSums(counts) * 1e6,
+        length = rep(1000, 5),
+        countsFromAbundance = "no"
+    )
+    genes <- c("G1", "G1", "G2", "G2", "G3")
+
+    res <- .calculate_diversity(lst, genes = genes, q = 1,
+        pseudocount = "auto", min_valid_frac = 0, verbose = FALSE)
+
+    expect_s4_class(res, "SummarizedExperiment")
+    expect_equal(nrow(res), 3L)  # 3 genes (min_valid_frac = 0 keeps sparse genes)
+    expect_true(all(is.finite(SummarizedExperiment::assay(res))))
 })

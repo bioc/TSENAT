@@ -30,7 +30,14 @@
       `effective_length` (parameter or SummarizedExperiment metadata) is now
       a hard error, since TPM already incorporates effective-length
       normalization (double normalization rejected). TPM remains available
-      for abundance-based filtering/QC.    * **Paired GAMM**: `nlme::lme` with `ns(q, df = 3) × condition` and a marginal
+      for abundance-based filtering/QC.
+    * **Pseudocount ordering and `'auto'` resolution**: effective-length
+      normalization is now applied BEFORE the pseudocount, so regularization
+      is constant on the effective-abundance scale (previously the count-space
+      pseudocount was implicitly divided by transcript length, systematically
+      boosting short isoforms); `pseudocount = 'auto'` is now estimated from
+      the resolved raw-count matrix after input resolution and is rejected
+      for TPM input.    * **Paired GAMM**: `nlme::lme` with `ns(q, df = 3) × condition` and a marginal
       F-test (mgcv gamm is singular on paired designs); no p-value underflow for
       strong signals (log-space recomputation) and pseudo-R² `effect_size`;
       `slope_diff` from population-level predictions; fit metadata records

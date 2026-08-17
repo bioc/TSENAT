@@ -24,14 +24,16 @@
 #' numbers), or 'both'.
 #' @param log_base Base of the logarithm used for Shannon limits and
 #' normalization (default: \code{exp(1)}).
-#' @param pseudocount Numeric scalar. Add this value to all transcript counts
-#'   before computing proportions (default: 0). Useful for stability with
-#'   zero-count features.
+#' @param pseudocount Numeric scalar. Added to all transcript values AFTER
+#'   effective-length normalization (i.e., on the effective-abundance scale),
+#'   immediately before computing proportions (default: 0). Useful for
+#'   stability with zero-count features.
 #' @param effective_length Numeric vector of effective transcript lengths
 #' (length = length(x)).
-#'   When provided, counts are normalized by length to remove length bias before
-#' entropy calculation. This implements SALMON's recommended isoform-level
-#' approach.
+#'   When provided, counts are normalized by length FIRST, and any pseudocount
+#'   is then added on the effective-abundance scale, so regularization is
+#'   constant per transcript (a count-space pseudocount would be divided by
+#'   L_eff and systematically boost short isoforms).
 
 #' @noRd
 #' @return For `what = 'S'` or `what = 'D'`: a numeric vector
@@ -97,39 +99,18 @@
             call. = FALSE)
     }
 
-    # Apply pseudocount if specified BEFORE length normalization or proportion
-    # calculation Handles both scalar and vector pseudocounts Vector
-    # pseudocounts are applied per-isoform (row-wise for matrices)
     # AUDIT3 RED 2: raw support is captured BEFORE pseudocount regularization,
     # so q=0 keeps its observed-support meaning.
     support_raw <- if (is.matrix(x))
         rowSums(x > 0) else sum(x > 0)
-    if (any(pseudocount > 0)) {
-        if (is.matrix(x) && length(pseudocount) > 1) {
-            # Per-isoform pseudocounts: apply row-wise via sweep
-            x <- sweep(x, 1, pseudocount, "+")
-        } else {
-            # Scalar pseudocount or vector input: simple addition
-            x <- x + pseudocount
-        }
-    }
 
     n <- length(x)
 
-    # If all counts sum to zero, return NA; allow single-element vectors to
-    # proceed
-    if (sum(x, na.rm = TRUE) <= 0) {
-        if (what == "both") {
-            return(list(S = rep(NA_real_, length(q)), D = rep(NA_real_, length(q))))
-        }
-        return(rep(NA_real_, length(q)))
-    }
-
-    # EFFECTIVE LENGTH NORMALIZATION If effective_length is provided, normalize
-    # counts by length to remove length bias This is SALMON's recommended
-    # approach for isoform-level analysis Normalized counts = x /
-    # effective_length (accounts for read-length & alignability bias) Then
-    # proportions = normalized_counts / sum(normalized_counts)
+    # EFFECTIVE LENGTH NORMALIZATION (applied FIRST; audit final2) If
+    # effective_length is provided, normalize counts by length to remove
+    # length bias. This is SALMON's recommended approach for isoform-level
+    # analysis: normalized counts = x / effective_length (accounts for
+    # read-length & alignability bias).
     if (!is.null(effective_length)) {
         if (length(effective_length) != length(x)) {
             stop("effective_length must have same length as x")
@@ -146,14 +127,36 @@
                  ". Please review your quantification output for quality issues.",
                  call. = FALSE)
         }
-        # Normalize counts: x_norm = x / effective_length
-        x_normalized <- x/effective_length
-        # Calculate proportions from normalized counts
-        p <- x_normalized/sum(x_normalized)
-    } else {
-        # Standard proportions from raw counts (no length normalization)
-        p <- x/sum(x)
+        x <- x/effective_length
     }
+
+    # AUDIT FINAL2: the pseudocount is added AFTER effective-length
+    # normalization, on the effective-abundance scale, so the regularization
+    # is constant per transcript. The previous pseudocount-then-divide order
+    # produced a length-dependent pseudocount c/L_i that systematically
+    # boosted short isoforms and distorted the within-gene composition TSENAT
+    # estimates. Handles both scalar and vector pseudocounts (vector
+    # pseudocounts are applied per-isoform, row-wise for matrices).
+    if (any(pseudocount > 0)) {
+        if (is.matrix(x) && length(pseudocount) > 1) {
+            # Per-isoform pseudocounts: apply row-wise via sweep
+            x <- sweep(x, 1, pseudocount, "+")
+        } else {
+            # Scalar pseudocount or vector input: simple addition
+            x <- x + pseudocount
+        }
+    }
+
+    # If all counts sum to zero, return NA; allow single-element vectors to
+    # proceed
+    if (sum(x, na.rm = TRUE) <= 0) {
+        if (what == "both") {
+            return(list(S = rep(NA_real_, length(q)), D = rep(NA_real_, length(q))))
+        }
+        return(rep(NA_real_, length(q)))
+    }
+
+    p <- x/sum(x)
 
     # Compute ONLY the requested quantity (previously both S and D were always
     # evaluated even when only one was requested: ~2x wasted work per vector).
@@ -1506,14 +1509,12 @@
         return(out)
     }
 
-    # Apply pseudocount to the whole block (equivalent to per-sample addition)
-    if (pseudocount > 0) {
-        counts_mat <- counts_mat + pseudocount
-    }
-
-    # Effective-length normalization: precompute the vector case (one
-    # division per transcript applied to all samples); the matrix case is
-    # applied per sample as before.
+    # AUDIT FINAL2: effective-length normalization is applied FIRST and the
+    # pseudocount is then added on the effective-abundance scale, so the
+    # regularization is constant per transcript. The previous order
+    # (pseudocount, THEN division by L_eff) produced a length-dependent
+    # pseudocount c/L_i that systematically boosted short isoforms and
+    # distorted the within-gene composition TSENAT estimates.
     el_vec <- NULL
     if (!is.null(effective_length) && is.vector(effective_length)) {
         el_vec <- effective_length[idx]
@@ -1533,6 +1534,11 @@
                   counts <- counts/el
                 }
             }
+        }
+
+        # Pseudocount AFTER length normalization (effective-abundance scale)
+        if (pseudocount > 0) {
+            counts <- counts + pseudocount
         }
 
         v <- .calculate_tsallis_entropy(counts, q = q, norm = norm, what = what, log_base = log_base)

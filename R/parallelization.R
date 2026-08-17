@@ -111,20 +111,11 @@
     # linear/mixed-model fits (ART/lm/lme). If every worker uses a
     # multithreaded BLAS, the workers contend for cores and parallel can be
     # SLOWER than serial (measured: ART 42s parallel vs 23s serial). Pin each
-    # worker process to a single BLAS/OpenMP thread; restore the previous
-    # environment afterwards.
-    blas_vars <- c("OPENBLAS_NUM_THREADS", "OMP_NUM_THREADS", "MKL_NUM_THREADS")
-    old_blas <- Sys.getenv(blas_vars, unset = NA_character_)
-    on.exit({
-        for (v in blas_vars) {
-            if (is.na(old_blas[[v]])) {
-                Sys.unsetenv(v)
-            } else {
-                Sys.setenv(v, old_blas[[v]])
-            }
-        }
-    }, add = TRUE)
-    Sys.setenv(OPENBLAS_NUM_THREADS = "1", OMP_NUM_THREADS = "1", MKL_NUM_THREADS = "1")
+    # worker process to a single BLAS/OpenMP thread for the duration of this
+    # call; withr::local_envvar() restores (or unsets) the variables
+    # automatically on exit, even on error.
+    withr::local_envvar(c(OPENBLAS_NUM_THREADS = "1", OMP_NUM_THREADS = "1",
+        MKL_NUM_THREADS = "1"))
 
     return(BiocParallel::bplapply(X, FUN, BPPARAM = bpparam))
 }

@@ -480,16 +480,19 @@
 .test_q_condition_interaction_art <- function(data, value_col, q_col, condition_col,
                                                paired, subject_col, pre_factored = FALSE) {
     tryCatch({
+        # Work on a local copy: the caller's data frame is never mutated and
+        # codetools sees no parameter reassignment.
+        dat <- data
         # Ensure factors (skip only if already factor, never skip for character)
-        if (!pre_factored || !is.factor(data[[q_col]])) {
-            data[[q_col]] <- factor(data[[q_col]])
+        if (!pre_factored || !is.factor(dat[[q_col]])) {
+            dat[[q_col]] <- factor(dat[[q_col]])
         }
-        if (!pre_factored || !is.factor(data[[condition_col]])) {
-            data[[condition_col]] <- factor(data[[condition_col]])
+        if (!pre_factored || !is.factor(dat[[condition_col]])) {
+            dat[[condition_col]] <- factor(dat[[condition_col]])
         }
         if (paired && !is.null(subject_col)) {
-            if (!pre_factored || !is.factor(data[[subject_col]])) {
-                data[[subject_col]] <- factor(data[[subject_col]])
+            if (!pre_factored || !is.factor(dat[[subject_col]])) {
+                dat[[subject_col]] <- factor(dat[[subject_col]])
             }
         }
 
@@ -503,12 +506,12 @@
             art_formula <- as.formula(paste0(
                 value_col, " ~ ", q_col, " * ", condition_col,
                 " + Error(", subject_col, "/(", q_col, "*", condition_col, "))"))
-            art_model <- try(ARTool::art(art_formula, data = data), silent = TRUE)
+            art_model <- try(ARTool::art(art_formula, data = dat), silent = TRUE)
             if (inherits(art_model, "try-error")) {
                 art_formula <- as.formula(paste0(
                     value_col, " ~ ", q_col, " * ", condition_col,
                     " + Error(", subject_col, "/", q_col, ")"))
-                art_model <- try(ARTool::art(art_formula, data = data), silent = TRUE)
+                art_model <- try(ARTool::art(art_formula, data = dat), silent = TRUE)
             }
             if (inherits(art_model, "try-error")) {
                 stop("ARTool::art() failed with both Error(subject/(q*condition)) and Error(subject/q) for paired design")
@@ -516,24 +519,23 @@
         } else {
             art_formula <- as.formula(paste0(
                 value_col, " ~ ", q_col, " * ", condition_col))
-            art_model <- ARTool::art(art_formula, data = data)
+            art_model <- ARTool::art(art_formula, data = dat)
         }
 
         # OPTIMIZATION: stats::anova(art_model) recomputes ANOVAs for ALL
         # effects (q, condition, q:condition). Only the interaction row is
         # needed: artlm() + flat.anova() on that single term reproduces it
         # EXACTLY (verified: identical F value and p-value) at ~1/3 of the
-        # cost. flat.anova is an unregistered S3 generic, so it is invoked
-        # through a wrapper whose environment is the ARTool namespace
-        # (UseMethod resolves methods in the caller's environment). Any
+        # cost. flat.anova is an unregistered S3 generic: the call is built
+        # BY NAME inside the ARTool namespace (so UseMethod dispatches
+        # correctly and codetools sees no undefined global function). Any
         # failure falls back to the full anova.
         interaction_term <- paste0(q_col, ":", condition_col)
         art_anova <- NULL
         try({
             artlm_int <- ARTool::artlm(art_model, interaction_term)
-            flat_anova_ns <- evalq(function(m.l, type, test) flat.anova(m.l, type = type,
-                test = test), envir = asNamespace("ARTool"))
-            anova_int <- flat_anova_ns(artlm_int, type = "III", test = "F")
+            anova_int <- eval(call("flat.anova", m.l = artlm_int, type = "III",
+                test = "F"), envir = asNamespace("ARTool"))
             if ("Term" %in% colnames(anova_int) && interaction_term %in% anova_int[["Term"]]) {
                 art_anova <- anova_int
             }

@@ -44,15 +44,16 @@
 #' numbers.
 #' @param nthreads Number of threads for parallel processing (default: 1).
 #' Set to > 1 to parallelize per-gene entropy calculations.
-#' @param pseudocount Numeric scalar or 'auto'. Add this value to all
-#' transcript counts
+#' @param pseudocount Numeric scalar or 'auto'. Added to transcript values
+#' AFTER effective-length normalization (on the effective-abundance scale),
 #' before calculating proportions (default: 0). Useful for handling genes with
 #' zero counts in some samples. Values like 0.5 or 1 are commonly used to avoid
-#' zero-division issues and NaN results. When set to 'auto', pseudocount is
-#' automatically estimated using library size adjustment via
-#' `.estimate_pseudocount()`
-#' (recommended for sparse count data where regularization strength should adapt
-#' to sequencing depth).
+#' zero-division issues and NaN results. When set to 'auto', the pseudocount is
+#' estimated from the RESOLVED raw-count matrix via the sequencing-depth-scaled
+#' heuristic `.estimate_pseudocount()` after the input representation has been
+#' fixed (recommended for sparse count data where regularization strength
+#' should adapt to sequencing depth). `'auto'` is not supported for
+#' `tpm = TRUE` input (the depth heuristic is defined on raw counts).
 #' @param min_count Numeric scalar or NULL; minimum total transcript count
 #' per gene
 #' required to include the gene in results (default: NULL = auto-detect).
@@ -233,10 +234,10 @@
     what <- validated$what
     shrinkage <- validated$shrinkage
 
-    # Handle pseudocount auto-estimation
-    pseudocount <- .handle_pseudocount_auto(pseudocount, x, verbose)
-
-    # Prepare input and calculate diversity
+    # pseudocount = "auto" is resolved INSIDE .prepare_diversity_data(), after
+    # the input representation (counts vs TPM, SE vs tximport list) has been
+    # fixed, so the depth heuristic always runs on the resolved raw-count
+    # matrix.
     prep <- .prepare_diversity_data(x, genes, original_x, effective_length, norm,
         q, what, nthreads, shrinkage, pseudocount, verbose, tpm, assayno, show_messages,
         min_valid_frac, log_base = log_base)
@@ -245,6 +246,7 @@
     genes <- prep$genes
     se_assay_mat <- prep$se_assay_mat
     effective_length <- prep$effective_length  # Extract effective_length from prep result
+    pseudocount <- prep$pseudocount  # resolved numeric (after 'auto' estimation)
 
     # Optional: Compute bootstrap CIs
     bootstrap_ci_results <- .bootstrap_diversity_ci(bootstrap, result, genes, se_assay_mat,
@@ -445,6 +447,26 @@
             call. = FALSE)
     }
 
+    # AUDIT FINAL2: resolve pseudocount = "auto" AFTER the input
+    # representation is fixed. The sequencing-depth heuristic must be
+    # estimated from the resolved RAW-count matrix — never from a TPM assay
+    # (whose column sums are ~1e6 by construction, not library sizes) nor
+    # from an unresolved tximport-style list. TPM + "auto" is rejected.
+    if (is.character(pseudocount) && length(pseudocount) == 1 && tolower(pseudocount) ==
+        "auto") {
+        if (isTRUE(tpm)) {
+            stop("[.prepare_diversity_data] pseudocount = 'auto' is not supported for TPM input: the sequencing-depth heuristic is defined on raw counts. Provide an explicit pseudocount for TPM data, or analyse counts (tpm = FALSE).",
+                call. = FALSE)
+        }
+        if (verbose && show_messages) {
+            message("Computing pseudocount automatically via .estimate_pseudocount()...")
+        }
+        pseudocount <- .estimate_pseudocount(se_assay_mat, verbose = FALSE)$scalar_pseudocount
+        if (verbose && show_messages) {
+            message(sprintf("  -> Estimated pseudocount = %.4f", pseudocount))
+        }
+    }
+
     # Calculate diversity
     use_range_norm <- (norm == "range")
     if (!is.null(effective_length) && verbose && show_messages) {
@@ -459,7 +481,8 @@
 
 
 
-    list(result = result, x = x, genes = genes, se_assay_mat = se_assay_mat, effective_length = effective_length)
+    list(result = result, x = x, genes = genes, se_assay_mat = se_assay_mat, effective_length = effective_length,
+        pseudocount = pseudocount)
 }
 
 # NOTE (March 2026): .bootstrap_diversity_ci() moved to bootstrap.R for
