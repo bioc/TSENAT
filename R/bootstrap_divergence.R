@@ -119,9 +119,10 @@
 #' - **Ramsay (2005), Springer Series in Statistics; Li (2023), R Package
 #'   'hillR'; Zhang & Yuan (2018)** (Bootstrap methodology): Percentile and BCa
 #' bootstrap
-#' performance validated. Coverage probabilities for entropy/divergence
-#' estimates
-#'   confirmed with confidence level >= 0.95 using nboot >= 500.
+#' performance validated. Simulation and literature-based evidence supports
+#' bootstrap inference under regular conditions (coverage near the nominal
+#' level with nboot >= 500), but coverage can deteriorate at low sequencing
+#' depth and small sample sizes (see NEWS.md).
 #'
 #' This function's implementation (percentile and BCa methods) aligns with
 #' approaches

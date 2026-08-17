@@ -42,12 +42,12 @@ suppressPackageStartupMessages(library(kableExtra))
 
 The primary goal of this vignette is to assess the **robustness and concordance** of scale-dependent entropic index × group interaction discoveries from Scale-Adaptive Interaction Tests (SAIT): do they generalize to a non-parametric statistical framework with fewer distributional assumptions? Agreement between GAMM and ART establishes robustness under complementary modeling assumptions.
 
-## Two Complementary Validation Approaches
+## Two Complementary Approaches
 
-**Method 1: Generalized Additive Mixed Models (GAMM)** with functional q-curve structure (full details in the main vignette).
+**Method 1: Paired regression-spline mixed model (GAMM-style)** with functional q-curve structure (full details in the main vignette). TSENAT historically refers to this family as GAMM; it is fitted with `nlme::lme`, not `mgcv::gamm()`.
 
 - Framework: Semi-parametric model $Y = f_1(q) + f_2(condition) + f_3(q, condition)$ + subject-intercept + $\varepsilon$ with smooth rather than linear $f$ terms.
-- Paired fits: `nlme::lme` with `ns(q, df = 3) × condition`, subject random intercepts, and an AR(1) working correlation within subject × condition (`nlme::corAR1()`; validated by Monte Carlo simulation); the interaction is tested with a marginal F-test.
+- Paired fits: `nlme::lme` with `ns(q, df = 3) × condition`, subject random intercepts, and a continuous-q AR(1) working correlation within subject × condition (`nlme::corCAR1`, $\exp(-\phi|q_i-q_j|)$; validated by Monte Carlo simulation); the interaction is tested with a marginal F-test.
 - q is a deterministic functional argument (not time): the confirmatory hypothesis is the functional interaction $H_0: \beta(q) = 0$ for all q, tested on the original H(q) curve. Gaussian residuals are assumed (paired mixed-model paths do not support extended families); heteroscedasticity is detected but variance weights are not applied in paired designs.
 
 **Method 2: Aligned Rank Transform (ART)** — rank-based non-parametric interaction testing (ARTool [@S273]), with Hochberg step-up FWER correction. The Conover-Iman Rank Transform is available via `method='rt'`.
@@ -70,7 +70,7 @@ Statistical testing in transcriptomics faces a fundamental challenge: no single 
 | Robustness | Moderate | Highest |
 | Outlier sensitivity | Moderate potential for bias | Minimal; inherently resistant |
 
-Validation strategy: Concordance between both methods confirms robustness across statistical frameworks.
+Robustness strategy: Concordance between both methods provides evidence of robustness across statistical frameworks (it does not by itself prove either method correct).
 
 ***
 

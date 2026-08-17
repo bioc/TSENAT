@@ -46,7 +46,7 @@
 # ==============================================================================
 # Helper: AR(1) correlation object over ACTUAL q distances
 # ==============================================================================
-# PURPOSE (audit R1):
+# PURPOSE:
 #   The previous AR(1) structure indexed q by POSITION in the sorted q grid:
 #   corAR1(~ grid_index | subject/condition) models Corr(e_i, e_j) =
 #   rho^|rank(q_i) - rank(q_j)|. That is valid only when q values are equally
@@ -79,6 +79,25 @@
     ar1 <- try(nlme::corAR1(form = stats::as.formula(paste0("~", grid_col, " | subject/condition"))),
         silent = TRUE)
     if (!inherits(ar1, "try-error")) {
+        # HARD GUARD: grid-index corAR1 models
+        # rho^|rank(q_i)-rank(q_j)| and is only valid for EQUALLY spaced q.
+        # Warn when the fallback is used on an irregular q grid (the primary
+        # corCAR1 path handles irregular grids correctly).
+        if ("q" %in% colnames(df)) {
+            uq <- sort(unique(as.numeric(stats::na.omit(df$q))))
+            if (length(uq) >= 3) {
+                gaps <- diff(uq)
+                pos_gaps <- gaps[gaps > 0]
+                if (length(pos_gaps) >= 1 && all(is.finite(pos_gaps))) {
+                    ratio <- max(pos_gaps)/min(pos_gaps)
+                    if (is.finite(ratio) && ratio > 1 + 1e-06) {
+                        warning("[.build_ar1_cor] Grid-index corAR1 fallback used on an IRREGULAR q grid (gap ratio ",
+                          format(ratio, digits = 3), "). The grid-index model assumes equally spaced q; prefer the continuous-q corCAR1 structure.",
+                          call. = FALSE)
+                    }
+                }
+            }
+        }
         return(list(cor_obj = ar1, label = "ar1_grid_within_subject_condition"))
     }
     NULL
@@ -88,10 +107,15 @@
 # Helper: Compute AR(1) design effect for autocorrelated entropy differences
 # ==============================================================================
 # PURPOSE:
-#   Estimates autocorrelation (rho) from differenced entropy data and computes
-#   design effect for bias correction in analysis. This is NOT the Kish formula
-#   (which assumes exchangeable ICC); TSENAT uses AR(1) correlation structure
-#   after ARIMA(1,1,0) differencing.
+#   Estimates autocorrelation (rho) from estimated q-profile increments and
+#   computes a design effect for small-sample/descriptive correlation
+#   adjustment. This is NOT the Kish formula (which assumes exchangeable
+#   ICC); TSENAT uses an AR(1) correlation structure.
+#
+#   LEGACY NOTE: this helper operates on differenced q-profile increments for
+#   this diagnostic only; it does NOT transform the response used by
+#   confirmatory SAIT (no ARIMA differencing is applied in any confirmatory
+#   path — q is a deterministic functional argument, not time).
 #
 # NOTE: AR(1) design effect computation has been consolidated into
 # .compute_ar1_design_effect() in sait_gee.R, which uses the exact
@@ -951,7 +975,7 @@ if (getOption("TSENAT.memoization", TRUE)) {
             message("[calculate_sait_interaction] Applied Hochberg stepup ", "adjustment for multi-q correlation")
         }
     } else if (multicorr == "bh") {
-        # Benjamini-Hochberg FDR (audit M10): dependence-agnostic FDR option
+        # Benjamini-Hochberg FDR : dependence-agnostic FDR option
         # for within-gene multi-q p-values. Gene-level FDR is `pcorr` (default
         # 'BH'); this applies BH at the q-level family within each gene.
         adj_p <- stats::p.adjust(p_values, method = "BH")
@@ -1089,7 +1113,7 @@ if (getOption("TSENAT.memoization", TRUE)) {
 
 #' @noRd
 .map_gene_annotations <- function(res, se, verbose) {
-    # Guard (July 2026): .finalize_sait_results may be called without SE
+    # Guard: .finalize_sait_results may be called without SE
     # for pure post-processing (e.g., unit tests, external result objects).
     if (is.null(se)) {
         # Ensure gene_name column exists even without annotations

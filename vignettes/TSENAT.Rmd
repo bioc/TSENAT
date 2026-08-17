@@ -439,12 +439,14 @@ Each gene produces a **q-curve**: a trajectory showing how entropy changes acros
 
 We can test for these interactions using one of four methods, each with specific strengths:
 
-- **GAM / GAMM** (generalized additive models / mixed models): flexibly capture nonlinear q-response patterns via adaptive smoothing splines. For unpaired (cross-sectional) designs, GAM is used directly. When `paired = TRUE`, `method = "gam"` dispatches to a **spline-based GAMM-style path implemented with `nlme::lme`** (natural regression splines, `ns(q, df = 3) × condition`), subject-level random intercepts and an AR(1) working correlation within each subject × condition block (marginal F-test for the interaction). `mgcv::gamm()` and standard GAM serve as fallbacks. GAMM can also be selected explicitly with `method = "gamm"`.
+- **GAM / GAMM** (generalized additive models / mixed models): flexibly capture nonlinear q-response patterns via adaptive smoothing splines. For unpaired (cross-sectional) designs, GAM is used directly. When `paired = TRUE`, `method = "gam"` dispatches to a **spline-based GAMM-style path implemented with `nlme::lme`** (natural regression splines, `ns(q, df = 3) × condition`), subject-level random intercepts and a continuous-q AR(1) working correlation (`nlme::corCAR1`, $\exp(-\phi|q_i-q_j|)$) within each subject × condition block (marginal F-test for the interaction). `mgcv::gamm()` and standard GAM serve as fallbacks. GAMM can also be selected explicitly with `method = "gamm"`. Note that the fitted spline is not constrained to be monotone: the monotonicity of the theoretical entropy functional does not imply that noisy finite-sample estimates are monotone at every q.
 - **LMM** (linear mixed models): parametric alternative with subject-level random intercepts for repeated q-ordered measurements.
 - **GEE** (generalized estimating equations): population-averaged approach particularly useful for paired and longitudinal designs with repeated q-measures.
 - **FPCA** (functional principal component analysis): treats q-values as ordered functional data, implicitly capturing q-ordering structure.
 
 GAM/LMM/GEE (and the FPCA global test) can account for within-subject dependence across the q-grid using an AR(1) *working correlation* model. This is a working covariance approximation for discretized functional estimates — correlation in entropy estimates across q is not biological temporal autocorrelation. ART provides a complementary rank-based interaction test and does not model AR(1) correlation explicitly (it treats q as a categorical factor).
+
+SAIT consumes the stored diversity assay **as computed**: with the default range normalization (`norm = TRUE`) the interaction is tested on range-normalized entropy (relative to each gene's theoretical maximum); use `norm = 'none'` to test raw Tsallis entropy.
 
 ```{r test-q-condition-interaction}
 # Scale-adaptive interaction test across q values using S4 wrapper
@@ -530,7 +532,7 @@ print(combined_plot)
 
 ## Transcript Switching Across Diversity Scales
 
-The SAIT interaction tests whether condition effects depend on which diversity scale (q-value) you examine. This section identifies **which individual transcripts** drive these scale-dependent patterns, revealing whether the same transcripts switch across all scales or whether different regulatory mechanisms dominate at rare versus abundant isoform scales.
+The SAIT interaction tests whether condition effects depend on which diversity scale (q-value) you examine. This section identifies **candidate transcript contributors** — an influence diagnostic (transcripts whose removal changes the diversity contrast), not causal attribution — revealing whether the same transcripts switch across all scales or whether different regulatory mechanisms dominate at rare versus abundant isoform scales.
 
 ### Two-Stage Analysis Approach
 
@@ -731,7 +733,7 @@ top_genes_display <- top_genes_result[, display_cols, drop = FALSE]
 
 # Rename columns for better display
 col_names <- c(
-    "Gene", "P-value", "Slope Diff",
+    "Gene", "P-value", "Endpoint Slope Diff",
     "D(q=0.5)", "D(q=1.0)", "D(q=2.0)",
     "Pattern"
 )
@@ -799,7 +801,7 @@ print(p_multi)
 
 Interpreting the Q-Spectrum Curve:
 
-- **Shape**: As defined in the pattern types above, a flat curve (balanced) vs. declining curve (rare driven) vs. rising curve (abundant driven) encodes fundamentally different mechanisms [@I059]; the full curve is the complete story, not any single q point [@I021].
+- **Shape**: As defined in the pattern types above, a flat curve (balanced) vs. declining curve (rare driven) vs. rising curve (abundant driven) is a descriptive summary of the q-spectrum [@I059]. A predominantly declining spectrum is consistent with stronger divergence at low-abundance scales, whereas a predominantly rising spectrum is consistent with stronger divergence at dominant-abundance scales; these are descriptive interpretations, not mechanistic classifications — the full curve is the complete story, not any single q point [@I021].
 
 - **q=1 (KL divergence)**: The middle point corresponds to ordinary Kullback-Leibler divergence [@K001; @I060], 
   to which Tsallis divergence converges in the limit $q \to 1$. KL weights each isoform by its probability under $P$ times its log-ratio $\log(p_i/r_i)$; it does **not** weight all isoforms equally (rare categories can contribute very large log-ratios).
@@ -823,8 +825,7 @@ Statistical Validation During Interpretation:
 
 2. Monotonicity check: For a fixed probability distribution, the standard Tsallis entropy decreases as q increases under the convention used here [@I002]. This property concerns the entropy functional, not the normalized entropy, Hill numbers, or divergence. While divergence between two distributions is not strictly monotonic, large erratic spikes in the divergence q-spectrum may indicate numerical instability.
 
-3. Comparison with genome-wide patterns: Compute q-spectra for housekeeping genes (GAPDH, 
-   ACTB, etc.). These should show BALANCED patterns. If not, revisit normalization parameters [@S023].
+3. Comparison with genome-wide patterns (optional negative control): Compute q-spectra for genes expected *a priori* to be stable in the biological system (e.g., GAPDH, ACTB). No universal requirement that housekeeping genes exhibit a "balanced" q-spectrum should be imposed — a housekeeping gene can have condition-dependent isoform usage. Unexpected patterns should be investigated rather than automatically attributed to normalization [@S023].
 
 # Appendices
 

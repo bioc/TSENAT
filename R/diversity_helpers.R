@@ -87,6 +87,16 @@
         stop("x must be numeric")
     }
 
+    # Discontinuity guard (final audit): for q != 1 the Tsallis entropy is
+    # log-base invariant, while the Shannon value at q = 1 is divided by
+    # log(log_base). A multi-q spectrum spanning both sides of 1 therefore
+    # has an artificial jump at q = 1 when log_base != exp(1).
+    if (length(q) > 1 && abs(log_base - exp(1)) > 1e-10 && any(q < 1) && any(q >
+        1)) {
+        warning("[.calculate_tsallis_entropy] log_base != exp(1) with q values on both sides of 1: the Tsallis entropy for q != 1 is log-base invariant, so the q-spectrum is discontinuous at q = 1. Use log_base = exp(1) for multi-q spectra.",
+            call. = FALSE)
+    }
+
     # Apply pseudocount if specified BEFORE length normalization or proportion
     # calculation Handles both scalar and vector pseudocounts Vector
     # pseudocounts are applied per-isoform (row-wise for matrices)

@@ -262,7 +262,7 @@ knitr::kable(shannon_summary, row.names = FALSE,
              align = c("l", "r", "r", "r", "r"))
 ```
 
-**Interpretation**: Both methods similarly identify significantly different transcript diversity between Normal and Tumor samples. The comparable number of significant genes (padj<0.05) and mean log2FC values demonstrate equivalent statistical power and effect size detection.
+**Interpretation**: Both methods similarly identify significantly different transcript diversity between Normal and Tumor samples. The comparable number of significant genes (padj<0.05) and mean log2FC values provide empirical evidence of agreement in this benchmark, not proof of equal statistical power in general.
 
 #### Top 10 Significant Genes - SplicingFactory (Laplace)
 ```{r shannon-splicing-factory-genes, message=FALSE, warning=FALSE, echo=FALSE}

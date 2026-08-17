@@ -31,7 +31,10 @@
 #' @param verbose Logical; print diagnostic messages when TRUE (default: TRUE).
 #' @param q Numeric scalar or vector of Tsallis q values to evaluate (q >= 0).
 #' If length(q) > 1, the result will contain separate columns per sample and
-#' q. q = 0 is supported and represents species richness.
+#' q. q = 0 returns the Tsallis SUPPORT statistic S_0 = n_present - 1 (number
+#' of positive-support isoforms minus one; with a positive pseudocount this
+#' becomes the annotated universe n - 1, not observed richness). For the Hill
+#' effective richness D_0 = n, use `what = 'D'`.
 #' @param what Which quantity to return: 'S' for Tsallis entropy or 'D' for Hill
 #' numbers.
 #' @param nthreads Number of threads for parallel processing (default: 1).
@@ -248,7 +251,9 @@
     # Build and return SummarizedExperiment
     .build_diversity_se_output(result, output_structure, original_x, se_assay_mat,
         bootstrap_ci_results, bootstrap, metadata, verbose, what, q, genes, sample_col,
-        condition_col, subject_col)
+        condition_col, subject_col, norm = norm, pseudocount = pseudocount,
+        shrinkage = shrinkage, effective_length_used = !is.null(effective_length),
+        log_base = log_base)
 }
 
 # ============================================================================
@@ -658,11 +663,14 @@
 #'
 #' @noRd
 .build_diversity_metadata <- function(q, what, se_assay_mat, bootstrap, bootstrap_ci_results,
-    original_x) {
+    original_x, norm = NULL, pseudocount = NULL, shrinkage = NULL, effective_length_used = FALSE,
+    log_base = NULL) {
     result_meta_list <- list(q = q, what = what[1], readcounts = se_assay_mat, bootstrap = bootstrap,
         bootstrap_nboot = if (!is.null(bootstrap_ci_results)) bootstrap_ci_results$bootstrap_nboot else NULL,
         bootstrap_method = if (!is.null(bootstrap_ci_results)) bootstrap_ci_results$bootstrap_method else NULL,
-        bootstrap_ci = if (!is.null(bootstrap_ci_results)) bootstrap_ci_results$bootstrap_ci else NULL)
+        bootstrap_ci = if (!is.null(bootstrap_ci_results)) bootstrap_ci_results$bootstrap_ci else NULL,
+        norm = norm, pseudocount = pseudocount, shrinkage = shrinkage,
+        effective_length_used = effective_length_used, log_base = log_base)
 
     if (is(original_x, "SummarizedExperiment") || is(original_x, "RangedSummarizedExperiment")) {
         result_meta_list$se <- original_x
@@ -676,7 +684,8 @@
 #' @noRd
 .build_diversity_se_output <- function(result, output_structure, original_x, se_assay_mat,
     bootstrap_ci_results, bootstrap, metadata, verbose, what, q, genes, sample_col = "sample",
-    condition_col = NULL, subject_col = NULL) {
+    condition_col = NULL, subject_col = NULL, norm = NULL, pseudocount = NULL,
+    shrinkage = NULL, effective_length_used = FALSE, log_base = NULL) {
 
     result_assay <- output_structure$result_assay
     filtered_gene_ids <- as.character(result[, 1])
@@ -726,7 +735,9 @@
 
     # Step 6: Build metadata
     result_meta_list <- .build_diversity_metadata(q, what, se_assay_mat, bootstrap,
-        bootstrap_ci_results, original_x)
+        bootstrap_ci_results, original_x, norm = norm, pseudocount = pseudocount,
+        shrinkage = shrinkage, effective_length_used = effective_length_used,
+        log_base = log_base)
 
     # Step 7: Create and return SummarizedExperiment
     result <- SummarizedExperiment::SummarizedExperiment(assays = assays_list, rowData = output_structure$rowData,
