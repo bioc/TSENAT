@@ -6,7 +6,8 @@
 #' 
 #' Applies Hochberg's stepup procedure for family-wise error rate (FWER) control
 #' under positive regression dependence. Recommended for q-correlated p-values
-#' from Tsallis entropy analysis (Papers S168-S175: AR(1) covariance).
+#' from Tsallis entropy analysis (Zimmerman & Harville 1991; Grunwald et al.
+#' 2000: AR(1) working covariance).
 #' @param pvalues Numeric vector of p-values to adjust
 #' @return Numeric vector of adjusted p-values
 #' @noRd
@@ -71,7 +72,7 @@
 #' 
 #' Applies Benjamini-Yekutieli FDR control that is valid under arbitrary
 #' dependence structures, including AR(1) correlations from Tsallis entropy
-#' q-value sequences (Papers S190, S193).
+#' q-value sequences (Benjamini & Hochberg 1995; Yekutieli 2008).
 #' @param pvalues Numeric vector of p-values to adjust
 #' @return Numeric vector of adjusted p-values
 #' @noRd
@@ -181,7 +182,8 @@
 #' - Phipson & Smyth (2010): p-value precision formula and minimum B
 #' - Westfall & Young (1993): Permutation method for multiple testing
 #' - Meinshausen, Maathuis, Buhlmann (2012): Optimality under dependence
-#' - TSENAT Database Papers S165-S175: AR(1) in multi-q entropy tests
+#' - Zimmerman & Harville (1991); Grunwald et al. (2000): AR(1) working
+#'   correlation in multi-q entropy tests
 #'
 #' @examples
 #' library(SummarizedExperiment)
@@ -417,7 +419,16 @@
             data[[condition_col]] <- factor(data[[condition_col]])
         }
 
-        formula_str <- paste("ranks ~", q_col, "*", condition_col)
+        if (paired && !is.null(subject_col)) {
+            # Add the subject blocking factor so the
+            # interaction test respects the pairing structure. Subject-blocked
+            # permutation (multicorr='westfall-young') remains the preferred
+            # primary test for paired designs; this blocked ANOVA on ranks is
+            # the closed-form alternative.
+            formula_str <- paste("ranks ~", q_col, "*", condition_col, "+", subject_col)
+        } else {
+            formula_str <- paste("ranks ~", q_col, "*", condition_col)
+        }
         sait_model <- lm(as.formula(formula_str), data = data)
         anova_result <- anova(sait_model)
 
@@ -482,21 +493,32 @@
             }
         }
 
-        # Build ART formula: entropy ~ q * condition [+ Error(subject/q)]
-        # NOTE: When Error(subject/q) is used, ARTool returns row names as
-        # numbers ("1","2","3") instead of term names. We detect the
-        # interaction row by matching the Term column.
+        # Build ART formula: entropy ~ q * condition [+ Error(subject/(q*condition))]
+        # Error(subject/q) expresses q nested in subject but
+        # does not transparently express q x condition as TWO within-subject
+        # factors. The ARTool-recommended structure for a fully within-subject
+        # two-factor design is Error(subject/(q*condition)). The legacy form is
+        # kept as fallback for older ARTool versions.
         if (paired && !is.null(subject_col)) {
             art_formula <- as.formula(paste0(
                 value_col, " ~ ", q_col, " * ", condition_col,
-                " + Error(", subject_col, "/", q_col, ")"))
+                " + Error(", subject_col, "/(", q_col, "*", condition_col, "))"))
+            art_model <- try(ARTool::art(art_formula, data = data), silent = TRUE)
+            if (inherits(art_model, "try-error")) {
+                art_formula <- as.formula(paste0(
+                    value_col, " ~ ", q_col, " * ", condition_col,
+                    " + Error(", subject_col, "/", q_col, ")"))
+                art_model <- try(ARTool::art(art_formula, data = data), silent = TRUE)
+            }
+            if (inherits(art_model, "try-error")) {
+                stop("ARTool::art() failed with both Error(subject/(q*condition)) and Error(subject/q) for paired design")
+            }
         } else {
             art_formula <- as.formula(paste0(
                 value_col, " ~ ", q_col, " * ", condition_col))
+            art_model <- ARTool::art(art_formula, data = data)
         }
 
-        # Fit ART model
-        art_model <- ARTool::art(art_formula, data = data)
         art_anova <- stats::anova(art_model)
 
         # Find interaction row: match by Term column, or by row name
@@ -567,7 +589,8 @@
 #' Compute Concurvity Index for GAM
 #'
 #' Detects collinearity among smooth terms. Values > 0.8 indicate problematic
-#' collinearity that may require regularization (S150, S143).
+#' collinearity that may require regularization (Siems et al., concurvity
+#' regularization in differentiable GAMs).
 #'
 #' @param data Matrix of predictor values (columns=predictors, rows=observations)
 #' @return List with concurvity metrics and status
@@ -702,7 +725,9 @@
 #' Compute Effective Degrees of Freedom (EDF) for GAM
 #'
 #' Assesses smoothing adequacy. EDF ratio < 0.5 (over-smoothed), 0.5-2.0
-#' (appropriate), > 2.0 (under-smoothed). References: S137, C045
+#' (appropriate), > 2.0 (under-smoothed). References: Hall, "Using a
+#' generalized additive model to compute bias-corrected near-surface bulk
+#' salinities"; "Workshop 8: Generalized additive models".
 #'
 #' @param data Matrix of predictor values
 #' @param q_values Optional numeric vector of q-values for per-gene GAM fitting
@@ -790,7 +815,7 @@
 #' Compute Non-linearity Contribution
 #'
 #' Quantifies GAM benefit over linear model. <5% (use LM), 5-20% (GAM justified),
-#' >20% (GAM essential). Reference: C045
+#' >20% (GAM essential). Reference: Wood (2017).
 #'
 #' @param data Matrix of predictor values
 #' @param q_values Optional numeric vector of q-values for per-gene GAM fitting

@@ -8,7 +8,8 @@ plot_diversity_violin_density(
   se,
   assay_name = "diversity",
   title = NULL,
-  output_file = NULL
+  output_file = NULL,
+  q = NULL
 )
 }
 \arguments{

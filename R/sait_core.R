@@ -20,17 +20,26 @@
 #'     \item `'lmm'`: Linear mixed models with AR(1) covariance for q-ordered
 #'       measurements (requires nlme). Recommended for strong signal detection.
 #'     \item `'gam'`: Generalized additive models with flexible smoothing
-#'       (requires mgcv). Useful for non-monotonic entropy patterns.
+#'       (requires mgcv). Useful for non-monotonic entropy patterns. For paired
+#'       designs (`paired = TRUE` with a subject column), dispatches to GAMM:
+#'       `nlme::lme` with regression splines (`ns(q, df = 3) x condition`),
+#'       subject random intercept and AR(1) within subject x condition
+#'       (marginal F-test for the interaction).
 #'     \item `'fpca'`: Functional principal components analysis for curve data.
 #'       Respects q-value ordering by treating q-values as ordered measurements
-#'       in a functional data framework (Papers S168-S171). PCA on ordered curves
-#'       implicitly captures AR(1) correlation structure.
+#'       in a functional data framework (Zimmerman & Harville 1991; Grunwald
+#'       et al. 2000). PCA decomposes the
+#'       OBSERVED covariance structure between q-values; it does NOT estimate
+#'       an AR(1) model.
 #'     \item `'gee'`: Generalized estimating equations for clustered/paired data
 #'       (requires geepack). Particularly useful for longitudinal designs with
 #'       repeated q-measures.
 #'   }
-#'   Q-values are mathematically dependent (Papers S168-S175: AR(1) covariance
+#'   Q-values are mathematically dependent (Zimmerman & Harville 1991;
+#'   Grunwald et al. 2000: AR(1) working covariance
 #'   structures). Regularized regression models without correlation structure should not be used.
+#'   One omnibus interaction test is computed per gene, so the multiplicity
+#'   family for FWER/FDR control is the set of genes.
 #' @param pvalue Type of p-value to compute: one of
 #'   \code{c('satterthwaite', 'lrt', 'both')} (default: 'satterthwaite').
 #'   Note: For method='lmm', only LRT p-values are available (Satterthwaite
@@ -63,7 +72,7 @@
 #'       are unordered).
 #'     \item `'independence'`: Independent observations (no correlation).
 #'   }
-#'   Paper S171: Zimmerman & Harville (1991) validates AR(1) for ordered data.
+#'   Zimmerman & Harville (1991) validate AR(1) for ordered data.
 #'   This parameter only affects `method='gee'`.
 #' @param bias_correction Logical; whether to apply Kauermann-Carroll (K-C)
 #'   bias correction for GEE with small number of clusters (default: TRUE).
@@ -86,20 +95,25 @@
 #'   `method='fpca'`.
 #' @param multicorr Method for adjusting p-values across multiple q-values
 #'   to account for correlation structure in Tsallis entropy (default: 'hochberg').
-#'   The interaction p-values from Scale-Adaptive Interaction Models naturally exhibit AR(1)
-#'   correlation for different q-values of the same gene (Papers S168-S175).
+#'   When the method performs ONE omnibus test per gene
+#'   (LMM/GEE/GAMM/FPCA global), q is part of the test itself and the family of
+#'   hypotheses is the set of GENES. The dependence relevant to FWER/FDR is the
+#'   dependence between gene p-values, not the AR(1) dependence between
+#'   q-values within a gene. Under arbitrary dependence use
+#'   `'benjamini-yekutieli'` (FDR) or `'westfall-young'` (FWER, validated
+#'   permutation). Hochberg assumes positive regression dependence between
+#'   GENE p-values, which is not guaranteed by any AR(1) property of q.
 #'   \itemize{
 #'     \item `'hochberg'`: Hochberg stepup procedure (FWER <= alpha under positive
 #'       regression dependence). Closed-form, computationally efficient.
-#'       Recommended for strong signal detection with family-wise error control.
+#'       Valid only if the dependence condition on gene p-values holds.
 #'     \item `'westfall-young'`: True Westfall-Young permutation procedure
 #'       (FWER <= alpha). Uses resampling to empirically control FWER by
 #'       tracking the minima across all tests. More powerful than Hochberg under
 #'       dependence but computationally expensive (refits LMM for each permutation).
 #'     \item `'benjamini-yekutieli'`: Benjamini-Yekutieli FDR control
 #'       (FDR <= alpha under arbitrary dependence). Valid under any correlation
-#'       structure. More conservative than Hochberg but makes fewer power loss
-#'       assumptions. Reference: Papers S190, S193.
+#'       structure. Reference: Benjamini & Hochberg (1995); Yekutieli (2008).
 #'   }
 #' @param wy_randomizations Number of permutation randomizations for
 #'   Westfall-Young correction (default: 1000). Only used when
@@ -109,12 +123,12 @@
 #'   computationally expensive as it requires refitting models for each
 #'   randomization.
 #' @param storey Logical; whether to apply Storey's adaptive FDR π0
-#'   estimation after the selected multicorr method (default: FALSE).
-#'   When TRUE, adapts the error threshold based on estimated proportion of
-#'   true null hypotheses, increasing power when many true signals are present.
-#'   Can be applied to any multicorr method. Computationally light enhancement.
-#'   Requires: .estimate_storey_pi0() and .compute_storey_qvalues() functions.
-#'   Reference: Storey (2002).
+#'   estimation (default: FALSE).
+#'   Storey's q-values are computed on the RAW gene-level
+#'   p-values; they are never chained after Westfall-Young adjusted p-values
+#'   (FWER-adjusted p-values are not Uniform(0,1) under the null). When TRUE,
+#'   the reported adjusted values are Storey FDR q-values derived from the raw
+#'   p-values. Reference: Storey (2002).
 #' @param adaptive_knots Logical; whether to use adaptive spline knot
 #'   selection for GAM method (default: TRUE). When TRUE, automatically adjusts
 #'   the number of basis functions (k) per gene based on entropy curve complexity,
@@ -204,7 +218,7 @@
 #'
 #'   Benjamini, Y., & Yekutieli, D. (2001). The control of the false discovery
 #'   rate in multiple testing under dependency. \emph{Annals of Statistics},
-#'   29(4), 1165-1188. FDR control under arbitrary dependence (Papers S190, S193).
+#'   29(4), 1165-1188. FDR control under arbitrary dependence.
 #'   Used in `multicorr='benjamini-yekutieli'` option.
 #'
 #'   Storey, J. D. (2002). A direct approach to false discovery rates.
@@ -248,7 +262,9 @@
     bias_correction = TRUE, regularization = c("pca", "lasso", "elasticnet", "gamsel",
         "spline"), corstr = c("ar1", "exchangeable", "independence", "auto"), multicorr = c("hochberg",
         "westfall-young", "benjamini-yekutieli"), storey = FALSE, wy_randomizations = 1000,
-    adaptive_knots = TRUE, return_model_data = FALSE) {
+    adaptive_knots = TRUE, block_col = NULL, strata_col = NULL,
+    permutation_scheme = c("auto", "within_subject", "within_block",
+        "within_strata", "unpaired_q"), return_model_data = FALSE) {
     
     # ========================================================================
     # STAGE 1: ARGUMENT NORMALIZATION & BASIC VALIDATION
@@ -346,6 +362,8 @@
         corstr = corstr, adaptive_knots = adaptive_knots,
         multicorr = multicorr, wy_randomizations = wy_randomizations,
         storey = storey, verbose = verbose,
+        block_col = block_col, strata_col = strata_col,
+        permutation_scheme = permutation_scheme,
         return_model_data = return_model_data, assay_name = assay_name)
 }
 
@@ -363,7 +381,7 @@
 .finalize_sait_results <- function(res, mat, se, metadata, method, pvalue,
     subject_col, paired, min_obs, nthreads, bias_correction, regularization,
     corstr, adaptive_knots, multicorr, wy_randomizations, storey, verbose,
-    return_model_data, assay_name) {
+    block_col, strata_col, permutation_scheme, return_model_data, assay_name) {
     
     if (!is.data.frame(res)) {
         stop(".fit_all_genes() should return a data.frame", call. = FALSE)
@@ -384,7 +402,7 @@
         stop("Results data.frame missing required 'p_interaction' column", call. = FALSE)
     }
     
-    # AUDIT FIX #23: Pass all parameters needed for Westfall-Young permutation refit.
+    # Pass all parameters needed for Westfall-Young permutation refit.
     # Without fit_one_fn and rownames_mat, the WY path cannot compute per-gene
     # permutation p-values and silently falls back to no adjustment.
     res$adj_p_interaction <- .adjust_pvalues_multicorr(p_values = res$p_interaction,
@@ -396,7 +414,8 @@
         subject_col = subject_col, paired = paired, min_obs = min_obs,
         nthreads = nthreads, bias_correction = bias_correction,
         regularization = regularization, corstr = corstr,
-        adaptive_knots = adaptive_knots)
+        adaptive_knots = adaptive_knots, block_col = block_col,
+        strata_col = strata_col, permutation_scheme = permutation_scheme)
     
     # Sort by adjusted p-values, then raw p-values
     res <- res[order(res$adj_p_interaction, res$p_interaction), , drop = FALSE]

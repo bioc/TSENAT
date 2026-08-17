@@ -41,7 +41,7 @@ While Tsallis entropy quantifies diversity *within* a single distribution, **Tsa
 
 **Mathematical Definition** (Furuichi formula): For two probability distributions $P$ and $Q$ representing isoform proportions in control and treatment conditions, Tsallis divergence is:
 
-$$D_q(P||Q) = \frac{1 - \sum_i p_i^q \cdot q_i^{1-q}}{q-1}$$
+$$D_q(P||Q) = \frac{\sum_i p_i^q \cdot q_i^{1-q} - 1}{q-1}$$
 
 where $p_i$ and $q_i$ are the probability values at position $i$.
 
@@ -161,12 +161,12 @@ For a complete walkthrough of the analysis pipeline with real biological example
 
 ## Statistical Inference Methods 
 
-TSENAT provides a flexible statistical framework optimized for entropy-based diversity analysis. The recommended main workflow (paired design) relies on **Generalized Additive Mixed Models (GAMM)** via [`mgcv::gamm()`](https://CRAN.R-project.org/package=mgcv) combined with ARIMA differencing.
+TSENAT provides a flexible statistical framework optimized for entropy-based diversity analysis. The recommended main workflow (paired design) relies on **Generalized Additive Mixed Models (GAMM)**: paired designs are fit with `nlme::lme` using regression splines (`ns(q, df = 3) × condition`), a subject random intercept, and AR(1) correlation within each subject × condition block, with the interaction tested via a marginal F-test.
 
 The statistical methods available in TSENAT include:
 
-- **Scale-adaptive interaction tests (SAIT)**: Multiple modeling approaches optimized for repeated measures with AR(1) correlation structure. GAM/GAMM, LMM, GEE and FPCA are all parametrized to handle the non-normality and heteroscedasticity characteristic of entropy data.
-- **Aligned Rank Transform (ART)**: State-of-the-art non-parametric interaction testing via the ARTool package (Kay et al. 2021). Strips main effects before ranking ("alignment") to properly preserve interaction structure — addressing the known limitation of classical rank-transform methods for factorial designs. The Conover-Iman Rank Transform remains available as a fallback via `method='rt'`.
+- **Scale-adaptive interaction tests (SAIT)**: Multiple modeling approaches for repeated q-ordered measurements. GAM/GAMM, LMM, GEE and FPCA model within-subject correlation with a working AR(1) structure within each subject × condition block, and are parametrized to handle the non-normality and heteroscedasticity characteristic of entropy data.
+- **Aligned Rank Transform (ART)**: State-of-the-art non-parametric interaction testing via the ARTool package (Kay et al. 2021). Strips main effects before ranking ("alignment") to properly preserve interaction structure — addressing the known limitation of classical rank-transform methods for factorial designs. The Conover-Iman Rank Transform remains available as a fallback via `method='rt'`. 
 - **M-estimation**: Robust location estimation for group comparison using iteratively re-weighted least squares, resistant to outliers.
 - **Jackknife isoform switching (JIS)**: Leave-one-out resampling to identify transcripts with condition-specific switching patterns and quantify their influence on entropy differences.
 

@@ -1,7 +1,7 @@
 context("Parallelization: Method Calculation with Multiple Threads")
 
-# Skip entire test file on Bioconductor due to long runtime (26.71s)
-skip_on_bioc()
+# Runtime ~27s: kept in the daily CI (Bioconductor check budget is 40 min).
+# Slow Monte Carlo validation lives in tests/testthat/ (skipped on Bioconductor via skip_on_bioc).
 
 # Internal helper access for calculate_method
 calculate_method <- TSENAT:::.calculate_method

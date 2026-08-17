@@ -384,13 +384,16 @@
     genes_filt <- genes_vec[tokeep]
     assay_mat_filt <- assay_mat[tokeep, , drop = FALSE]
 
+    # Precompute isoform index per gene (O(T) once); each gene lookup is O(1)
+    gene_index <- split(seq_along(genes_filt), genes_filt)
+
     # For each gene, calculate relative abundance of each isoform
     keep_iso <- rep(FALSE, sum(tokeep))  # length = # rows still kept
     gene_unique <- unique(genes_filt)
 
     for (gene in gene_unique) {
         # Get indices of all isoforms for this gene (within filtered set)
-        gene_idx <- which(genes_filt == gene)
+        gene_idx <- gene_index[[as.character(gene)]]
 
         if (length(gene_idx) == 1) {
             # Single isoform gene - always keep

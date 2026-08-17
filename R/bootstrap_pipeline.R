@@ -39,7 +39,7 @@
             warning("nboot = ", nboot, " is below minimum recommended (10). ", "CI bounds may be unreliable. Consider nboot >= 50 for production use.")
     } else if (nboot < 100 && !isTRUE(getOption("TSENAT.suppress_nboot_warning")) &&
         show_messages) {
-        warning("nboot = ", nboot, " is below recommended minimum (100). ", "Consider nboot >= 100 for stable CI estimates (per papers S111, S114).")
+        warning("nboot = ", nboot, " is below recommended minimum (100). ", "Consider nboot >= 100 for stable CI estimates (jackknife resampling literature, e.g., Zhang & Cao 2023).")
     }
     if (!is.numeric(ci) || ci <= 0 || ci >= 1) {
         stop("ci must be a probability in (0, 1).")
@@ -54,7 +54,7 @@
     total_count <- sum(x, na.rm = TRUE)
     if (total_count < 10 && show_messages) {
         warning("Total count (", total_count, ") below recommended minimum (10-20).\n",
-            "Bootstrap estimates may be unreliable (per papers S111, S114).")
+            "Bootstrap estimates may be unreliable (jackknife resampling literature, e.g., Zhang & Cao 2023).")
     }
 }
 
@@ -245,6 +245,23 @@
     pseudocount, what, gene_name, verbose, include_diagnostics, use_job, paired,
     effective_length = NULL, min_valid_frac = 0.75, resample_by = "read",
     counts_matrix = NULL) {
+    resample_by <- match.arg(resample_by)
+
+    # FAST PATH (optimization audit): standard read-level bootstrap on a
+    # vector. ONE C++ call resamples once per iteration and evaluates ALL q,
+    # instead of Q separate bootstrap runs. QC regeneration and degenerate
+    # cases fall back to the original per-q pipeline for identical behavior.
+    if (!paired && identical(resample_by, "read") && is.null(counts_matrix) &&
+        identical(method, "percentile")) {
+        fast <- .bootstrap_process_multiple_q_fast(x, q, norm, nboot, ci, log_base,
+            pseudocount, what, include_diagnostics, use_job, effective_length,
+            min_valid_frac)
+        if (!is.null(fast)) {
+            names(fast) <- paste0("q=", q)
+            return(structure(fast, class = c("tsenat_bootstrap_ci_list", "list")))
+        }
+    }
+
     results_list <- lapply(q, function(q_val) {
         .calculate_tsallis_entropy_bootstrap(x = x, se = NULL, res = NULL, top_n = 1,
             q = q_val, norm = norm, nboot = nboot, ci = ci, method = method, log_base = log_base,
@@ -255,6 +272,89 @@
     })
     names(results_list) <- paste0("q=", q)
     structure(results_list, class = c("tsenat_bootstrap_ci_list", "list"))
+}
+
+#' Fast multi-q bootstrap: one resample -> all q (percentile, unpaired, read)
+#'
+#' Mirrors the data transformation and result assembly of the per-q pipeline.
+#' Returns NULL when the fast path is not applicable (caller falls back).
+#'
+#' @noRd
+.bootstrap_process_multiple_q_fast <- function(x, q, norm, nboot, ci, log_base,
+    pseudocount, what, include_diagnostics, use_job, effective_length, min_valid_frac) {
+    q <- as.numeric(q)
+    n_q <- length(q)
+
+    # Same effective_length transformation as .bootstrap_compute_ci
+    x_for_calc <- x
+    effective_length_for_calc <- NULL
+    if (!is.null(effective_length) && length(effective_length) == length(x)) {
+        x_normalized <- x/effective_length
+        x_normalized[!is.finite(x_normalized)] <- 0
+        sum_original <- sum(x)
+        sum_normalized <- sum(x_normalized)
+        if (sum_normalized > 0) {
+            x_for_calc <- x_normalized * (sum_original/sum_normalized)
+        }
+    }
+
+    # ONE C++ call: nboot x n_q matrix (same resample for all q)
+    dist_matrix <- if (what == "S") {
+        bootstrap_compute_multi_q_cpp_wrapper(x = x_for_calc, q = q, normalize = norm,
+            nboot = nboot, log_base = log_base, pseudocount = pseudocount)
+    } else {
+        mat <- bootstrap_compute_multi_q_cpp_wrapper(x = x_for_calc, q = q, normalize = FALSE,
+            nboot = nboot, log_base = log_base, pseudocount = pseudocount)
+        # Hill number conversion per q (same as the single-q path)
+        for (j in seq_len(n_q)) {
+            qv <- q[j]
+            colj <- mat[, j]
+            if (abs(qv - 1) < 1e-06) {
+                mat[, j] <- exp(colj)
+            } else {
+                base <- 1 - (qv - 1) * colj
+                n_neg <- sum(base < 0, na.rm = TRUE)
+                if (n_neg > 0) {
+                  warning("Hill number conversion produced ", n_neg, " negative base values for q=",
+                    qv, ". Clamping to small positive value (1e-10).", call. = FALSE)
+                  base <- pmax(base, 1e-10)
+                }
+                mat[, j] <- base^(1/(1 - qv))
+            }
+        }
+        mat
+    }
+
+    results <- vector("list", n_q)
+    for (j in seq_len(n_q)) {
+        q_val <- q[j]
+        dist_j <- dist_matrix[, j]
+        n_valid <- sum(!is.na(dist_j))
+
+        # Degenerate/QC fallback: identical to the legacy per-q pipeline
+        # (includes regeneration attempts and all-Na warnings)
+        if (n_valid == 0 || (n_valid/nboot) < min_valid_frac) {
+            results[[j]] <- .calculate_tsallis_entropy_bootstrap(x = x, se = NULL,
+                res = NULL, top_n = 1, q = q_val, norm = norm, nboot = nboot,
+                ci = ci, method = "percentile", log_base = log_base, pseudocount = pseudocount,
+                what = what, gene_name = NULL, verbose = FALSE, include_diagnostics = include_diagnostics,
+                use_job = use_job, paired = FALSE, effective_length = effective_length,
+                min_valid_frac = min_valid_frac, resample_by = "read", counts_matrix = NULL)
+            next
+        }
+
+        point_est <- .calculate_tsallis_entropy(x_for_calc, q = q_val, norm = norm,
+            what = what, log_base = log_base, pseudocount = pseudocount,
+            effective_length = effective_length_for_calc)
+        ci_result <- .ci_percentile(dist_j, ci = ci)
+        diag_list <- .bootstrap_compute_diag(point_est, dist_j, use_job, paired = FALSE,
+            x = x_for_calc, q = q_val, norm = norm, nboot = nboot, ci = ci,
+            method = "percentile", log_base = log_base, pseudocount = pseudocount,
+            what = what, accel_factor = NA_real_)
+        results[[j]] <- .bootstrap_assemble_result(point_est, ci_result, dist_j,
+            ci, "percentile", nboot, diag_list, include_diagnostics, use_job)
+    }
+    results
 }
 
 
@@ -412,7 +512,7 @@
         ci_result <- .ci_percentile(bootstrap_dist, ci = ci)
         accel_factor <- NA_real_
     } else {
-        # AUDIT FIX #4: Pass x_for_calc (already normalized) and pre-computed point_est
+        # Pass x_for_calc (already normalized) and pre-computed point_est
         ci_result <- .ci_bca(x_for_calc, bootstrap_dist, q = q, norm = norm, ci = ci, log_base = log_base,
             pseudocount = pseudocount, what = what, point_est = point_est)
         accel_factor <- if (!is.null(ci_result$a))

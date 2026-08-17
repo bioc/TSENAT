@@ -45,12 +45,15 @@
 #' # print(p)
 #'
 plot_diversity_violin_density <- function(se, assay_name = "diversity", title = NULL,
-    output_file = NULL) {
+    output_file = NULL, q = NULL) {
     # Load visualization dependencies (ggplot2, cowplot, etc.)
     .load_visualization_deps()
 
-    # Normalize input (handles TSENATAnalysis → SE, condition_col, assay validation)
-    normalized <- .normalize_plot_input(se, assay_name = assay_name, multi_q = FALSE)
+    # Normalize input (handles TSENATAnalysis → SE, condition_col, assay
+    # validation). For single-q plots the q value MUST be unambiguous:
+    # explicit q=, or exactly one q stored in the object.
+    normalized <- .normalize_plot_input(se, assay_name = assay_name, multi_q = FALSE,
+        q = q)
     se <- normalized$se
 
     # Extract q-value and long-format data

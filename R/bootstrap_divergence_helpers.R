@@ -29,7 +29,7 @@
             return(NA_real_)
         divergence <- sum(p[idx] * log(p[idx]/r[idx], base = log_base))
     } else if (q > 0) {
-        # General Tsallis divergence (Furuichi 2006, I002)
+        # General Tsallis divergence (Furuichi 2006)
         # D_q(p||r) = (1/(q-1)) * (1 - sum(p^q * r^(1-q)))
 
         p_power <- p^q
@@ -64,7 +64,7 @@
     # as divergence should always be >= 0
     divergence <- abs(divergence)
 
-    # AUDIT FIX July 2026 (I10): log_base normalization only applies to the
+    # Log_base normalization only applies to the
     # q→1 (KL divergence) limit. For q≠1, Tsallis divergence is scale-invariant
     # and does not involve a logarithm base.
     if (abs(q - 1) < 1e-10 && log_base != exp(1)) {
@@ -72,7 +72,7 @@
     }
 
     # Normalize if requested
-    # AUDIT FIX July 2026 (I7): Max divergence normalization depends on q.
+    # Max divergence normalization depends on q.
     # - For q≈1 (KL limit): max = log(n), using Shannon-style max. Correct.
     # - For q>1: Tsallis divergence is bounded by 1/(q-1) when p and r are
     #   maximally different (one element concentrates in p, another in r).
@@ -127,7 +127,7 @@
         return(list(lower = as.numeric(lower), upper = as.numeric(upper)))
     }
 
-    # AUDIT FIX #12: Use strict < comparison with +0.5/B padding.
+    # Use strict < comparison with +0.5/B padding.
     # Clamp to avoid qnorm(0) = -Inf and qnorm(1) = Inf/NaN.
     prop_less <- (sum(boot_dist < theta_hat, na.rm = TRUE) + 0.5) / n
     prop_less <- pmax(0.001, pmin(0.999, prop_less))
@@ -138,7 +138,7 @@
         z0 <- 0
     }
 
-    # AUDIT FIX #3: BCa acceleration MUST be computed from true leave-one-out
+    # BCa acceleration MUST be computed from true leave-one-out
     # jackknife on the ORIGINAL data, not from the bootstrap distribution.
     # When jackknife_estimates is provided (e.g., from divergence jackknife),
     # use those. Otherwise fall back to bootstrap-based acceleration with a
@@ -436,6 +436,9 @@ print.tsenat_divergence_bootstrap_ci <- function(x, ...) {
 
     filtered_genes <- as.character(result[, 1])
 
+    # Precompute transcript->gene index once (O(T)); each gene lookup is O(1)
+    # instead of re-scanning the full genes vector (O(G*T)).
+    gene_index <- split(seq_along(genes), genes)
 
     # Create a list where each element is bootstrap results for one (gene,
     # sample) pair
@@ -446,11 +449,9 @@ print.tsenat_divergence_bootstrap_ci <- function(x, ...) {
 
     for (g_idx in seq_along(filtered_genes)) {
         g <- filtered_genes[g_idx]
-        tx_mask <- which(genes == g)
+        tx_mask <- gene_index[[as.character(g)]]
 
-
-
-        if (length(tx_mask) == 0)
+        if (is.null(tx_mask) || length(tx_mask) == 0)
             next
 
         # Get effective_length normalization for this gene's transcripts if

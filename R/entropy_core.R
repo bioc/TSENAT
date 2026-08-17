@@ -37,7 +37,7 @@
 
         # Filter out only negative values (zeros contribute 0 to entropy)
     # Filter out only negative values (zeros contribute 0 to entropy)
-    # AUDIT FIX R15: Removed >1e-15 threshold — zeros are valid, consistent with C++ fix #17
+    # Removed >1e-15 threshold — zeros are valid, consistent with C++ fix #17
     p_nonzero <- proportions[proportions >= 0]
 
     if (length(p_nonzero) == 0) {
@@ -51,9 +51,9 @@
     # Mathematically: S_0 = (1 - Σp_i^0)/(-1) = n_present - 1 (Tsallis 1988).
     # NOTE: This is the Tsallis ENTROPY (n_present-1), NOT the Hill number/effective
     # richness D_0 = n. The entropy value n_present-1 is consistent with the C++
-    # implementation (entropy_cpp, audit fix #5).
-    # AUDIT FIX R13: Changed from length(p) to length(p)-1.
-    # AUDIT FIX July 2026: Count only species with p > 0 (zeros contribute nothing
+    # implementation (entropy_cpp).
+    # Changed from length(p) to length(p)-1.
+    # Count only species with p > 0 (zeros contribute nothing
     # to species richness). Using sum(p > 0) instead of length(p) to exclude
     # zero-proportion isoforms.
     if (q < q_tol) {
@@ -72,14 +72,24 @@
         # The Tsallis formula (1 - Σp^q)/(q-1) is scale-invariant and does
         # not use a logarithm base. Only Shannon entropy (q→1 limit) uses
         # log_base for cross-study comparability.
-        H <- (1 - sum(p^q))/(q - 1)
+        # Numerically stable evaluation near q = 1. The raw
+        # form (1 - Σp^q)/(q-1) becomes 0/0 as q→1. With t = q-1 and
+        # Σ p exp(t log p) = 1 + Σ p expm1(t log p), the entropy equals
+        # -Σ p expm1(t log p) / t, which is stable for arbitrarily small t.
+        p_pos <- p[p > 0]
+        t_q <- q - 1
+        if (abs(t_q) < 1e-07) {
+            H <- -sum(p_pos * log(p_pos))/log(log_base)
+        } else {
+            H <- -sum(p_pos * expm1(t_q * log(p_pos)))/t_q
+        }
     }
 
     # Normalize by maximum entropy if requested
     if (norm) {
         n <- length(p)
         if (q < q_tol) {
-            # AUDIT FIX R14: Tsallis q=0 max = n - 1, not log(n)
+            # Tsallis q=0 max = n - 1, not log(n)
             H_max <- length(p) - 1
         } else if (abs(q - 1) < q_tol) {
             H_max <- log(n)/log(log_base)
@@ -152,7 +162,7 @@
         return(NA_real_)
 
     if (q < q_tol) {
-        # AUDIT FIX July 2026: Tsallis q=0 max = n_species - 1 (not n_species).
+        # Tsallis q=0 max = n_species - 1 (not n_species).
         # The maximum Tsallis entropy at q=0 for n species is n-1, achieved
         # when all n species have equal (non-zero) proportions.  Using n_species
         # would cause inconsistent normalization with .entropy_core() which
@@ -211,8 +221,8 @@
     # Calculate entropy using standardized core logic
     if (q < q_tol) {
         # Tsallis entropy at q=0: S_0 = n_nonzero - 1
-        # Consistent with .entropy_core() (AUDIT FIX R13) and entropy_cpp
-        # (AUDIT FIX #5).  Not the Hill number / effective richness D_0 = n.
+        # Consistent with .entropy_core() and entropy_cpp
+        # Not the Hill number / effective richness D_0 = n.
         p_nonzero <- p[p > 0]
         entropy <- length(p_nonzero) - 1
     } else if (abs(q - 1) < q_tol) {
@@ -226,7 +236,17 @@
     } else {
         # Generalized Tsallis entropy: (1 - sum(p^q)) / (q-1) [log_base NOT
         # applied]
-        entropy <- (1/(q - 1)) * (1 - sum(p^q))
+        # Stable evaluation near q = 1 via
+        # H = -Σ p expm1(t log p) / t with t = q - 1.
+        p_nonzero <- p[p > 0]
+        t_q <- q - 1
+        if (abs(t_q) < 1e-07) {
+            entropy <- if (length(p_nonzero) > 0) {
+                -sum(p_nonzero * log(p_nonzero)/log(log_base))
+            } else 0
+        } else {
+            entropy <- -sum(p_nonzero * expm1(t_q * log(p_nonzero)))/t_q
+        }
     }
 
     # Normalize to [0, 1] if requested

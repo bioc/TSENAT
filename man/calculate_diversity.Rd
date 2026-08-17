@@ -7,7 +7,7 @@
 calculate_diversity(
   analysis,
   q = NULL,
-  norm = TRUE,
+  norm = NULL,
   norm_method = NULL,
   reference_group = NULL,
   verbose = NULL,

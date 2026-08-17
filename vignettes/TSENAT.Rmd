@@ -447,7 +447,7 @@ Each gene produces a **q-curve**: a trajectory showing how entropy changes acros
 
 We can test for these interactions using one of four methods, each with specific strengths:
 
-- **GAM / GAMM** (generalized additive models / mixed models): flexibly capture nonlinear q-response patterns via adaptive smoothing splines. For unpaired (cross-sectional) designs, GAM is used directly. When `paired = TRUE`, `method = "gam"` automatically dispatches to GAMM internally, adding subject-level random intercepts and AR(1) correlation structure to accommodate within-subject correlation in repeated q-ordered measurements. GAMM can also be selected explicitly with `method = "gamm"`.
+- **GAM / GAMM** (generalized additive models / mixed models): flexibly capture nonlinear q-response patterns via adaptive smoothing splines. For unpaired (cross-sectional) designs, GAM is used directly. When `paired = TRUE`, `method = "gam"` automatically dispatches to GAMM internally: `nlme::lme` with regression splines (`ns(q, df = 3) × condition`), subject-level random intercepts and AR(1) correlation within each subject × condition block (marginal F-test for the interaction). `mgcv::gamm()` and standard GAM serve as fallbacks. GAMM can also be selected explicitly with `method = "gamm"`.
 - **LMM** (linear mixed models): parametric alternative with subject-level random intercepts for repeated q-ordered measurements.
 - **GEE** (generalized estimating equations): population-averaged approach particularly useful for paired and longitudinal designs with repeated q-measures.
 - **FPCA** (functional principal component analysis): treats q-values as ordered functional data, implicitly capturing q-ordering structure.
@@ -471,6 +471,10 @@ print(sait_results)
 ```{r display-interaction-results, echo = FALSE, results="asis"}
 sait_res <- results(analysis, type = "sait")
 if (!is.null(sait_res) && is.data.frame(sait_res) && nrow(sait_res) > 0) {
+    # Order by adjusted p-value so the table shows the 6 leading genes
+    if ("adj_p_interaction" %in% colnames(sait_res)) {
+        sait_res <- sait_res[order(sait_res$adj_p_interaction), ]
+    }
     display <- head(sait_res, 6)
     
     # Select only most informative columns
@@ -484,11 +488,23 @@ if (!is.null(sait_res) && is.data.frame(sait_res) && nrow(sait_res) > 0) {
     pval_cols <- grepl("^p_|^adj_p_", colnames(display))
     display[, numeric_cols & !pval_cols] <- round(display[, numeric_cols & !pval_cols], 4)
     
-    # Format p-values to show more precision (scientific notation for very small values)
+    # Format p-values robustly (no "0e+00" underflow artifacts)
+    fmt_p <- function(x) {
+        if (is.na(x)) return("NA")
+        if (x <= 0) return("<1e-300")
+        sprintf("%.2e", x)
+    }
     for (col in colnames(display)) {
         if (is.numeric(display[[col]]) && grepl("^p_|^adj_p_", col)) {
-            display[[col]] <- format(display[[col]], scientific = TRUE, digits = 3)
+            display[[col]] <- vapply(display[[col]], fmt_p, character(1))
         }
+    }
+    
+    # Effect size as percentage
+    if ("effect_size" %in% colnames(display)) {
+        display$effect_size <- vapply(display$effect_size, function(x) {
+            if (is.na(x) || !is.finite(x)) "NA" else sprintf("%.1f%%", x * 100)
+        }, character(1))
     }
     
     knitr::kable(display, 
@@ -500,7 +516,7 @@ if (!is.null(sait_res) && is.data.frame(sait_res) && nrow(sait_res) > 0) {
 
 **Interpretation:**
 
-- **Effect Size**: Proportion of deviance in entropy explained by the q × condition interaction, ranging from 0 to 1. Larger values indicate stronger scale-dependent effects, but note that deviance explained in GAMs differs from classical η² and does not share the same interpretive thresholds (Cohen's conventions for η² do not directly apply).
+- **Effect Size**: Proportion of variance in entropy explained by the fitted model, ranging from 0 to 1 (deviance explained for GAM paths; model pseudo-R² for the paired regression-spline path). Larger values indicate stronger scale-dependent effects, but note that this deviance/R² scale differs from classical η² and does not share the same interpretive thresholds (Cohen's conventions for η² do not directly apply).
 - **Test Statistic** ($F$): F-statistic for the smooth interaction term, quantifying the signal-to-noise ratio of the scale-dependent effect.
 - **Model Converged**: TRUE if the GAM optimization converged successfully; FALSE indicates convergence failure (results for that gene are unreliable and should be excluded).
 - **Heteroscedasticity**: TRUE indicates variance heterogeneity was detected across the q-spectrum (assumption violated, results warrant caution).
@@ -647,7 +663,7 @@ To understand which diversity scales show the most pronounced biological differe
 
 For two probability distributions $P$ and $Q$ representing isoform proportions in control and treatment conditions, Tsallis divergence is:
 
-$$D_q(P||Q) = \frac{1 - \sum_i p_i^q \cdot q_i^{1-q}}{q-1}$$
+$$D_q(P||Q) = \frac{\sum_i p_i^q \cdot q_i^{1-q} - 1}{q-1}$$
 
 where $p_i$ and $q_i$ are the probability values at position $i$.
 

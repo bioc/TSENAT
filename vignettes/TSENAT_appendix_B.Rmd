@@ -44,13 +44,13 @@ The primary goal of this vignette is to validate that discoveries of scale-depen
 
 ## Two Complementary Validation Approaches
 
-**Method 1: Generalized Additive Mixed Models (GAMM)** with ARIMA-Ordered Measurement Structure.
+**Method 1: Generalized Additive Mixed Models (GAMM)** with functional q-curve structure.
 
-- Framework: Semi-parametric model combining flexible smooth functions (thin-plate splines) with mixed-effects structure; assumes additive model Y = f₁(q) + f₂(condition) + f₃(q, condition) + subject-intercept + ε where f terms are smooth rather than linear.
-- Paired design structure: Uses random intercepts by subject (~1|subject) with AR(1) correlation structure to accommodate repeated entropy measurements across q-values within each subject. This hierarchical approach preserves paired sample structure while modeling autocorrelation in q-ordered measurements.
-- Distributional assumption: Uses Gaussian residuals (standard for mixed-effects models); automatically detects bounded support [0,1] entropy but applies Gaussian family due to `mgcv::gamm()` limitations with extended families in paired designs.
-- Treatment of entropic structure: Treats q-values as time-like ordered measurements within each subject, applies ARIMA(1,1,0) first-differencing to remove monotone trend and ensure stationarity; AR(1) correlation structure captured through nlme::corAR1() specification.
-- Heteroscedasticity handling: Automatically detects variance heterogeneity (Breusch-Pagan test); however, heteroscedasticity-based variance weights are not applied in paired designs due to `mgcv::gamm()` limitations.
+- Framework: Semi-parametric model combining flexible smooth functions (regression splines in paired designs) with mixed-effects structure; assumes additive model Y = f₁(q) + f₂(condition) + f₃(q, condition) + subject-intercept + ε where f terms are smooth rather than linear.
+- Paired design structure: Uses random intercepts by subject (~1|subject) with AR(1) correlation structure to accommodate repeated entropy measurements across q-values within each subject. Paired models are fit via `nlme::lme` with natural regression splines (`ns(q, df = 3) × condition`) and a marginal F-test for the interaction; this hierarchical approach preserves paired sample structure while modeling autocorrelation in q-ordered measurements.
+- Distributional assumption: Uses Gaussian residuals (standard for mixed-effects models); automatically detects bounded support [0,1] entropy but applies Gaussian family because the paired mixed-model paths (`nlme::lme` / `mgcv::gamm()`) do not support extended families in paired designs.
+- Treatment of entropic structure: q is treated as a deterministic functional argument of the Tsallis statistic, not as a time index. The confirmatory hypothesis is the functional interaction — H0: β(q) = 0 for all q, tested on the ORIGINAL entropy curve H(q). The AR(1) structure in `nlme::corAR1()` is a working covariance model for the functional residuals, validated by Monte Carlo simulation.
+- Heteroscedasticity handling: Automatically detects variance heterogeneity (Breusch-Pagan test); however, heteroscedasticity-based variance weights are not applied in paired designs due to paired mixed-model path limitations (`nlme::lme` / `mgcv::gamm()`).
 - Key advantage: Captures smooth nonlinear q × condition interactions while accommodating paired sample correlation structure through random intercepts and AR(1) correlation modeling.
 
 **Method 2: Aligned Rank Transform (ART)** — State-of-the-art non-parametric interaction testing, with Hochberg Step-Up Correction. The Conover-Iman Rank Transform is also available via the `method='rt'` option as an alternative approach.
@@ -70,7 +70,7 @@ Statistical testing in transcriptomics faces a fundamental challenge: no single 
 |--------|------------------------|----------------------|
 | Assumptions | Normality, homoscedasticity | None; aligned ranks, fully non-parametric |
 | Power | Highest (if assumptions hold) | Good; reduced but robust to violations |
-| Interaction testing | F-test on penalized smooth terms | Proper interaction tests via alignment [@S271] |
+| Interaction testing | Marginal F-test on regression-spline interaction terms | Proper interaction tests via alignment [@S271] |
 | q-value treatment | Continuous smooth predictor (preserves ordinal structure) | Categorical factor (discards ordering) |
 | Robustness | Moderate | Highest |
 | Outlier sensitivity | Moderate potential for bias | Minimal; inherently resistant |
@@ -428,16 +428,19 @@ if ("p_interaction" %in% colnames(sait_results)) {
       }
       
       # Format p-value columns with scientific notation for very small values
+      fmt_p <- function(x) {
+        if (is.na(x)) return("NA")
+        if (x <= 0) return("<1e-300")
+        if (x < 0.001) sprintf("%.2e", x) else sprintf("%.6f", x)
+      }
       if ("p_interaction" %in% colnames(gam_display)) {
-        gam_display$p_interaction <- sapply(gam_display$p_interaction, function(x) {
-          if (is.na(x)) "NA" else if (x < 0.001) sprintf("%.2e", x) else sprintf("%.6f", x)
-        })
+        gam_display$p_interaction <- vapply(gam_display$p_interaction, fmt_p,
+          character(1))
       }
       
       if ("adj_p_interaction" %in% colnames(gam_display)) {
-        gam_display$adj_p_interaction <- sapply(gam_display$adj_p_interaction, function(x) {
-          if (is.na(x)) "NA" else if (x < 0.001) sprintf("%.2e", x) else sprintf("%.6f", x)
-        })
+        gam_display$adj_p_interaction <- vapply(gam_display$adj_p_interaction,
+          fmt_p, character(1))
       }
       
       # Format effect size as percentage
@@ -514,21 +517,13 @@ if (!is.null(concordance_results) && is.list(concordance_results)) {
                  row.names = FALSE))
   }
   
-  # Display agreement distribution
-  if (!is.null(concordance_results$agreement_dist) && nrow(concordance_results$agreement_dist) > 0) {
-    cat("\n")
-    print(knitr::kable(concordance_results$agreement_dist, 
-                 caption = "**Supplementary Table 20 | Agreement Distribution: Concordance by Gene Category.** Distribution of genes across categories: both methods significant, GAMM only, ART only, and neither method.",
-                 align = c("l", "r", "r"),
-                 row.names = FALSE))
-  }
-  
-  # Display high-confidence genes (concordant in both methods)
+  # Display high-confidence genes (concordant in both methods), top 10
   if (!is.null(concordance_results$high_conf_table) && nrow(concordance_results$high_conf_table) > 0) {
     cat("\n")
+    hc_top <- head(concordance_results$high_conf_table, 10)
     n_hc <- nrow(concordance_results$high_conf_table)
-    print(knitr::kable(concordance_results$high_conf_table, 
-                 caption = paste0("**Supplementary Table 21 | Robust Entropic Order Index Interactions: High-Confidence Genes Detected by Both Methods (n=", n_hc, ", ranked by statistical significance).** Cross-method validation: genes significant in both GAMM and ART provide strongest evidence for q × condition effects."),
+    print(knitr::kable(hc_top, 
+                 caption = paste0("**Supplementary Table 20 | Robust Entropic Order Index Interactions: Top 10 High-Confidence Genes Detected by Both Methods (of ", n_hc, " concordant, ranked by statistical significance).** Cross-method validation: genes significant in both GAMM and ART provide strongest evidence for q × condition effects."),
                  align = c("l", "r", "r", "r", "r"),
                  row.names = FALSE))
   }
@@ -545,7 +540,7 @@ GAMM's superior power derives from three factors:
 
 1. Distributional assumptions: GAMM assumes approximately normal residuals and homogeneous variance, which are reasonable after appropriate transformation for entropy data. Under these assumptions, parametric methods are theoretically optimal, achieving maximum power for a given type I error rate. ART is assumption-free but necessarily discards quantitative information through alignment and ranking, which reduces statistical power when the underlying data are approximately normal.
 
-2. Model flexibility with penalty: GAMM uses thin-plate splines with smoothness penalties that simultaneously fit nonlinear patterns while controlling degrees of freedom. This flexibility allows GAMM to detect subtle entropic index × group interactions across all q-values.
+2. Model flexibility: GAMM captures nonlinear q patterns with splines (natural regression splines with 3 df for paired designs) that simultaneously fit nonlinear trends while controlling degrees of freedom. This flexibility allows GAMM to detect subtle entropic index × group interactions across all q-values.
 
 3. Continuous vs. categorical q treatment: GAMM models q as a continuous smooth predictor across all 41 q-values, preserving the ordinal structure and borrowing strength across adjacent q-levels. ART treats q as a categorical factor — while this enables proper interaction testing via alignment, it discards the continuous ordering information, reducing sensitivity to graded q-dependent trends. This discretization is a major contributor to ART's lower power relative to GAMM, independent of distributional assumptions.
 

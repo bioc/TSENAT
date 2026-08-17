@@ -136,31 +136,28 @@
         p <- x/sum(x)
     }
 
+    # Compute ONLY the requested quantity (previously both S and D were always
+    # evaluated even when only one was requested: ~2x wasted work per vector).
     tol <- sqrt(.Machine$double.eps)
-    S_vec <- .calc_S(p = p, q = q, tol = tol, n = n, log_base = log_base, norm = norm)
-    D_vec <- .calc_D(p = p, q = q, tol = tol, log_base = log_base)
+    format_out <- function(v) {
+        if (length(q) > 1) {
+            names(v) <- paste0("q=", q)
+            return(v)
+        }
+        unname(v)
+    }
 
     if (what == "S") {
-        out <- S_vec
-        if (length(q) > 1) {
-            names(out) <- paste0("q=", q)
-        }
-        if (length(q) == 1) {
-            return(unname(out))
-        }
-        return(out)
+        return(format_out(.calc_S(p = p, q = q, tol = tol, n = n, log_base = log_base,
+            norm = norm)))
     }
     if (what == "D") {
-        out <- D_vec
-        if (length(q) > 1) {
-            names(out) <- paste0("q=", q)
-        }
-        if (length(q) == 1) {
-            return(unname(out))
-        }
-        return(out)
+        return(format_out(.calc_D(p = p, q = q, tol = tol, log_base = log_base)))
     }
+
     # both
+    S_vec <- .calc_S(p = p, q = q, tol = tol, n = n, log_base = log_base, norm = norm)
+    D_vec <- .calc_D(p = p, q = q, tol = tol, log_base = log_base)
     names(S_vec) <- paste0("q=", q)
     names(D_vec) <- paste0("q=", q)
     return(list(S = S_vec, D = D_vec))
@@ -299,7 +296,7 @@
         valid_mask <- !is.na(n_iso_vec) & n_iso_vec > 1 & !is.na(col_q) & !is.na(s_vals) &
             is.finite(s_vals) & s_max_vec > 0
 
-        # AUDIT FIX July 2026: Use log(..., base = log_base) instead of hardcoded
+        # Use log(..., base = log_base) instead of hardcoded
         # natural log to maintain consistency with the entropy calculation's
         # logarithm base.
         # Also handle s_vals ≤ 0: these are non-positive entropy estimates
@@ -628,7 +625,8 @@
 #' unreliable confidence intervals. Filtering by minimum count prevents this.
 #'
 #' **References:**
-#' Papers S070, S197 (DESeq2, edgeR) recommend filtering low-abundance genes
+#' Bioconductor (2022) and Love et al. (2014, DESeq2) recommend filtering
+#' low-abundance genes
 #' before hypothesis testing because their estimates are unreliable.
 #'
 #' @examples
@@ -933,7 +931,7 @@
     alpha <- 1 - ci
     z_alpha <- qnorm(alpha/2)  # Two-tailed critical value
 
-    # AUDIT FIX #4: Accept pre-computed point_est from caller to avoid recomputing
+    # Accept pre-computed point_est from caller to avoid recomputing
     # from raw x when x has already been normalized (e.g., by effective_length).
     if (is.null(point_est)) {
         point_est <- .calculate_tsallis_entropy(x, q = q, norm = norm, what = what, log_base = log_base,
@@ -942,7 +940,7 @@
     point_est <- as.numeric(point_est)
 
     # Proportion of bootstrap replicates <= point estimate
-    # AUDIT FIX #12: Use strict < comparison with +0.5/B padding to prevent
+    # Use strict < comparison with +0.5/B padding to prevent
     # qnorm(0) → -Inf when all bootstrap values exceed the point estimate.
     # Clamp to [0.001, 0.999] to avoid qnorm(1) = Inf producing NaN.
     B <- length(bootstrap_dist)
@@ -950,7 +948,7 @@
     prop_less <- max(0.001, min(0.999, prop_less))
     z0 <- qnorm(prop_less)
 
-    # AUDIT FIX #3: BCa acceleration MUST be computed from true leave-one-out
+    # BCa acceleration MUST be computed from true leave-one-out
     # jackknife on the ORIGINAL data, not from the bootstrap distribution.
     # Computing leave-one-out means of bootstrap replicates yields theta_jack[i] ≈ theta_bar
     # for all i when B is large, forcing a → 0 and silently disabling the BCa skewness correction.
@@ -1031,10 +1029,16 @@
 .estimate_shrinkage_params <- function(x, genes, entropy_matrix, q = 2, min_count = 1) {
     gene_levels <- unique(genes)
 
+    # Precomputed transcript->gene index (O(T) once) for O(1) per-gene lookups
+    gene_index <- split(seq_along(genes), genes)
+
     # Count expressed isoforms per gene (non-zero after filtering) Use vapply
     # with named input to preserve gene names in output
     n_isoforms <- vapply(setNames(gene_levels, gene_levels), function(g) {
-        gene_mask <- genes == g
+        gene_mask <- gene_index[[as.character(g)]]
+        if (is.null(gene_mask)) {
+            return(0L)
+        }
         gene_counts <- rowSums(x[gene_mask, , drop = FALSE])
         sum(gene_counts > min_count)
     }, FUN.VALUE = integer(1))
@@ -1075,22 +1079,16 @@
 
         # Get mean entropy and variance for each gene from this column
         entropy_vals <- entropy_matrix[, col_name]
-        gene_names <- rownames(entropy_matrix)
 
-        # For each gene, calculate per-sample variance Map genes to their rows
-        # and compute row-wise variance
-        gene_variances <- vapply(gene_names, function(g_name) {
-            # Find the index of this gene
-            gene_idx <- which(rownames(entropy_matrix) == g_name)
-            if (length(gene_idx) > 0) {
-                # This gene has a single entropy value per sample-q combination
-                # We use the mean entropy value as a proxy for expression level
-                var(entropy_matrix[gene_idx, grep(paste0("_q=", q_val, "$"), colnames(entropy_matrix))],
-                  na.rm = TRUE)
-            } else {
-                NA
-            }
-        }, FUN.VALUE = numeric(1))
+        # Row-wise variance across this q's sample columns (vectorized; no
+        # O(G^2) rowname scans). Each gene row holds the same q across its
+        # samples, so its row variance is the per-gene spread for this q.
+        q_col_idx <- grep(paste0("_q=", q_val, "$"), colnames(entropy_matrix))
+        gene_variances <- if (length(q_col_idx) > 0) {
+            apply(entropy_matrix[, q_col_idx, drop = FALSE], 1, var, na.rm = TRUE)
+        } else {
+            rep(NA_real_, nrow(entropy_matrix))
+        }
 
         # Fit loess trend: variance ~ mean entropy per q-value Only use genes
         # with valid finite values for robust fitting
@@ -1127,7 +1125,8 @@
                 # Outlier detection: genes with variance >2SD from trend (Love
                 # et al. 2014 DESeq2)
                 outlier_threshold <- 2 * sd_resid
-                outliers <- gene_names[valid_idx][abs(residuals) > outlier_threshold]
+                outliers <- rownames(entropy_matrix)[valid_idx][abs(residuals) >
+                  outlier_threshold]
                 outlier_genes[[col_name]] <- outliers
 
             }, error = function(e) {
@@ -1225,7 +1224,7 @@
 
     # Pre-allocate weights matrix (vectorized storage)
     weights_matrix <- matrix(1, nrow = n_rows, ncol = n_cols)
-    # AUDIT FIX July 2026: Initialize to NA_real_ instead of 0 so that
+    # Initialize to NA_real_ instead of 0 so that
     # columns whose q-value cannot be matched do not silently fill NAs with 0.
     means_vector <- rep(NA_real_, n_cols)
 
@@ -1364,6 +1363,10 @@
     # multiple values when length(q) > 1
     gene_levels <- unique(genes)
 
+    # Precompute transcript->gene index ONCE (O(T)) instead of scanning the
+    # full genes vector for every gene (O(G*T)) inside .tsallis_row.
+    gene_index <- split(seq_along(genes), genes)
+
     # ensure column names order matches the order used when constructing the
     # result matrix (samples vary outer, q varies inner). If sample names are
     # missing, synthesize deterministic names so column creation still works.
@@ -1377,7 +1380,8 @@
     # compute requested quantity ('S' or 'D') in parallel
     result_list <- .bplapply(gene_levels, function(gene) {
         .tsallis_row(x = x, genes = genes, gene = gene, q = q, norm = norm, what = what,
-            pseudocount = pseudocount, effective_length = effective_length, log_base = log_base)
+            pseudocount = pseudocount, effective_length = effective_length, log_base = log_base,
+            gene_index = gene_index)
     }, nthreads = nthreads)
 
     # Convert list to matrix (each element is a named vector) result_list is a
@@ -1447,39 +1451,58 @@
 # Internal helpers for calculate_method
 
 .tsallis_row <- function(x, genes, gene, q, norm, what, pseudocount = 0, effective_length = NULL,
-    log_base = exp(1)) {
-    idx <- which(genes == gene)
+    log_base = exp(1), gene_index = NULL) {
+    # O(1) transcript lookup from the precomputed gene index (built ONCE per
+    # .calculate_method call); direct callers fall back to the linear scan.
+    if (!is.null(gene_index)) {
+        idx <- gene_index[[as.character(gene)]]
+        if (is.null(idx))
+            idx <- integer(0)
+    } else {
+        idx <- which(genes == gene)
+    }
     n_q <- length(q)
     n_samples <- ncol(x)
 
     # Pre-allocate output vector to avoid unlist(lapply(...)) overhead
     out <- setNames(numeric(n_q * n_samples), NULL)
 
-    # Vectorized loop for each sample
+    # Extract the gene block ONCE and apply sample-independent transforms once
+    counts_mat <- x[idx, , drop = FALSE]
+    if (nrow(counts_mat) == 0) {
+        out[] <- NA_real_
+        return(out)
+    }
+
+    # Apply pseudocount to the whole block (equivalent to per-sample addition)
+    if (pseudocount > 0) {
+        counts_mat <- counts_mat + pseudocount
+    }
+
+    # Effective-length normalization: precompute the vector case (one
+    # division per transcript applied to all samples); the matrix case is
+    # applied per sample as before.
+    el_vec <- NULL
+    if (!is.null(effective_length) && is.vector(effective_length)) {
+        el_vec <- effective_length[idx]
+    }
+
     for (j in seq_len(n_samples)) {
-        # Get counts for this gene and sample
-        counts <- x[idx, j]
+        counts <- counts_mat[, j]
 
-        # Apply pseudocount to counts (add before calculating proportions)
-        if (pseudocount > 0) {
-            counts <- counts + pseudocount
-        }
-
-        # Apply effective length normalization if provided
         if (!is.null(effective_length)) {
-            el <- NULL
-            if (is.vector(effective_length)) {
-                el <- effective_length[idx]
+            if (!is.null(el_vec)) {
+                if (length(el_vec) == length(counts)) {
+                  counts <- counts/el_vec
+                }
             } else if (is.matrix(effective_length)) {
                 el <- effective_length[idx, j]
-            }
-            # Normalize counts by effective length (convert to TPM-like units)
-            if (!is.null(el) && length(el) == length(counts)) {
-                counts <- counts/el
+                if (!is.null(el) && length(el) == length(counts)) {
+                  counts <- counts/el
+                }
             }
         }
 
-        # Calculate entropy on the adjusted counts
         v <- .calculate_tsallis_entropy(counts, q = q, norm = norm, what = what, log_base = log_base)
         out_idx <- (j - 1) * n_q + seq_len(n_q)
         if (length(v) == n_q && all(is.finite(v) | is.na(v))) {

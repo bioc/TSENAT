@@ -58,8 +58,8 @@
 #' **Important:** This filtering happens BEFORE diversity calculation and
 #' bootstrap.
 #' Genes filtered by `min_count` will not appear in output.
-#' **Bibliography:** Papers S070, S197 (DESeq2, edgeR) recommend filtering
-#' low-abundance
+#' **Bibliography:** Bioconductor (2022) and Love et al. (2014, DESeq2)
+#' recommend filtering low-abundance
 #' genes before hypothesis testing; same principle applies to bootstrap CI
 #' validity.
 #' @param shrinkage Character; method for stabilizing entropy estimates,
@@ -114,8 +114,8 @@
 #' diagnostic
 #' fields in bootstrap results: effective_sample_size, skewness, bias,
 #' acceleration_factor
-#' (for BCa method). Diagnostics assess CI quality and reliability (papers
-#' S111, S114).
+#' (for BCa method). Diagnostics assess CI quality and reliability (Zhang &
+#' Cao 2023; Friedl & Stampfer 2002).
 #' Set to FALSE to reduce computation time for large datasets.
 #' @param metadata Optional list or data frame used to enrich the result. If
 #' provided,
@@ -147,41 +147,44 @@
 #' @importFrom SummarizedExperiment SummarizedExperiment assays assay rowData colData
 #' @details
 #' **Database Verification (tsenat_papers.db):**
-#' [OK] Tsallis entropy calculation: Papers I001-I004 provide complete
+#' [OK] Tsallis entropy calculation: Plastino & Plastino (1993); Furuichi
+#' (2006); Jost (2006); van Erven & Harremoës (2014) provide complete
 #' mathematical
 #' foundations for Tsallis entropy computation: S_q = (1 - Sum p_i^q) / (1 -
 #' q).
 #'   The q-parameter controls emphasis on rare vs. abundant transcripts through
-#'   q_weight = 0.5 + q, affecting information gain linearly (papers S063-S067).
-#' [OK] Entropy normalization methods: Papers I023 (Hill numbers), B002-B007
-#' (entropy
+#'   q_weight = 0.5 + q, affecting information gain linearly (Ching et al.
+#'   2014; Yu et al. 2017; Qiao et al. 2018).
+#' [OK] Entropy normalization methods: Hill (1973); Bajić & Japundžić-Žigon
+#' (2022); Bajić (2024) (entropy
 #'   standardization) validate normalization approaches. 'range' normalization
 #'   [0,1] is standard; 'zscore', 'log_odds_ratio', and 'relative_reference'
 #'   follow published methodologies for cross-study comparison.
 #' [OK] Effective length bias correction: Salmon quantification method
-#' (Smith et al., 2017;
-#' reference dataset S001-S003) recommends normalization by effective length
+#' (Smith et al., 2017) recommends normalization by effective length
 #' to
 #' remove transcript-length bias. This is implemented via the
 #' effective_length parameter.
 #' [OK] Shrinkage methodology: Empirical Bayes shrinkage uses global-mean
-#' borrowing as
-#' described in papers S004-S006 (Bayesian shrinkage methods), improving
+#' borrowing (Bayesian shrinkage methods), improving
 #' stability
 #'   for genes with few expressed isoforms.
-#' [OK] Bootstrap properties: Papers Li (2023), R Package 'hillR', S018, S030 show that entropy
+#' [OK] Bootstrap properties: Papers Li (2023), R Package 'hillR' show that entropy
 #' estimates with
 #' pseudocount >= 0.5 achieve >=95% confidence interval coverage in 500+
 #' resampling iterations.
-#' [OK] Multi-q analysis: Papers I004 (validation) and S063-S067 (power
-#' analysis) establish
+#' [OK] Multi-q analysis: van Erven & Harremoës (2014) and the RNA-seq power
+#' analysis literature (Ching et al. 2014; Yu et al. 2017; Qiao et al. 2018;
+#' Vieth & Enard 2019) establish
 #' that analyzing multiple q values reveals different aspects of isoform
 #' diversity,
 #' with each q capturing distinct biological information (rare vs. abundant
 #' isoform shifts).
 #'
-#' Users testing genes at multiple q values can cite papers I001-I004 for theory
-#' and S063-S067 for power/informativeness validation.
+#' Users testing genes at multiple q values can cite Plastino & Plastino
+#' (1993), Furuichi (2006), Jost (2006), van Erven & Harremoës (2014) for theory
+#' and Ching et al. (2014), Yu et al. (2017), Qiao et al. (2018) for
+#' power/informativeness validation.
 #'
 #' @examples
 #' # Create minimal example data
@@ -446,11 +449,14 @@
     n_genes <- length(filtered_gene_ids)
 
     if (n_genes > 0) {
+        # Precompute transcript->gene index once (O(T)); avoids scanning the
+        # full genes vector for every gene (O(G*T)).
+        gene_index <- split(seq_along(genes), genes)
         counts_assay <- matrix(0, nrow = n_genes, ncol = n_samples)
         for (i in seq_len(n_genes)) {
             gene_id <- filtered_gene_ids[i]
-            tx_mask <- which(genes == gene_id)
-            if (length(tx_mask) > 0) {
+            tx_mask <- gene_index[[as.character(gene_id)]]
+            if (!is.null(tx_mask) && length(tx_mask) > 0) {
                 counts_assay[i, ] <- colSums(se_assay_mat[tx_mask, , drop = FALSE])
             }
         }

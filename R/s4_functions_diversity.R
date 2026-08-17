@@ -202,7 +202,7 @@
 #'
 #' @export
 #' @importFrom utils write.table
-calculate_diversity <- function(analysis, q = NULL, norm = TRUE, norm_method = NULL,
+calculate_diversity <- function(analysis, q = NULL, norm = NULL, norm_method = NULL,
     reference_group = NULL, verbose = NULL, show_messages = FALSE, what = NULL, nthreads = NULL,
     pseudocount = NULL, min_valid_frac = NULL, shrinkage = NULL, bootstrap = NULL,
     nboot = NULL, bootstrap_method = NULL, bootstrap_ci = NULL, bootstrap_include_diagnostics = NULL,

@@ -901,7 +901,7 @@ test_that("calculate_divergence handles bootstrap with bca method", {
     group_col_name = "sample_type"
   )
   
-  result <- .calculate_divergence(
+  result <- suppressWarnings(.calculate_divergence(
     se,
     group_col = "sample_type",
     control_group = "Control",
@@ -909,7 +909,7 @@ test_that("calculate_divergence handles bootstrap with bca method", {
     nboot = 100,
     method = "bca",  # Bias-corrected accelerated method
     progress = FALSE
-  )
+  ))
   
   expect_true(methods::is(result, "SummarizedExperiment"))
 })
@@ -1550,10 +1550,10 @@ test_that("[BUG #4] Divergence merge detects partial matches as error", {
 })
 
 # ============================================================================
-# AUDIT FIX TESTS: Divergence sign, support violations, unequal-length warning
+# TESTS: Divergence sign, support violations, unequal-length warning
 # ============================================================================
 
-test_that("[AUDIT #6] tsallis_divergence_cpp returns large finite value on support violation (KL)", {
+test_that("tsallis_divergence_cpp returns large finite value on support violation (KL)", {
     # KL divergence: when p>0 but r=0, divergence should be very large
     # (finite, not +Inf — to keep bootstrap quantiles computable)
     p <- c(0.5, 0.5)
@@ -1564,7 +1564,7 @@ test_that("[AUDIT #6] tsallis_divergence_cpp returns large finite value on suppo
     expect_true(div > 1000)  # Very large but finite
 })
 
-test_that("[AUDIT #6] tsallis_divergence_cpp returns large finite value on support violation (q>1)", {
+test_that("tsallis_divergence_cpp returns large finite value on support violation (q>1)", {
     # Tsallis divergence q>1: when p>0 but r=0, divergence should be very large (finite)
     p <- c(0.5, 0.5)
     r <- c(1.0, 0.0)
@@ -1574,7 +1574,7 @@ test_that("[AUDIT #6] tsallis_divergence_cpp returns large finite value on suppo
     expect_true(div > 1000)
 })
 
-test_that("[AUDIT #6] tsallis_divergence_cpp has correct sign (no abs wrapper)", {
+test_that("tsallis_divergence_cpp has correct sign (no abs wrapper)", {
     # Divergence should be non-negative by mathematical property,
     # not because of an abs() wrapper masking sign errors.
     p <- c(0.3, 0.7)
@@ -1589,7 +1589,7 @@ test_that("[AUDIT #6] tsallis_divergence_cpp has correct sign (no abs wrapper)",
     expect_equal(div_identical, 0, tolerance = 1e-10)
 })
 
-test_that("[AUDIT #6] tsallis_divergence_cpp q=0 always returns 0", {
+test_that("tsallis_divergence_cpp q=0 always returns 0", {
     p <- c(0.3, 0.7)
     r <- c(0.5, 0.5)
     
@@ -1597,7 +1597,7 @@ test_that("[AUDIT #6] tsallis_divergence_cpp q=0 always returns 0", {
     expect_equal(div, 0)
 })
 
-test_that("[AUDIT #25] tsallis_divergence_cpp warns on unequal-length vectors", {
+test_that("tsallis_divergence_cpp warns on unequal-length vectors", {
     p <- c(0.3, 0.4, 0.3)
     r <- c(0.5, 0.5)  # Different length
     
@@ -1689,11 +1689,15 @@ test_that("M6: q=0 divergence is support-difference (not constant zero)", {
     # Different supports → divergence should be > 0
     expect_true(div_diff > 0)
 
-    # With pseudocount > 0, all entries get positive probability → supports identical
+    # q=0 is now evaluated on the RAW (pre-pseudocount) support
+    # (review_divergence.md, Option A): with pseudocount > 0 the regularized
+    # vectors are all-positive, but the support divergence still reflects the
+    # underlying zero structure.
+    # Here: raw P support = {1, 2}; raw R = (0.3, 0, 0.7) → D_0 = 1 - 0.3 = 0.7
     div_same_smoothed <- TSENAT:::.tsallis_divergence_scalar(
         x = c(5, 5, 0), y = c(3, 0, 7), q_val = 0, pseudocount = 0.5
     )
-    expect_equal(div_same_smoothed, 0)
+    expect_equal(div_same_smoothed, 0.7)
 })
 
 # ============================================================================

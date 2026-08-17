@@ -313,6 +313,17 @@ NumericVector bootstrap_compute_cpp(NumericVector x, int nboot = 1000,
   
   // Pre-allocate result vector
   NumericVector boot_dist(nboot);
+
+  // Preallocated buffers reused across iterations (allocation hoisting)
+  IntegerVector boot_sample_int(n);
+  NumericVector boot_counts(n);
+  NumericVector boot_props(n);
+
+  if (total > static_cast<double>(INT_MAX)) {
+    Rcpp::stop("Total count exceeds maximum integer value (%d)", INT_MAX);
+  }
+  int total_int = static_cast<int>(std::round(total));
+  if (total_int <= 0) total_int = 1;  // Safety check
   
   // Get R's RNG state for reproducibility
   GetRNGstate();
@@ -321,29 +332,21 @@ NumericVector bootstrap_compute_cpp(NumericVector x, int nboot = 1000,
   // Each iteration: resample counts -> normalize to proportions -> compute entropy
   for (int b = 0; b < nboot; b++) {
     // Generate multinomial bootstrap sample using R::rmultinom
-    IntegerVector boot_sample_int(n);
-    // BUG FIX: Check total against INT_MAX before conversion to avoid overflow
-    if (total > static_cast<double>(INT_MAX)) {
-      Rcpp::stop("Total count exceeds maximum integer value (%d)", INT_MAX);
-    }
-    int total_int = static_cast<int>(std::round(total));
-    if (total_int <= 0) total_int = 1;  // Safety check
     R::rmultinom(total_int, p_hat.begin(), n, boot_sample_int.begin());
-    
-    // Convert to NumericVector for proportion calculation
-    NumericVector boot_counts = as<NumericVector>(boot_sample_int);
-    
-    // CRITICAL: Normalize bootstrap sample from counts to proportions
-    // entropy_cpp() expects proportions, not counts
-    double boot_total = sum(boot_counts);
-    
+
+    // Convert to NumericVector for proportion calculation (buffer reuse)
+    for (int i = 0; i < n; i++) boot_counts[i] = static_cast<double>(boot_sample_int[i]);
+
+    double boot_total = 0.0;
+    for (int i = 0; i < n; i++) boot_total += boot_counts[i];
+
     // Safety check: avoid division by zero
     if (boot_total <= 0) {
       boot_dist[b] = NA_REAL;
       continue;
     }
-    
-    NumericVector boot_props = boot_counts / boot_total;
+
+    for (int i = 0; i < n; i++) boot_props[i] = boot_counts[i] / boot_total;
     
     // Compute Tsallis entropy for this bootstrap replicate
     boot_dist[b] = entropy_cpp(boot_props, q, normalize, log_base);
@@ -357,6 +360,80 @@ NumericVector bootstrap_compute_cpp(NumericVector x, int nboot = 1000,
   // Restore R's RNG state
   PutRNGstate();
   
+  return boot_dist;
+}
+
+// ============================================================================
+// MULTI-Q BOOTSTRAP (audit: resample once, evaluate ALL q per iteration)
+// ============================================================================
+// Returns nboot x n_q matrix. The resampling plan is drawn ONCE per iteration
+// and every q is evaluated on that same resample, which (a) removes the
+// O(Q*B) resampling cost down to O(B), and (b) preserves the joint
+// correlation structure across q. Buffers are preallocated outside the loop.
+//
+// [[Rcpp::export(rng = false)]]
+NumericMatrix bootstrap_compute_multi_q_cpp(NumericVector x, NumericVector q,
+                                            int nboot = 1000, bool normalize = true,
+                                            double log_base = 2.718281828,
+                                            double pseudocount = 0.0) {
+  if (log_base <= 0 || std::abs(log_base - 1.0) < 1e-10) {
+    Rcpp::stop("Invalid log_base (must be > 1, not equal to 1)");
+  }
+  int nq = q.size();
+  if (nq < 1) Rcpp::stop("q must contain at least one value");
+  for (int j = 0; j < nq; j++) {
+    if (q[j] < 0) Rcpp::stop("Invalid q parameter (must be non-negative)");
+  }
+
+  int n = x.size();
+  if (n < 1) Rcpp::stop("Input vector x must have at least 1 element");
+  if (nboot < 1) Rcpp::stop("nboot must be at least 1");
+
+  NumericVector x_adj = x + pseudocount;
+  double total = sum(x_adj);
+
+  NumericMatrix boot_dist(nboot, nq);
+  if (total <= 0) {
+    std::fill(boot_dist.begin(), boot_dist.end(), NA_REAL);
+    return boot_dist;
+  }
+
+  NumericVector p_hat = x_adj / total;
+
+  // Preallocated buffers reused across iterations
+  IntegerVector boot_sample_int(n);
+  NumericVector boot_counts(n);
+  NumericVector boot_props(n);
+
+  if (total > static_cast<double>(INT_MAX)) {
+    Rcpp::stop("Total count exceeds maximum integer value (%d)", INT_MAX);
+  }
+  int total_int = static_cast<int>(std::round(total));
+  if (total_int <= 0) total_int = 1;
+
+  GetRNGstate();
+  for (int b = 0; b < nboot; b++) {
+    R::rmultinom(total_int, p_hat.begin(), n, boot_sample_int.begin());
+
+    for (int i = 0; i < n; i++) boot_counts[i] = static_cast<double>(boot_sample_int[i]);
+
+    double boot_total = 0.0;
+    for (int i = 0; i < n; i++) boot_total += boot_counts[i];
+
+    if (boot_total <= 0) {
+      for (int j = 0; j < nq; j++) boot_dist(b, j) = NA_REAL;
+      continue;
+    }
+
+    for (int i = 0; i < n; i++) boot_props[i] = boot_counts[i] / boot_total;
+
+    for (int j = 0; j < nq; j++) {
+      double val = entropy_cpp(boot_props, q[j], normalize, log_base);
+      boot_dist(b, j) = std::isfinite(val) ? val : NA_REAL;
+    }
+  }
+  PutRNGstate();
+
   return boot_dist;
 }
 
@@ -1061,22 +1138,27 @@ double tsallis_divergence_cpp(NumericVector p, NumericVector r, double q = 1.0,
   if (n == 0) return NA_REAL;
   
   double divergence = 0.0;
-  double q_tol = 1e-6;
+  double q_tol = 1e-10;
   
-  // Special case: q ≈ 0 (Tsallis at q=0 always equals 0)
-  if (q < q_tol) {
-    // D_0(p||r) = (1/(0-1)) * (1 - sum(p^0 * r^1))
-    //           = (-1) * (1 - 1) = 0
-    return 0.0;
+  // Special case: q = 0 (exact, up to numerical tolerance 1e-10).
+  // Convention 0^0 = 0: D_0(p||r) = lim_{q->0} (sum p_i^q r_i^(1-q) - 1)/(q - 1)
+  //                           = 1 - sum_{i: p_i > 0} r_i
+  // i.e. the r-mass on p's zero support. Under pseudocount > 0 all bins are
+  // positive and D_0 = 0.
+  if (std::abs(q - 0.0) < q_tol) {
+    double r_mass_on_p_support = 0.0;
+    for (int i = 0; i < n; i++) {
+      if (p[i] > 1e-15) r_mass_on_p_support += r[i];
+    }
+    divergence = 1.0 - r_mass_on_p_support;
+    if (divergence < 0.0 && divergence > -1e-12) divergence = 0.0;  // roundoff clamp
+    return divergence;
   } 
-  // Special case: q ≈ 1 (KL divergence)
-  // AUDIT FIX #6: For KL, p>0 && r=0 indicates a support violation — the
-  // divergence is mathematically +∞. However, during bootstrap resampling,
-  // multinomial draws can artificially create zero bins. To keep bootstrap
-  // quantiles computable, we return a large finite value (1e10) instead of
-  // R_PosInf. The original code silently skipped these terms, underestimating
-  // divergence. This compromise preserves the directional correctness while
-  // keeping numerical stability during resampling.
+  // Special case: q = 1 (KL divergence), exact up to numerical tolerance 1e-10.
+  // For KL, p>0 && r=0 indicates a support violation — the divergence is
+  // mathematically +Inf. During bootstrap resampling, multinomial draws can
+  // artificially create zero bins; to keep bootstrap quantiles computable we
+  // return a large finite value (1e10) instead of R_PosInf.
   else if (std::abs(q - 1.0) < q_tol) {
     bool has_support_violation = false;
     for (int i = 0; i < n; i++) {
@@ -1092,12 +1174,12 @@ double tsallis_divergence_cpp(NumericVector p, NumericVector r, double q = 1.0,
     if (has_support_violation) {
       return 1e10;  // Large finite value instead of +Inf for bootstrap compatibility
     }
-    // abs() handles numerical underflow while preserving magnitude
-    divergence = std::abs(divergence);
+    // Numerical roundoff clamp only (no abs(): the KL formula is non-negative)
+    if (divergence < 0.0 && divergence > -1e-12) divergence = 0.0;
   } else if (q > 0) {
-    // General Tsallis divergence (Furuichi formula)
-    // AUDIT FIX #6: Correct sign — D_q = (sum(p^q * r^(1-q)) - 1) / (q - 1)
-    //               Previously had (1 - sum_pq_r) / (q - 1) with abs() wrapper.
+    // General Tsallis divergence (Furuichi formula):
+    // D_q(p||r) = (sum_i p_i^q * r_i^(1-q) - 1) / (q - 1)
+    // Implemented directly with the correct sign; abs() is NOT applied.
     
     double sum_pq_r = 0.0;
     bool has_valid_term = false;
@@ -1128,8 +1210,8 @@ double tsallis_divergence_cpp(NumericVector p, NumericVector r, double q = 1.0,
       }
     }
     
-    // AUDIT FIX #6: For q ≥ 1 + q_tol, support violation → large finite value
-    // (1e10) instead of R_PosInf, so bootstrap quantiles remain computable.
+    // For q >= 1 + q_tol, support violation -> large finite value (1e10)
+    // instead of R_PosInf, so bootstrap quantiles remain computable.
     if (has_support_violation) {
       return 1e10;
     }
@@ -1138,22 +1220,141 @@ double tsallis_divergence_cpp(NumericVector p, NumericVector r, double q = 1.0,
     if (!has_valid_term) {
       divergence = 0.0;
     } else {
-      // D_q(p||r) = (1/(q-1)) * (1 - Σ p_i^q * r_i^(1-q))
-      // Use abs() to handle numerical underflow (sum ≈ 1) while preserving magnitude.
-      divergence = std::abs((1.0 - sum_pq_r) / (q - 1.0));
+      // D_q(p||r) = (sum_i p_i^q * r_i^(1-q) - 1) / (q - 1) — correct sign.
+      divergence = (sum_pq_r - 1.0) / (q - 1.0);
+      // Numerical roundoff clamp only; genuine anomalies remain visible.
+      if (divergence < 0.0 && divergence > -1e-12) divergence = 0.0;
     }
   } else {
     return NA_REAL;
   }
-  
-  // AUDIT FIX #6: Removed std::abs(divergence) wrapper — correct sign from formula
-  
+
   // Handle invalid results
   if (std::isnan(divergence) || std::isinf(divergence)) {
     return NA_REAL;
   }
   
   return divergence;
+}
+
+// ============================================================================
+// MULTI-Q TSAILLIS DIVERGENCE VECTOR (exact mirror of .tsallis_divergence_vector)
+// ============================================================================
+// Evaluates D_q(x||y) for ALL q from ONE normalization pass. Semantics mirror
+// the R reference implementation exactly:
+//   - pseudocount normalization: p = (x + pc) / (sum(x) + n*pc)
+//   - q = 0 limit evaluated on UNCLAMPED probabilities
+//   - min_prob = 1e-10 clamp + renormalization ONLY when pseudocount == 0
+//   - q = 1 -> KL in natural log; general branch sum(p^q * r^(1-q)) with a
+//     log-space fallback when powers are non-finite
+//
+// [[Rcpp::export(rng = false)]]
+NumericVector tsallis_divergence_vector_cpp(NumericVector x, NumericVector y,
+                                            NumericVector q_vals,
+                                            double pseudocount = 0.5,
+                                            double log_base = 2.718281828) {
+  int n = x.size();
+  int nq = q_vals.size();
+  NumericVector result(nq, NA_REAL);
+
+  if (n == 0 || static_cast<int>(y.size()) != n) return result;
+
+  for (int i = 0; i < n; i++) {
+    if (ISNAN(x[i]) || ISNAN(y[i])) return result;
+  }
+
+  // Normalize to probabilities with pseudocount (mirrors R)
+  double xsum = 0.0, ysum = 0.0;
+  for (int i = 0; i < n; i++) {
+    xsum += x[i] + pseudocount;
+    ysum += y[i] + pseudocount;
+  }
+  NumericVector p(n), r(n);
+  for (int i = 0; i < n; i++) {
+    p[i] = (x[i] + pseudocount) / xsum;
+    r[i] = (y[i] + pseudocount) / ysum;
+  }
+  for (int i = 0; i < n; i++) {
+    if (ISNAN(p[i]) || ISNAN(r[i])) return result;
+  }
+
+  // q = 0 limit (convention 0^0 = 0) evaluated on the RAW (pre-pseudocount)
+  // support so that D_0 = 1 - sum_{i: X_i > 0} (Y_i / sum Y) keeps its
+  // support-difference meaning even when pseudocount > 0 makes every
+  // regularized bin positive (review_divergence.md, Option A).
+  double q_tol = 1e-10;
+  double q0_value = NA_REAL;
+  double xsum0 = 0.0, ysum0 = 0.0;
+  for (int i = 0; i < n; i++) { xsum0 += x[i]; ysum0 += y[i]; }
+  if (xsum0 > 0 && ysum0 > 0) {
+    for (int j = 0; j < nq; j++) {
+      if (q_vals[j] == 0.0) {
+        double r_mass = 0.0;
+        for (int i = 0; i < n; i++) {
+          if (x[i] > 0) r_mass += y[i] / ysum0;
+        }
+        q0_value = 1.0 - r_mass;
+        if (q0_value < 0 && q0_value > -1e-12) q0_value = 0.0;
+      }
+    }
+  }
+
+  // min_prob clamping ONLY when pseudocount == 0 (mirrors R)
+  if (pseudocount < 1e-10) {
+    double min_prob = 1e-10;
+    for (int i = 0; i < n; i++) {
+      if (p[i] < min_prob) p[i] = min_prob;
+      if (r[i] < min_prob) r[i] = min_prob;
+    }
+    double ps = 0.0, rs = 0.0;
+    for (int i = 0; i < n; i++) { ps += p[i]; rs += r[i]; }
+    for (int i = 0; i < n; i++) { p[i] /= ps; r[i] /= rs; }
+  }
+
+  for (int j = 0; j < nq; j++) {
+    double qv = q_vals[j];
+    if (qv == 0.0) {
+      result[j] = q0_value;
+    } else if (qv > 0 && std::abs(qv - 1.0) < q_tol) {
+      // KL limit in natural log; log_base correction applied like in R
+      double d = 0.0;
+      for (int i = 0; i < n; i++) {
+        d += p[i] * std::log(p[i] / r[i]);
+      }
+      result[j] = (log_base != std::exp(1.0)) ? d / std::log(log_base) : d;
+    } else if (qv > 0) {
+      double sum_term = 0.0;
+      bool bad = false;
+      for (int i = 0; i < n; i++) {
+        double pp = std::pow(p[i], qv);
+        double rp = std::pow(r[i], 1.0 - qv);
+        if (std::isnan(pp) || std::isinf(pp) || std::isnan(rp) || std::isinf(rp)) {
+          bad = true;
+          break;
+        }
+        sum_term += pp * rp;
+      }
+      if (bad) {
+        // Log-space fallback (mirrors R: log(p + 1e-10), natural log)
+        sum_term = 0.0;
+        for (int i = 0; i < n; i++) {
+          double lp = qv * std::log(p[i] + 1e-10);
+          double lr = (1.0 - qv) * std::log(r[i] + 1e-10);
+          sum_term += std::exp(lp + lr);
+        }
+      }
+      result[j] = (sum_term - 1.0) / (qv - 1.0);
+    }
+  }
+
+  // Final numerical safety (mirrors the R tail): clamp only tiny negative
+  // roundoff to zero (no abs()), then replace non-finite with NA.
+  for (int j = 0; j < nq; j++) {
+    if (result[j] < 0.0 && result[j] > -1e-12) result[j] = 0.0;
+    if (!std::isfinite(result[j])) result[j] = NA_REAL;
+  }
+
+  return result;
 }
 
 // Main divergence bootstrap function
@@ -1649,14 +1850,30 @@ NumericVector divergence_bootstrap_flexible_cpp(
     // Step 4: Normalize and compute divergence
     // Truncate both to min length so tsallis_divergence_cpp receives equal-length
     // vectors. Unequal lengths occur naturally when groups have different numbers
-    // of unpaired samples.
+    // of unpaired samples. Renormalize the truncated vectors so each sums to 1
+    // over the common support; otherwise the dropped samples' mass makes the
+    // "probabilities" sub-normalized and the Tsallis formula can return negatives.
     int n_common = std::min(nx, ny);
     NumericVector p_boot(n_common);
     NumericVector r_boot(n_common);
+    double p_boot_sum = 0.0;
+    double r_boot_sum = 0.0;
     
     for (int i = 0; i < n_common; i++) {
-      p_boot[i] = x_boot_counts[i] / x_boot_sum;
-      r_boot[i] = y_boot_counts[i] / y_boot_sum;
+      p_boot[i] = x_boot_counts[i];
+      r_boot[i] = y_boot_counts[i];
+      p_boot_sum += x_boot_counts[i];
+      r_boot_sum += y_boot_counts[i];
+    }
+    
+    if (p_boot_sum <= 1e-10 || r_boot_sum <= 1e-10) {
+      boot_divs[b] = NA_REAL;
+      continue;
+    }
+    
+    for (int i = 0; i < n_common; i++) {
+      p_boot[i] /= p_boot_sum;
+      r_boot[i] /= r_boot_sum;
     }
     
     boot_divs[b] = tsallis_divergence_cpp(p_boot, r_boot, q, log_base);

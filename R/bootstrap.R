@@ -183,8 +183,37 @@ bootstrap_compute_cpp_wrapper <- function(x, q = 1, normalize = TRUE, nboot = 10
         as.numeric(pseudocount_scalar))
 }
 
+#' Multi-q standard bootstrap (one resample -> all q)
+#'
+#' Returns an `nboot x length(q)` matrix. The resampling plan is drawn ONCE
+#' per iteration and every q is evaluated on the same resample, removing the
+#' O(Q*B) resampling cost and preserving the joint correlation across q.
+#'
+#' @noRd
+bootstrap_compute_multi_q_cpp_wrapper <- function(x, q, normalize = TRUE, nboot = 1000L,
+    log_base = exp(1), pseudocount = 0) {
+    .validate_bootstrap_input(x, context = "standard multi-q bootstrap",
+        pseudocount = pseudocount)
+    x <- as.numeric(x)
+
+    if (length(pseudocount) > 1) {
+        if (length(pseudocount) != length(x)) {
+            stop("pseudocount must have length 1 or equal to x length")
+        }
+        x_adj <- x + pseudocount
+        pseudocount_scalar <- 0
+    } else {
+        x_adj <- x
+        pseudocount_scalar <- pseudocount
+    }
+
+    .Call("_TSENAT_bootstrap_compute_multi_q_cpp", PACKAGE = "TSENAT", as.numeric(x_adj),
+        as.numeric(q), as.integer(nboot), as.logical(normalize), as.numeric(log_base),
+        as.numeric(pseudocount_scalar))
+}
+
 # ============================================================================
-# REPLICATE-LEVEL BOOTSTRAP WRAPPER (AUDIT FIX #11)
+# REPLICATE-LEVEL BOOTSTRAP WRAPPER
 # ============================================================================
 
 #' Replicate-Level Bootstrap Entropy Computation
@@ -522,7 +551,7 @@ divergence_bootstrap_flexible_cpp_wrapper <- function(x, y, x_pair_ids, y_pair_i
         return(bootstrap_dist)
     }
 
-    # AUDIT FIX #11: Replicate-level bootstrap — resample entire samples
+    # Replicate-level bootstrap — resample entire samples
     # (columns) with replacement to capture biological variability between
     # replicates. This is in contrast to the default "read" mode which
     # resamples individual reads (multinomial) and only captures sampling noise.
