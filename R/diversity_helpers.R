@@ -66,8 +66,10 @@
 #'
 #' When `norm = TRUE`, the **Tsallis entropy S_q** is scaled to [0, 1] by
 #' dividing by its theoretical maximum at the given \eqn{q}{q} (natural
-#' logarithms for the Shannon limit \eqn{q \to 1}{q → 1}); the result is a
-#' dimensionless measure independent of species count.
+#' logarithms for the Shannon limit \eqn{q \to 1}{q → 1}). For
+#' \eqn{q > 0}{q > 0}, this makes entropy dimensionless and independent of
+#' species count. At \eqn{q = 0}{q = 0}, the normalized value represents
+#' observed isoform richness relative to the annotated isoform universe.
 #'
 #' **Hill numbers D_q are NEVER normalized**: `norm` only applies to the
 #' Tsallis entropy path (`what = "S"`). D_q is always returned on its native
@@ -87,6 +89,13 @@
     }
     if (!is.numeric(x)) {
         stop("x must be numeric")
+    }
+
+    # Negative expression values are invalid input: they would be silently
+    # discarded downstream, computing entropy on a different abundance vector
+    # than the user supplied (audit 2026-08-17).
+    if (any(x < 0, na.rm = TRUE)) {
+        stop("Input expression values must be non-negative.", call. = FALSE)
     }
 
     # Discontinuity guard (audit3): for q != 1 the Tsallis entropy is
@@ -115,12 +124,12 @@
         if (length(effective_length) != length(x)) {
             stop("effective_length must have same length as x")
         }
-        # Check for valid effective_length values (must be positive)
-        invalid_length_idx <- which(effective_length <= 0 | is.na(effective_length))
+        # Check for valid effective_length values (must be finite and positive)
+        invalid_length_idx <- which(!is.finite(effective_length) | effective_length <= 0)
         if (length(invalid_length_idx) > 0) {
             stop("[.calculate_diversity] CRITICAL: ",
                  length(invalid_length_idx), " out of ", length(effective_length),
-                 " transcripts have invalid effective_length (<=0 or NA). ",
+                 " transcripts have invalid effective_length (<=0, NA, NaN, or Inf). ",
                  "These transcripts are unreliable and must be filtered before analysis. ",
                  "Affected transcript indices: ", paste(head(invalid_length_idx, 5), collapse=", "),
                  if(length(invalid_length_idx) > 5) paste(", ... and", length(invalid_length_idx)-5, "more") else "",
@@ -1028,7 +1037,10 @@
     lower <- quantile(bootstrap_dist, probs = p_low, type = 7, names = FALSE)
     upper <- quantile(bootstrap_dist, probs = p_high, type = 7, names = FALSE)
 
-    return(list(lower = lower, upper = upper))
+    # Also return the acceleration factor and the leave-one-out jackknife
+    # estimates used for it, so tests can verify the BCa jackknife implements
+    # exactly the same estimator as the point estimate (audit 2026-08-17).
+    return(list(lower = lower, upper = upper, a = a, jackknife = theta_jack))
 }
 
 #' Estimate Hyperparameters for Empirical Bayes Shrinkage

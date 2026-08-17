@@ -496,8 +496,13 @@ divergence_bootstrap_flexible_cpp_wrapper <- function(x, y, x_pair_ids, y_pair_i
     pseudocount_eff <- pseudocount
     if (!is.null(effective_length) && length(effective_length) == length(x)) {
         x_abund <- x/effective_length
-        # Zero out NaN/Inf values from zero effective_lengths
-        x_abund[!is.finite(x_abund)] <- 0
+        # Invalid effective lengths must FAIL, not silently become zeros
+        # (audit 2026-08-17: a zero length previously turned C/0 -> Inf -> 0,
+        # silently dropping the transcript from the resampling input).
+        if (any(!is.finite(x_abund))) {
+            stop("[.prepare_bootstrap_resample] effective_length normalization produced non-finite abundances. effective_length must contain finite positive values.",
+                call. = FALSE)
+        }
         x_adj <- x_abund + pseudocount
         sum_original <- sum(x)
         sum_adj <- sum(x_adj)

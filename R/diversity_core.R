@@ -420,6 +420,9 @@
     if (!is.numeric(x) || any(is.na(x))) {
         stop("Input data must be numeric and contain no NAs!", call. = FALSE)
     }
+    if (any(x < 0)) {
+        stop("Input expression values must be non-negative.", call. = FALSE)
+    }
     if (nrow(x) != length(genes)) {
         stop("The number of rows is not equal to the given gene set.", call. = FALSE)
     }
@@ -445,6 +448,34 @@
     if (isTRUE(tpm) && !is.null(effective_length)) {
         stop("[.prepare_diversity_data] tpm = TRUE with effective_length is invalid: TPM already incorporates effective-length normalization. Use raw counts (tpm = FALSE) with effective-length correction, or set effective_length = NULL when analysing TPM.",
             call. = FALSE)
+    }
+
+    # AUDIT 2026-08-17: validate effective_length at the main diversity input
+    # boundary. Previously the multi-gene path (.tsallis_row) divided counts
+    # by effective_length directly, bypassing the validation in
+    # .calculate_tsallis_entropy(), so an invalid length could silently become
+    # zeros/NA instead of failing.
+    if (!is.null(effective_length)) {
+        el <- effective_length
+        if (is.data.frame(el)) {
+            el <- as.matrix(el)
+        }
+        if (is.vector(el) && !is.matrix(el)) {
+            if (length(el) != nrow(x)) {
+                stop("effective_length must have one value per transcript (length == nrow(x)).",
+                    call. = FALSE)
+            }
+        } else if (is.matrix(el)) {
+            if (!identical(dim(el), dim(x))) {
+                stop("effective_length matrix must have the same dimensions as the input data (transcripts x samples).",
+                    call. = FALSE)
+            }
+        } else {
+            stop("effective_length must be a numeric vector or matrix.", call. = FALSE)
+        }
+        if (any(!is.finite(el)) || any(el <= 0)) {
+            stop("effective_length must contain finite positive values.", call. = FALSE)
+        }
     }
 
     # AUDIT FINAL2: resolve pseudocount = "auto" AFTER the input

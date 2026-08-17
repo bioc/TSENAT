@@ -548,7 +548,8 @@
     }
     if (any(q < 0)) {
         stop("q parameter must be >= 0. ", "Note: q should be in range [0, 3] for typical use. ",
-            "q=0 represents uniform divergence. ", "Got: ", paste(q, collapse = ", "))
+            "q=0 represents a support-based divergence limit (D_0(P||Q) = 1 - sum_{P_i>0} Q_i). ",
+            "Got: ", paste(q, collapse = ", "))
     }
     q
 }

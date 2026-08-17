@@ -10,6 +10,9 @@
 #'   \item Bootstrap confidence intervals: Quantify uncertainty in divergence estimates
 #'   \item Multiple testing correction: Hochberg, Benjamini-Yekutieli, or no correction
 #'   \item Paired designs: Supports paired/repeated measures via subject_col parameter
+#'   \item Partially paired designs: Incomplete pairs (a sample missing its
+#'     control or treatment counterpart) are treated as unpaired units and do
+#'     not receive the paired covariance treatment
 #'   \item Effect size reporting: Log-fold-change and confidence intervals per gene
 #'   \item Flexible control group: Compare any condition vs. any other condition
 #' }

@@ -41,8 +41,14 @@
         stop("q must be non-negative")
     }
 
-        # Filter out only negative values (zeros contribute 0 to entropy)
-    # Filter out only negative values (zeros contribute 0 to entropy)
+    # Negative proportions are invalid input: silently discarding them would
+    # compute entropy on a different abundance vector than the user supplied
+    # (audit 2026-08-17: reject instead of filter).
+    if (any(proportions < 0)) {
+        stop("Proportions must be non-negative.", call. = FALSE)
+    }
+
+    # Keep only positive proportions (zeros contribute 0 to entropy).
     # Removed >1e-15 threshold — zeros are valid, consistent with C++ fix #17
     p_nonzero <- proportions[proportions >= 0]
 

@@ -950,19 +950,20 @@ test_that(".bootstrap_resample_optimized with paired=TRUE and what='D'", {
   expect_equal(length(result), 5)
 })
 
-test_that(".bootstrap_resample_optimized handles effective_length zero values", {
+test_that(".bootstrap_resample_optimized rejects zero effective_length instead of zeroing out", {
   counts <- c(100, 80, 60, 40, 20)
-  # Includes zero effective length
+  # Includes zero effective length: invalid quantification input must fail
+  # loudly, not silently become C/0 -> Inf -> 0 (audit 2026-08-17).
   eff_length <- c(1000, 0, 800, 700, 600)
-  
-  result <- TSENAT:::.bootstrap_resample_optimized(
-    x = counts, q = 2.0, norm = "none", nboot = 8,
-    log_base = 2, pseudocount = 0.5, what = "S", paired = FALSE,
-    effective_length = eff_length
+
+  expect_error(
+    TSENAT:::.bootstrap_resample_optimized(
+      x = counts, q = 2.0, norm = "none", nboot = 8,
+      log_base = 2, pseudocount = 0.5, what = "S", paired = FALSE,
+      effective_length = eff_length
+    ),
+    "non-finite|finite positive"
   )
-  
-  expect_is(result, "numeric")
-  expect_equal(length(result), 8)
 })
 
 test_that(".bootstrap_resample_optimized with different q values", {
