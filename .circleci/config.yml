@@ -62,7 +62,7 @@ jobs:
       - configure_r
       - restore_cache:
           keys:
-            - v2-r-packages-{{ checksum "DESCRIPTION" }}-r4.5.2
+            - v3-r-packages-{{ checksum "DESCRIPTION" }}-r4.5.2
       - run:
           name: Install package dependencies
           command: |
@@ -97,12 +97,25 @@ jobs:
               bioc_sug <- setdiff(suggests, avail_cran)
               if (length(bioc_sug)) BiocManager::install(bioc_sug, update = FALSE, ask = FALSE)
             }
+
+            # Fail the job if anything is still missing: install.packages() and
+            # BiocManager::install() can emit warnings instead of errors, and a
+            # half-installed library must never be saved to the cache (it breaks
+            # downstream build/check jobs with "dependency not available").
+            imports <- read.dcf("DESCRIPTION")[1, c("Imports", "LinkingTo")]
+            imports <- trimws(strsplit(gsub("\n", " ", paste(imports, collapse = ", ")), ",")[[1]])
+            needed <- unique(c(imports, suggests))
+            missing <- needed[!vapply(needed, requireNamespace, logical(1), quietly = TRUE)]
+            if (length(missing)) {
+              cat("ERROR: still not installed:", paste(missing, collapse = ", "), "\n")
+              quit(status = 1)
+            }
             EOF
           no_output_timeout: 45m
       - save_cache:
           paths:
             - /usr/local/lib/R/site-library
-          key: v2-r-packages-{{ checksum "DESCRIPTION" }}-r4.5.2
+          key: v3-r-packages-{{ checksum "DESCRIPTION" }}-r4.5.2
 
   build:
     docker:
@@ -114,7 +127,7 @@ jobs:
       - configure_r
       - restore_cache:
           keys:
-            - v2-r-packages-{{ checksum "DESCRIPTION" }}-r4.5.2
+            - v3-r-packages-{{ checksum "DESCRIPTION" }}-r4.5.2
       - run:
           name: Build package (with vignettes)
           command: |
@@ -139,7 +152,7 @@ jobs:
       - configure_r
       - restore_cache:
           keys:
-            - v2-r-packages-{{ checksum "DESCRIPTION" }}-r4.5.2
+            - v3-r-packages-{{ checksum "DESCRIPTION" }}-r4.5.2
       - attach_workspace:
           at: /root/repo
       - run:
@@ -178,7 +191,7 @@ jobs:
       - configure_r
       - restore_cache:
           keys:
-            - v2-r-packages-{{ checksum "DESCRIPTION" }}-r4.5.2
+            - v3-r-packages-{{ checksum "DESCRIPTION" }}-r4.5.2
       - run:
           name: Configure compiler environment
           command: |
