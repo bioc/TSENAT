@@ -1,25 +1,22 @@
 # ============================================================================
-library(microbenchmark)
-library(testthat)
-
-# ============================================================================
 # PERFORMANCE REGRESSION TESTS
 # ============================================================================
 # These tests verify that critical functions maintain acceptable performance
 # and don't regress when code is refactored.
 #
-# Run with: devtools::test("tests/testthat/test-performance.R")
+# Skipped by default: they are resource-intensive and require the optional
+# 'microbenchmark' package, which is not installed in the CI check job. To
+# execute them, set RUN_PERFORMANCE_TESTS=true, e.g.:
+#   RUN_PERFORMANCE_TESTS=true Rscript -e 'testthat::test_file("tests/testthat/test-infrastructure-performance.R")'
 
-# SKIP ALL TESTS IF RUNNING COVERAGE ANALYSIS (performance tests are slow and not needed for coverage)
-
-
-
-if (identical(Sys.getenv("SKIP_PERFORMANCE_TESTS"), "true")) {
-  cat("Skipping all performance tests (SKIP_PERFORMANCE_TESTS environment variable set)\n")
-} else {
-  # UNCOMMENT THE LINE BELOW TO RUN PERFORMANCE TESTS
+# This guard must stay at the very top of the file, before any library()
+# calls, so the file is skipped cleanly when its optional dependencies are
+# unavailable.
+if (!identical(Sys.getenv("RUN_PERFORMANCE_TESTS"), "true")) {
   skip("Performance tests skipped by default - resource-intensive")
 }
+
+library(testthat)
 
 # Setup: Load real TSENAT data like in roxygen documentation
 setup_real_test_analysis <- function(n_genes = NULL, n_samples = NULL) {
